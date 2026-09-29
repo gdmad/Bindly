@@ -15,6 +15,7 @@ struct LanguageToolConnectionSection: View {
     @State private var ok: Bool?
     @State private var testing = false
     @State private var modeDraft: LanguageToolMode = .free
+    @State private var targetDraft: LanguageToolTarget = .custom
     @State private var testTask: Task<Void, Never>?
     /// A token stored while typing still needs one engine rebuild.
     @State private var tokenPendingReconfigure = false
@@ -38,14 +39,31 @@ struct LanguageToolConnectionSection: View {
                 urlDraft = url
             }
 
+            // Both stay configured: switching never discards the custom URL or the installed server.
+            if modeDraft == .selfHosted {
+                Picker("Server", selection: $targetDraft) {
+                    ForEach(LanguageToolTarget.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: targetDraft) { _, target in
+                    resetTest()
+                    DispatchQueue.main.async { appState.settings.languageToolTarget = target }
+                }
+            }
+
             LabeledContent("Server URL") {
-                TextField("", text: $urlDraft,
-                          prompt: Text("https://api.languagetool.org/v2"))
-                    .labelsHidden().textFieldStyle(.plain).darkField()
-                    .onChange(of: urlDraft) { _, url in
-                        // Deferred: onChange fires inside the view update.
-                        DispatchQueue.main.async { appState.settings.languageToolBaseURL = url }
-                    }
+                if modeDraft == .selfHosted && targetDraft == .local {
+                    Text(appState.settings.localServerURL)
+                        .foregroundStyle(.secondary).textSelection(.enabled)
+                } else {
+                    TextField("", text: $urlDraft,
+                              prompt: Text("https://api.languagetool.org/v2"))
+                        .labelsHidden().textFieldStyle(.plain).darkField()
+                        .onChange(of: urlDraft) { _, url in
+                            // Deferred: onChange fires inside the view update.
+                            DispatchQueue.main.async { appState.settings.languageToolBaseURL = url }
+                        }
+                }
             }
             // Credentials belong to Premium only: the public server rejects them, and a self-hosted
             // server is reached by URL.
@@ -81,9 +99,10 @@ struct LanguageToolConnectionSection: View {
                 Text(status).font(.caption).foregroundStyle(.secondary)
             }
         } header: {
-            helpHeader("LanguageTool server", "How BindAll reaches LanguageTool.\n\nFree public: api.languagetool.org, no account, rate-limited, and your text is sent to languagetool.org. Credentials are never sent (the public server rejects them).\n\nPremium: api.languagetoolplus.com (a different host) with the username and token from your LanguageTool Premium account.\n\nSelf-hosted: your own server URL, no credentials.\n\nThe URL is pre-filled per mode but stays editable.")
+            helpHeader("LanguageTool server", "How BindAll reaches LanguageTool.\n\nFree public: api.languagetool.org, no account, rate-limited, and your text is sent to languagetool.org. Credentials are never sent (the public server rejects them).\n\nPremium: api.languagetoolplus.com (a different host) with the username and token from your LanguageTool Premium account.\n\nSelf-hosted: a server BindAll installs and runs on this Mac, or your own server URL; no credentials. Both stay configured, so you can switch between them.\n\nThe URL is pre-filled per mode but stays editable.")
         }
         .onAppear { load() }
+        .onChange(of: appState.settings.languageToolTarget) { _, target in targetDraft = target }
         .onDisappear {
             commitToken()
             // A verdict must not survive a tab switch, and an in-flight test must not surface later.
@@ -111,6 +130,7 @@ struct LanguageToolConnectionSection: View {
 
     private func load() {
         modeDraft = appState.settings.languageToolMode
+        targetDraft = appState.settings.languageToolTarget
         tokenDraft = appState.languageToolToken()
         urlDraft = appState.settings.languageToolBaseURL
         usernameDraft = appState.settings.languageToolUsername

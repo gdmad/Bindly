@@ -24,6 +24,16 @@ final class AppState: ObservableObject {
     /// True while the user is recording a shortcut in Settings (pauses global hotkeys).
     @Published var isRecordingShortcut: Bool = false
 
+    /// The portable LanguageTool server (install, run, update, remove).
+    let localServer = LocalServerManager()
+    private var cancellables = Set<AnyCancellable>()
+
+    /// The part of the settings that decides whether the local server should be up, and where.
+    private struct LocalServerPlan: Equatable {
+        let wanted: Bool
+        let port: Int
+    }
+
     init() {
         if let data = UserDefaults.standard.data(forKey: Self.settingsKey),
            let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
@@ -31,6 +41,14 @@ final class AppState: ObservableObject {
         } else {
             settings = Settings()
         }
+        localServer.appState = self
+        // Also fires for the initial value, which is what starts the server at launch.
+        $settings
+            .map { LocalServerPlan(wanted: $0.usesLocalServer, port: $0.localServerPort) }
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.localServer.sync() }
+            .store(in: &cancellables)
     }
 
     private func persist() {

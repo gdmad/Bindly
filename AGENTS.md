@@ -65,6 +65,11 @@ BindAll/
 │   ├── PromptParser.swift      # separator split + action-key resolution
 │   ├── ActionRouter.swift      # EngineFactory (builds an AIEngine from settings)
 │   └── MaskAISlop.swift        # typography normalizer (dashes/quotes/emoji)
+├── LocalServer/                # portable LanguageTool: own JRE + server in one folder, nothing system-wide
+│   ├── LocalServerManager.swift   # @Observable owner: install/update/start/stop/remove state machine
+│   ├── LocalServerInstaller.swift # download, verify, unpack into .staging, atomic swap, remove
+│   ├── LocalServerProcess.swift   # the java child, PID file, readiness poll, orphan reaping
+│   └── LocalServerLayout/Port/Release/Manifest/State/Error, FileDownloader, CommandRunner
 ├── UI/
 │   ├── SettingsView.swift      # tabs: General, Actions, Translation, Autocomplete, Proofread, Providers (each feature owns its tab, including its on/off switch); `toggleRow(title, help, isOn:)` is the shared pattern for a Form toggle with a help hint -- keeps the hint's `Button` out of the Toggle's own label
 │   ├── AutocompleteSettingsView.swift  # autocomplete tab (on/off, count, layout, language, learning, per-app)
@@ -72,7 +77,8 @@ BindAll/
 │   ├── AppFilterSection.swift          # shared per-app allow/deny section (autocomplete + proofread)
 │   ├── ActionKeysSettingsView.swift
 │   ├── ProvidersSettingsView.swift     # engine picker + AI providers (keys, models)
-│   ├── LanguageToolConnectionSection.swift # LT mode/URL/credentials block on the Proofread tab
+│   ├── LanguageToolConnectionSection.swift # LT mode/target/URL/credentials block on the Proofread tab
+│   ├── LocalServerSection.swift        # install/run/update/remove block (Self-hosted mode) + its Status/Port/Update/Progress rows
 │   ├── PopupKit.swift          # shared popup metrics/panel/placement/tile measuring (AppKit geometry, not views)
 │   ├── PopupPresenter.swift    # owns a popup's non-activating panel; generic present(view), no AnyView
 │   ├── PopupChrome.swift       # material panel + hairline border modifier (reads Reduce Transparency from the environment)
@@ -207,6 +213,24 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   wire for Premium only; `LanguageToolEngine.authParams` is a final guard that never sends a
   lone username or apiKey. The Premium token lives in the Keychain. The URL is pre-filled per mode
   but stays editable; there is no settings migration (mode defaults to Free).
+  **Self-hosted has two targets** (`LanguageToolTarget`), kept side by side so switching loses
+  nothing: **Local server** (installed by BindAll, address derived from `localServerPort`) and
+  **Custom URL** (`languageToolBaseURL`). `Settings.usesLocalServer` says which is live.
+- **Local LanguageTool server** (`LocalServer/`, opt-in from Settings -> Proofread -> Self-hosted):
+  the user clicks Install and BindAll downloads Temurin 21 JRE (Adoptium API, SHA-256 verified) and
+  `LanguageTool-stable.zip` (no published checksum: only unpacking success is checked) into
+  `~/Library/Application Support/BindAll/LanguageTool/` (`jre/`, `server/`, `install.json`,
+  `server.log`, `server.pid`). Nothing else on disk, no system Java, ~540 MB. Downloads are prepared
+  in `.staging` and swapped in atomically, so a failed update keeps the old files. The server
+  (`java -cp languagetool-server.jar ...HTTPServer --port N`, loopback only) is started by
+  `LocalServerManager.sync()` whenever the local target is selected (also at launch, driven by
+  `AppState`'s settings sink) and stopped on target/mode change, Stop, Remove and quit
+  (`stopForTermination`). A busy port moves the server to the next free one, saves it and shows a
+  notice. A crashed run's leftover java is reaped from `server.pid` (only if its command line is inside
+  our folder). Updates are never automatic: a weekly passive check (HEAD on the zip + Adoptium
+  metadata) sets `manifest.available`, the user presses Update; JRE stays on Java 21. Remove deletes the
+  whole folder and falls back via `Settings.localServerRemoved()`. Dragging the app to the Trash does
+  not remove the folder (documented in the info hint).
 - **Writing results back:** the frontmost app is captured when an action starts; the result is pasted
   with Cmd+V (reliable across native and Electron/Chromium apps). If focus moved to another app while
   the engine worked, the original app is re-activated first so the result lands where it started.

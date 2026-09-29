@@ -52,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     func applicationWillTerminate(_ notification: Notification) {
         coordinator.stop()
+        appState.localServer.stopForTermination()
         AutocompleteLearningStore.shared.flush() // save any words learned in the debounce window
     }
 

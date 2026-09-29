@@ -29,7 +29,10 @@ No Dock icon: BindAll lives in the menu bar (`LSUIElement`); the icon pulses whi
   checked by a [LanguageTool](https://languagetool.org) server (public, self-hosted, or Premium) and
   every issue is underlined in place. Click an underlined word to pick a fix; Tab moves to the next
   issue, and applying a fix walks straight to the next one when several are found. No shortcut
-  involved. Enable and configure it all on the Proofread tab.
+  involved. Enable and configure it all on the Proofread tab. In Self-hosted mode BindAll can install
+  and run its own portable LanguageTool (own Java runtime, one folder, ~540 MB, listens on this Mac
+  only) with one click, and remove it completely with another; a server of your own stays available
+  as a second choice.
 - **Providers** — Apple on-device (default), DeepSeek, OpenRouter, OpenAI, Ollama. Add an API key,
   pick a model, Test connection. OpenRouter has a "free models only" filter.
 - **History** — the last results are kept locally and reachable from the menu bar (click to copy).

@@ -125,6 +125,22 @@ enum LanguageToolMode: String, Codable, CaseIterable {
     }
 }
 
+/// Where a self-hosted LanguageTool lives. The two are not mutually exclusive: the user's own server
+/// URL is kept while the local one is in use, so switching back loses nothing.
+enum LanguageToolTarget: String, Codable, CaseIterable {
+    /// The portable server BindAll installs and runs itself (`LocalServer*`).
+    case local
+    /// A server the user runs; its address is `languageToolBaseURL`.
+    case custom
+
+    var displayName: String {
+        switch self {
+        case .local: return "Local server"
+        case .custom: return "Custom URL"
+        }
+    }
+}
+
 // MARK: - Popup layout
 
 /// How the floating popups arrange their items. Shared by autocomplete suggestions and proofread
@@ -221,12 +237,34 @@ struct Settings: Codable, Equatable {
     var languageToolBaseURL: String = "https://api.languagetool.org/v2"  // used only in self-hosted mode
     var languageToolUsername: String = ""           // Premium account email
     var languageToolLanguage: String = "auto"        // BCP-47 code or "auto"
+    var languageToolTarget: LanguageToolTarget = .custom // self-hosted only: installed server or own URL
+    var localServerPort: Int = LocalServerPort.defaultPort
+
+    /// The address of the installed local server. Derived from the port, never stored as a URL.
+    var localServerURL: String { "http://127.0.0.1:\(localServerPort)/v2" }
+
+    /// True while requests go to the server BindAll runs itself.
+    var usesLocalServer: Bool { languageToolMode == .selfHosted && languageToolTarget == .local }
+
+    /// The local server is gone: fall back to the user's own URL, or to the public server when there
+    /// is none (a blank field or one of the built-in addresses is not "their own").
+    mutating func localServerRemoved() {
+        guard languageToolTarget == .local else { return }
+        languageToolTarget = .custom
+        let url = languageToolBaseURL.trimmingCharacters(in: .whitespaces)
+        let builtIn = LanguageToolMode.allCases.compactMap(\.defaultURL)
+        if languageToolMode == .selfHosted && (url.isEmpty || builtIn.contains(url)) {
+            languageToolMode = .free
+        }
+    }
 
     /// The base URL, username and apiKey to actually put on the wire, resolved from the mode.
     /// Only Premium sends credentials: the public server rejects them, and a self-hosted server is
     /// reached by URL alone. `token` is read from the Keychain by the caller.
     func languageToolConnection(token: String) -> (baseURL: String, username: String, apiKey: String) {
         switch languageToolMode {
+        case .selfHosted where languageToolTarget == .local:
+            return (localServerURL, "", "")
         case .free, .selfHosted:
             return (languageToolBaseURL, "", "")
         case .premium:
@@ -270,6 +308,7 @@ extension Settings {
              proofreadMinLength, proofreadAppMode, proofreadApps,
              historyEnabled, sourceLanguage, targetLanguage,
              correctEnabled, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
+             languageToolTarget, localServerPort,
              openRouterFreeOnly, providers, defaultActionHotkey, translateHotkey,
              screenTranslateHotkey, quickTranslateHotkey
     }
@@ -325,6 +364,8 @@ extension Settings {
         if let v = try c.decodeIfPresent(String.self, forKey: .languageToolUsername) { languageToolUsername = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .languageToolLanguage) { languageToolLanguage = v }
         if let v = try c.decodeIfPresent(LanguageToolMode.self, forKey: .languageToolMode) { languageToolMode = v }
+        if let v = try c.decodeIfPresent(LanguageToolTarget.self, forKey: .languageToolTarget) { languageToolTarget = v }
+        if let v = try c.decodeIfPresent(Int.self, forKey: .localServerPort) { localServerPort = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .openRouterFreeOnly) { openRouterFreeOnly = v }
         if let v = try c.decodeIfPresent([ProviderConfig].self, forKey: .providers) { providers = v }
         if let v = try c.decodeIfPresent(HotkeyConfig.self, forKey: .defaultActionHotkey) { defaultActionHotkey = v }

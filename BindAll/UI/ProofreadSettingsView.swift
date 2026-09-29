@@ -46,6 +46,9 @@ struct ProofreadSettingsView: View {
             }
 
             LanguageToolConnectionSection()
+            if appState.settings.languageToolMode == .selfHosted {
+                LocalServerSection()
+            }
 
             AppFilterSection(title: "Apps",
                              help: "Limit where proofreading runs. 'Only selected' checks just the listed apps; 'All except' leaves them alone.",
