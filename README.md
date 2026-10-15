@@ -33,6 +33,12 @@ No Dock icon: BindAll lives in the menu bar (`LSUIElement`); the icon pulses whi
   and run its own portable LanguageTool (own Java runtime, one folder, ~540 MB, listens on this Mac
   only) with one click, and remove it completely with another; a server of your own stays available
   as a second choice.
+  **Google Docs and other sites:** Google Docs draws its text on a canvas that macOS accessibility
+  cannot read, so BindAll cannot check it. Use the LanguageTool browser extension there and point it
+  at the same server: in the extension's settings, Advanced settings -> local or other server, URL
+  `http://127.0.0.1:<port>/v2` for BindAll's local server (or your self-hosted URL). Some users report
+  the extension failing against a local server in Chromium, and the extension's own terms may change,
+  so check it works before relying on it.
 - **Providers** — Apple on-device (default), DeepSeek, OpenRouter, OpenAI, Ollama. Add an API key,
   pick a model, Test connection. OpenRouter has a "free models only" filter.
 - **History** — the last results are kept locally and reachable from the menu bar (click to copy).

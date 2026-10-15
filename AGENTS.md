@@ -216,6 +216,9 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   **Self-hosted has two targets** (`LanguageToolTarget`), kept side by side so switching loses
   nothing: **Local server** (installed by BindAll, address derived from `localServerPort`) and
   **Custom URL** (`languageToolBaseURL`). `Settings.usesLocalServer` says which is live.
+- **Google Docs** is not supported: it renders to a canvas, so there is no AX text or word geometry.
+  Only extensions Google allowlists (Grammarly, LanguageTool) get its text; the README points users
+  to the LanguageTool extension configured with BindAll's server (`http://127.0.0.1:<port>/v2`).
 - **Local LanguageTool server** (`LocalServer/`, opt-in from Settings -> Proofread -> Self-hosted):
   the user clicks Install and BindAll downloads Temurin 21 JRE (Adoptium API, SHA-256 verified) and
   `LanguageTool-stable.zip` (no published checksum: only unpacking success is checked) into
