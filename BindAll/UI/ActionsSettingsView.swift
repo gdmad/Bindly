@@ -22,6 +22,15 @@ struct ActionsSettingsView: View {
             }
 
             Section {
+                HelpToggleRow("From the star menu", "Before Fix, Fix spelling, an action key or a custom prompt from a star replaces your text, show what will change (added words highlighted, removed ones struck through). Apply with Return, Esc to cancel.",
+                              isOn: $appState.settings.previewFromMenu)
+                HelpToggleRow("From the shortcuts", "The same preview for the global shortcuts. Off by default: the shortcuts are the quick path.",
+                              isOn: $appState.settings.previewFromHotkeys)
+            } header: {
+                Text("Preview before replacing")
+            }
+
+            Section {
                 LabeledContent("Separator") {
                     TextField("Separator", text: deferredWrite($appState.settings.separator))
                         .labelsHidden()

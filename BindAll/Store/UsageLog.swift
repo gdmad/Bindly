@@ -3,7 +3,8 @@ import Foundation
 
 /// What BindAll feature an event is about.
 enum UsageFeature: String, Codable, CaseIterable {
-    case autocomplete, proofread, fix, actionKey, translate, ocr, quickTranslate, translationPopup
+    case autocomplete, proofread, fix, actionKey, translate, ocr, quickTranslate, translationPopup,
+         star, preview, customPrompt, spelling
 }
 
 /// What happened. "Shown" without a following "accepted"/"applied" is the interesting part: it is

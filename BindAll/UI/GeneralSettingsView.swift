@@ -27,6 +27,15 @@ struct GeneralSettingsView: View {
             }
 
             Section {
+                HelpToggleRow("Star in text fields", "A violet star in the bottom-right corner of the text field you are in. Click it for actions on the whole text: Fix, Fix spelling, Translate, your action keys, a custom prompt, and the issues Proofread found.",
+                              isOn: $appState.settings.starFieldEnabled)
+                HelpToggleRow("Star at a selection", "A violet star at the end of selected text, with the same actions for just the selection. While something is selected, the field's star steps aside, so there is only ever one.",
+                              isOn: $appState.settings.starSelectionEnabled)
+            } header: {
+                HelpHeader("Stars", "Stars follow the app list on the Proofread tab, and never show in password fields or very small fields.")
+            }
+
+            Section {
                 Stepper("Text size: \(appState.settings.popupFontSize) pt",
                         value: $appState.settings.popupFontSize, in: 10...20)
             } header: {

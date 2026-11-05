@@ -15,6 +15,9 @@ final class HotkeyCoordinator {
     private let autocomplete = AutocompleteController()
     private let proofread = ProofreadController()
     private lazy var quickTranslate = QuickTranslateController(appState: appState)
+    private let stars = FieldStarController()
+    private let preview = PreviewController()
+    private let customPrompt = CustomPromptController()
 
     private var translationWindow: NSWindow?
     private var settingsObserver: Task<Void, Never>?
@@ -45,6 +48,7 @@ final class HotkeyCoordinator {
         }
         updateAutocomplete()
         updateProofread()
+        setupStars()
 
         // Every settings change -- or a key/token change in the Keychain -- re-applies everything; each
         // step is cheap and idempotent. The first value is the current one, already applied just
@@ -59,6 +63,7 @@ final class HotkeyCoordinator {
                 self.refreshStatus()
                 self.updateAutocomplete()
                 self.updateProofread()
+                self.updateStars()
             }
         }
 
@@ -130,7 +135,170 @@ final class HotkeyCoordinator {
         }
     }
 
+    // MARK: - Stars
+
+    private func setupStars() {
+        stars.appAllowed = { [weak self] in self?.proofreadAppAllowed() ?? false }
+        stars.onOpen = { [weak self] context, view in self?.openStarMenu(context, at: view) }
+        updateStars()
+    }
+
+    private func updateStars() {
+        let s = appState.settings
+        let on = s.enabled && AccessibilityPermission.isGranted
+        stars.apply(FieldStarController.Config(fieldEnabled: on && s.starFieldEnabled,
+                                               selectionEnabled: on && s.starSelectionEnabled))
+    }
+
+    /// Stars follow the Proofread app filter: an app where checking is unwanted wants no star either.
+    private func proofreadAppAllowed() -> Bool {
+        let s = appState.settings
+        let bundle = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
+        switch s.proofreadAppMode {
+        case "allow": return s.proofreadApps.contains(bundle)
+        case "deny": return !s.proofreadApps.contains(bundle)
+        default: return true
+        }
+    }
+
+    /// What a star menu item does.
+    enum StarAction {
+        case fix, spelling, translate
+        case actionKey(ActionKey)
+        case prompt(String, showOnly: Bool)
+    }
+
+    private func openStarMenu(_ context: StarContext, at view: NSView) {
+        let menu = NSMenu()
+        func add(_ title: String, _ symbol: String, _ action: @escaping () -> Void) {
+            let item = ClosureMenuItem(title: title, action: action)
+            item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+            menu.addItem(item)
+        }
+        add("Fix", "wand.and.stars") { [weak self] in self?.runStarAction(.fix, context) }
+        add("Fix spelling", "textformat.abc") { [weak self] in self?.runStarAction(.spelling, context) }
+        add("Translate", "globe") { [weak self] in self?.runStarAction(.translate, context) }
+        let keys = appState.settings.actionKeys.filter { !$0.prompt.isEmpty }
+        if !keys.isEmpty {
+            menu.addItem(.separator())
+            for key in keys {
+                let title = key.label.isEmpty ? key.key : key.label
+                add(title, "sparkle") { [weak self] in self?.runStarAction(.actionKey(key), context) }
+            }
+        }
+        menu.addItem(.separator())
+        add("Custom prompt…", "text.bubble") { [weak self] in self?.askForPrompt(context) }
+        if !context.isSelection {
+            let count = proofread.issueCount(in: context.element)
+            if count > 0 {
+                menu.addItem(.separator())
+                add(count == 1 ? "1 issue: show it" : "\(count) issues: show the first", "text.magnifyingglass") { [weak self] in
+                    UsageLog.record(.star, .accepted, detail: "proofread")
+                    self?.proofread.showFirstIssue()
+                }
+            }
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.height + 2), in: view)
+    }
+
+    private func askForPrompt(_ context: StarContext) {
+        UsageLog.record(.customPrompt, .shown)
+        customPrompt.show(recent: appState.settings.recentPrompts,
+                          scope: context.isSelection ? "Selection" : "Whole text",
+                          near: context.anchor) { [weak self] prompt, showOnly, save in
+            self?.rememberPrompt(prompt, saveAsActionKey: save)
+            self?.runStarAction(.prompt(prompt, showOnly: showOnly), context)
+        }
+    }
+
+    private func rememberPrompt(_ prompt: String, saveAsActionKey: Bool) {
+        var recent = appState.settings.recentPrompts.filter { $0 != prompt }
+        recent.insert(prompt, at: 0)
+        appState.settings.recentPrompts = Array(recent.prefix(5))
+        if saveAsActionKey, !appState.settings.actionKeys.contains(where: { $0.prompt == prompt }) {
+            appState.settings.actionKeys.append(ActionKey(key: "", label: String(prompt.prefix(40)), prompt: prompt))
+        }
+    }
+
+    /// Runs a star action on the context's text, then previews (or shows) the result.
+    private func runStarAction(_ action: StarAction, _ context: StarContext) {
+        let text = context.subject
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let settings = appState.settings
+        if case .translate = action {
+            UsageLog.record(.star, .accepted, detail: "translate")
+            Task { await translateAndShow(text, historyKind: .translate) }
+            return
+        }
+        guard !isBusy else { return }
+        beginBusy()
+        let started = ContinuousClock.now
+        let (feature, title, detail): (UsageFeature, String, String) = switch action {
+        case .fix: (.fix, "Fix", "source:star")
+        case .spelling: (.spelling, "Fix spelling", "source:star")
+        case .actionKey(let key): (.actionKey, key.label.isEmpty ? key.key : key.label, key.key)
+        case .prompt: (.customPrompt, "Custom prompt", "source:star")
+        case .translate: (.translate, "Translate", "source:star")
+        }
+        currentTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.endBusy() }
+            do {
+                var result: String
+                switch action {
+                case .spelling:
+                    result = try await EngineFactory.makeLanguageTool(appState: self.appState).correct(text)
+                case .fix, .actionKey, .prompt, .translate:
+                    let instruction: String = switch action {
+                    case .actionKey(let key): key.prompt
+                    case .prompt(let prompt, _): prompt
+                    default: settings.defaultPrompt
+                    }
+                    let engine = EngineFactory.make(kind: settings.defaultEngine, appState: self.appState)
+                    result = try await engine.process(text: text, instruction: instruction)
+                    if settings.maskAISlop { result = MaskAISlop.apply(to: result) }
+                }
+                if Task.isCancelled { return }
+                self.recordHistory(kind: .action, input: text, output: result, engine: settings.defaultEngine.displayName)
+                let ms = UsageLog.elapsed(since: started)
+                if case .prompt(_, true) = action {
+                    UsageLog.record(feature, .shown, detail: detail, ms: ms)
+                    self.popup.show(title: title, text: result, original: text)
+                    return
+                }
+                let apply = { [weak self] in
+                    UsageLog.record(feature, .applied, detail: detail, ms: ms)
+                    self?.replace(context, with: result)
+                }
+                if settings.previewFromMenu {
+                    self.preview.show(title: title, original: text, result: result, near: context.anchor, onApply: apply)
+                } else {
+                    apply()
+                }
+            } catch {
+                if self.isCancellation(error) { return }
+                UsageLog.record(feature, .failed, reason: "error", detail: detail)
+                self.popup.show(title: "Error", text: error.localizedDescription)
+            }
+        }
+    }
+
+    /// Puts `result` in place of the context's text: back in its app, select the range, paste.
+    private func replace(_ context: StarContext, with result: String) {
+        let app = NSRunningApplication(processIdentifier: context.pid)
+        app?.activate()
+        Task { @MainActor [weak self] in
+            // Let the app take focus back before selecting in it.
+            try? await Task.sleep(for: .milliseconds(200))
+            _ = ProofreadAX.select(context.appRange, in: context.element)
+            try? await Task.sleep(for: .milliseconds(80))
+            TextInjector.replaceSelection(with: result, restorePrevious: self?.appState.settings.restoreClipboard ?? true,
+                                          target: TextInjector.FocusTarget(app: app))
+        }
+    }
+
     func stop() {
+        stars.stop()
         settingsObserver?.cancel()
         settingsObserver = nil
         retryTimer?.invalidate()
@@ -330,9 +498,18 @@ final class HotkeyCoordinator {
                 }
                 self.recordHistory(kind: .action, input: parsed.content, output: result,
                                    engine: settings.defaultEngine.displayName)
-                TextInjector.replaceSelection(with: result, restorePrevious: settings.restoreClipboard, target: target)
-                UsageLog.record(feature, .applied, detail: actionKey ?? source,
-                                ms: UsageLog.elapsed(since: started))
+                let original = parsed.content
+                let replace = {
+                    TextInjector.replaceSelection(with: result, restorePrevious: settings.restoreClipboard, target: target)
+                    UsageLog.record(feature, .applied, detail: actionKey ?? source,
+                                    ms: UsageLog.elapsed(since: started))
+                }
+                if settings.previewFromHotkeys {
+                    self.preview.show(title: actionKey.map { "Action \($0)" } ?? "Fix", original: original,
+                                      result: result, near: NSEvent.mouseLocation, onApply: replace)
+                } else {
+                    replace()
+                }
             } catch {
                 if self.isCancellation(error) {
                     UsageLog.record(feature, .dismissed, reason: "cancelled", detail: actionKey ?? source)

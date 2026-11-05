@@ -218,6 +218,15 @@ struct Settings: Codable, Equatable {
     // Proofread (LanguageTool): optional, has no shortcut -- it checks as you type. The token (if
     // any) lives in the Keychain; only non-secret config is stored here.
     var correctEnabled: Bool = false
+
+    // Stars: the violet star in a text field's corner (whole text) and at a selection's end.
+    var starFieldEnabled: Bool = true
+    var starSelectionEnabled: Bool = true
+    // Preview before replacing text: for star actions, and for the global shortcuts.
+    var previewFromMenu: Bool = true
+    var previewFromHotkeys: Bool = false
+    /// The last custom prompts, newest first (at most 5).
+    var recentPrompts: [String] = []
     var languageToolMode: LanguageToolMode = .free
     var languageToolBaseURL: String = "https://api.languagetool.org/v2"  // used only in self-hosted mode
     var languageToolUsername: String = ""           // Premium account email
@@ -270,7 +279,8 @@ extension Settings {
              proofreadMaxReplacements, proofreadLayout,
              proofreadMinLength, proofreadAppMode, proofreadApps,
              historyEnabled, sourceLanguage, targetLanguage,
-             correctEnabled, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
+             correctEnabled, starFieldEnabled, starSelectionEnabled, previewFromMenu, previewFromHotkeys,
+             recentPrompts, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
              openRouterFreeOnly, providers, defaultActionHotkey, translateHotkey,
              screenTranslateHotkey, quickTranslateHotkey
     }
@@ -323,6 +333,11 @@ extension Settings {
         if let v = try c.decodeIfPresent(String.self, forKey: .sourceLanguage) { sourceLanguage = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .targetLanguage) { targetLanguage = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .correctEnabled) { correctEnabled = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .starFieldEnabled) { starFieldEnabled = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .starSelectionEnabled) { starSelectionEnabled = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .previewFromMenu) { previewFromMenu = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .previewFromHotkeys) { previewFromHotkeys = v }
+        if let v = try c.decodeIfPresent([String].self, forKey: .recentPrompts) { recentPrompts = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .languageToolBaseURL) { languageToolBaseURL = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .languageToolUsername) { languageToolUsername = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .languageToolLanguage) { languageToolLanguage = v }

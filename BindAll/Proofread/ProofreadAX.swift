@@ -35,7 +35,9 @@ enum ProofSource {
 enum ProofreadAX {
     /// Reads the focused field. Unlike autocomplete, a non-empty selection is fine: it means the user
     /// wants that range checked.
-    static func focus() -> ProofSource {
+    /// `analyze: false` skips the hidden-break search (a walk over the field's text leaves) for
+    /// callers that only need the text, the selection and the offset map.
+    static func focus(analyze: Bool = true) -> ProofSource {
         enableElectronAccessibilityIfNeeded()
         guard let focused = focusedElement() else { return .none }
         if isSecure(focused) { return .none }
@@ -56,7 +58,7 @@ enum ProofreadAX {
                 chromiumPids.insert(pid)
             }
             let chromium = isChromium(pid: pid)
-            let breaks = chromium ? hiddenBreaks(in: candidate, text: text) : .none
+            let breaks = chromium && analyze ? hiddenBreaks(in: candidate, text: text) : .none
             let map = chromium ? offsetMap(for: candidate, text: text) : nil
             // The selection is reported in the app's offsets; everything downstream works in the
             // value's, so it is translated back before anyone measures a word with it.

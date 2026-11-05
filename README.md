@@ -42,6 +42,17 @@ No Dock icon: BindAll lives in the menu bar (`LSUIElement`); the icon pulses whi
   dictionary language, and per-app allow/deny.
 - **Launch at login**, automatic light/dark, and in-app **Check for Updates**.
 
+## Where it works
+
+Checked so far (more apps as they are tested):
+
+| App | Autocomplete | Proofread | Stars |
+|---|---|---|---|
+| TextEdit | inline + list | yes | yes |
+| Slack | list | yes (lists, quotes, code blocks, emoji) | yes |
+| Claude (desktop) | list | yes | yes |
+| Google Docs | no (canvas, no accessible text) | no | no |
+
 ## Default shortcuts
 
 All shortcuts are configurable in Settings → Actions → Shortcuts.

@@ -125,6 +125,18 @@ final class ProofreadController {
 
     var isSessionActive: Bool { !issues.isEmpty && target != nil }
 
+    /// Issues found in `element` by the last check, for the star menu.
+    func issueCount(in element: AXUIElement) -> Int {
+        guard let target, CFEqual(target.element, element) else { return 0 }
+        return issues.count
+    }
+
+    /// Opens the fixes popup on the first issue (from the star menu).
+    func showFirstIssue() {
+        guard !issues.isEmpty else { return }
+        focusIssue(0)
+    }
+
     // MARK: - Lifecycle
 
     func configure(_ config: Config, engine: LanguageToolEngine, language: String) {

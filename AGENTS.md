@@ -284,6 +284,22 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   field's `AXFont` attribute when reported, otherwise from the line height. Tab accepts as usual;
   Down replaces the inline text with the list (browsing). Mid-line, for corrections, or with no
   precise caret rect (Slack reports an empty rect for the field), the list is shown as before.
+- **Stars** (`Selection/FieldStarController.swift`): one violet `sparkle` (`Color.brand`, the icon's
+  violet) in a click-through-free non-activating panel (`StarPanel`) -- at the end of the selection
+  (below it, away from editors' own selection toolbars) when something is selected, otherwise in the
+  focused field's bottom-right corner; never both. Re-evaluated on mouse-up, key-up and app switch
+  (debounced), hidden on key-down/scroll; follows the Proofread app filter; skips BindAll itself,
+  password and tiny fields. Uses `ProofreadAX.focus(analyze: false)` (no hidden-break walk) and the
+  offset map for the selection's end. A click opens an `NSMenu` built by the coordinator: Fix, Fix
+  spelling (LanguageTool `correct`), Translate (popup), action keys, Custom prompt..., and for the
+  field star "N issues: show the first". `StarContext` captures element, value, selection and map;
+  replacing re-activates the app, selects `appRange` and pastes.
+- **Preview** (`UI/Preview*`): every text-replacing star action shows a word diff (`TextDiff.words`,
+  LCS over word+whitespace tokens; `DiffText` renders added on green + underline, removed red +
+  strikethrough) with Changes/Result, Close / Copy / Apply (Return). `previewFromMenu` (default on)
+  and `previewFromHotkeys` (default off) in Actions. **Custom prompt** (`UI/CustomPrompt*`): a key
+  panel with the prompt field, the last 5 prompts (`Settings.recentPrompts`), Save as action key,
+  Run (preview, Return) or Show (popup only, Opt+Return).
 - **Usage metrics** (`Store/UsageLog.swift`): local only, JSON lines in
   `Application Support/BindAll/Usage/usage-YYYY-MM.jsonl`. Each event: feature, kind
   (shown/accepted/applied/skipped/dismissed/failed), frontmost app, optional ms, and fixed `reason` /

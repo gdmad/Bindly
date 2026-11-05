@@ -742,6 +742,11 @@ allChanged.autocompleteLearn = false
 allChanged.autocompleteNextWord = false
 allChanged.autocompleteAcceptReturn = false
 allChanged.autocompleteInline = false
+allChanged.starFieldEnabled = false
+allChanged.starSelectionEnabled = false
+allChanged.previewFromMenu = false
+allChanged.previewFromHotkeys = true
+allChanged.recentPrompts = ["x"]
 allChanged.autocompleteContextRanking = false
 allChanged.autocompleteAppMode = "deny"
 allChanged.autocompleteApps = ["com.example.one"]
@@ -1054,6 +1059,26 @@ eq(InlineCompletion.suffix(of: "приветствие", after: "привет") 
 eq(InlineCompletion.suffix(of: "Привет", after: "при") ?? "nil", "вет", "case does not matter for the match")
 check(InlineCompletion.suffix(of: "малоко", after: "малак") == nil, "a correction is not a completion: it goes to the list")
 check(InlineCompletion.suffix(of: "мир", after: "мир") == nil, "nothing left to draw")
+
+print("TextDiff")
+let diffParts = TextDiff.words(old: "Привет как дела малако", new: "Привет, как дела молоко")
+check(diffParts == [.removed("Привет "), .added("Привет, "), .same("как дела "), .removed("малако"), .added("молоко")],
+      "changed words are removed and added, the rest kept (\(diffParts))")
+func joined(_ parts: [TextDiff.Part], keepAdded: Bool) -> String {
+    parts.map { part -> String in
+        switch part {
+        case .same(let s): s
+        case .added(let s): keepAdded ? s : ""
+        case .removed(let s): keepAdded ? "" : s
+        }
+    }.joined()
+}
+let longOld = "Это первый абзац.\n\nВторой абзац, с ошибкой малако.", longNew = "Это первый абзац.\n\nВторой абзац с молоком."
+let longParts = TextDiff.words(old: longOld, new: longNew)
+check(joined(longParts, keepAdded: true) == longNew && joined(longParts, keepAdded: false) == longOld,
+      "the parts rebuild both texts exactly, newlines included")
+check(!TextDiff.hasChanges(TextDiff.words(old: "same text", new: "same text")), "identical texts have no changes")
+check(TextDiff.tokens("  a b") == ["  ", "a ", "b"], "leading whitespace is its own token")
 
 print("UsageLog")
 let usageDir = FileManager.default.temporaryDirectory.appendingPathComponent("bindall-usage-\(UUID().uuidString)")
