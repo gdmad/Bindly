@@ -741,6 +741,7 @@ allChanged.autocompleteLanguages = ["ru", "en"]
 allChanged.autocompleteLearn = false
 allChanged.autocompleteNextWord = false
 allChanged.autocompleteAcceptReturn = false
+allChanged.autocompleteInline = false
 allChanged.autocompleteContextRanking = false
 allChanged.autocompleteAppMode = "deny"
 allChanged.autocompleteApps = ["com.example.one"]
@@ -1044,6 +1045,15 @@ check(pk(125, browsing: true) == .move(dx: 0, dy: 1) && pk(126, browsing: true, 
       "inside: Down moves, Up from the first backs out")
 check(pk(53, browsing: true) == .leave, "inside: Esc backs out")
 check(pk(36, browsing: true) == .apply, "inside: Return applies the selected fix")
+
+print("InlineCompletion")
+check(InlineCompletion.caretAtLineEnd(in: "привет", caret: 6), "the end of the text is a line end")
+check(InlineCompletion.caretAtLineEnd(in: "при\nвет", caret: 3), "before a newline is a line end")
+check(!InlineCompletion.caretAtLineEnd(in: "привет мир", caret: 6), "mid-line is not")
+eq(InlineCompletion.suffix(of: "приветствие", after: "привет") ?? "nil", "ствие", "the rest of the word is drawn")
+eq(InlineCompletion.suffix(of: "Привет", after: "при") ?? "nil", "вет", "case does not matter for the match")
+check(InlineCompletion.suffix(of: "малоко", after: "малак") == nil, "a correction is not a completion: it goes to the list")
+check(InlineCompletion.suffix(of: "мир", after: "мир") == nil, "nothing left to draw")
 
 print("UsageLog")
 let usageDir = FileManager.default.temporaryDirectory.appendingPathComponent("bindall-usage-\(UUID().uuidString)")

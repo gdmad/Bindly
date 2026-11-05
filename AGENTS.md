@@ -276,6 +276,14 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   backs out. Until entered, the first item is shown with a soft highlight (`PopupCell.softSelection`).
   Both popups close when the input source changes (`TISNotifySelectedKeyboardInputSourceChanged`).
   The fixes popup header has Skip (eye) and Close (cross) icons.
+- **Inline suggestion (ghost text):** with `autocompleteInline` on (default), when the caret is at the
+  end of its line (`InlineCompletion.caretAtLineEnd`) and the app reports a precise rect for the
+  character before the caret, the first suggestion's remaining letters
+  (`InlineCompletion.suffix`, only when the word simply continues the partial) are drawn in tertiary
+  gray right after the caret by `InlineGhostOverlay` (click-through panel). The font comes from the
+  field's `AXFont` attribute when reported, otherwise from the line height. Tab accepts as usual;
+  Down replaces the inline text with the list (browsing). Mid-line, for corrections, or with no
+  precise caret rect (Slack reports an empty rect for the field), the list is shown as before.
 - **Usage metrics** (`Store/UsageLog.swift`): local only, JSON lines in
   `Application Support/BindAll/Usage/usage-YYYY-MM.jsonl`. Each event: feature, kind
   (shown/accepted/applied/skipped/dismissed/failed), frontmost app, optional ms, and fixed `reason` /

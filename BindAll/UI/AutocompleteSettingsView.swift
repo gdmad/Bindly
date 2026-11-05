@@ -39,6 +39,8 @@ struct AutocompleteSettingsView: View {
             }
 
             Section("Behavior") {
+                HelpToggleRow("Inline suggestion", "At the end of a line the first suggestion appears as gray text right after the caret, as with macOS's own predictions: Tab accepts it, Down opens the list. In the middle of a line, or in apps that do not report where the caret is, the list is shown instead.",
+                              isOn: $appState.settings.autocompleteInline)
                 Toggle("Accept with Return too", isOn: $appState.settings.autocompleteAcceptReturn)
                 HelpToggleRow("Predict next word", "After a space, suggest the most likely next word, learned from what you have typed before.",
                               isOn: $appState.settings.autocompleteNextWord)

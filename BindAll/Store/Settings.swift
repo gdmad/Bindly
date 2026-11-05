@@ -194,6 +194,7 @@ struct Settings: Codable, Equatable {
     var autocompleteLearn: Bool = true        // learn accepted/typed words and rank them
     var autocompleteNextWord: Bool = true     // predict the next word after a space
     var autocompleteAcceptReturn: Bool = true // accept with Return in addition to Tab
+    var autocompleteInline: Bool = true       // first suggestion as gray text after the caret, when possible
     var autocompleteContextRanking: Bool = true // rank completions by the preceding words (n-grams)
     var autocompleteAppMode: String = "all"   // "all" | "allow" | "deny"
     var autocompleteApps: [String] = []       // bundle identifiers for allow/deny
@@ -265,7 +266,7 @@ extension Settings {
         case enabled, defaultEngine, separator, defaultPrompt, actionKeys,
              restoreClipboard, maskAISlop, autocompleteEnabled, autocompleteCount, autocompleteLayout,
              popupFontSize, autocompleteLanguages, autocompleteLearn, autocompleteNextWord,
-             autocompleteAcceptReturn, autocompleteContextRanking, autocompleteAppMode, autocompleteApps,
+             autocompleteAcceptReturn, autocompleteInline, autocompleteContextRanking, autocompleteAppMode, autocompleteApps,
              proofreadMaxReplacements, proofreadLayout,
              proofreadMinLength, proofreadAppMode, proofreadApps,
              historyEnabled, sourceLanguage, targetLanguage,
@@ -309,6 +310,7 @@ extension Settings {
         if let v = try c.decodeIfPresent(Bool.self, forKey: .autocompleteLearn) { autocompleteLearn = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .autocompleteNextWord) { autocompleteNextWord = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .autocompleteAcceptReturn) { autocompleteAcceptReturn = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .autocompleteInline) { autocompleteInline = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .autocompleteContextRanking) { autocompleteContextRanking = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .autocompleteAppMode) { autocompleteAppMode = v }
         if let v = try c.decodeIfPresent([String].self, forKey: .autocompleteApps) { autocompleteApps = v }

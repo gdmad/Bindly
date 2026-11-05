@@ -69,6 +69,9 @@ final class AutocompleteController {
     private var selectedIndex = 0
     /// Went into the list with ↓: only then do the arrows and Return drive it.
     private var browsing = false
+    /// The first suggestion is drawn inline instead of the list (see `InlineCompletion`).
+    private var inlineShown = false
+    private let ghost = InlineGhostOverlay()
     private var inputSourceObserver: NSObjectProtocol?
     private var partial = ""
     private var lastAnchor = CGRect.zero
@@ -86,6 +89,7 @@ final class AutocompleteController {
         var learn = true
         var nextWord = true
         var acceptReturn = true
+        var inline = true            // gray text after the caret at the end of a line, when possible
         var contextRanking = true   // rank completions by the preceding words (the winning variant)
         var appMode = AppFilterMode.all
         var apps: Set<String> = []
@@ -479,6 +483,7 @@ final class AutocompleteController {
             guard let self else { return }
             let resolvedPartial: String
             let resolvedAnchor: CGRect
+            var ghostPlace: GhostPlace?
             // Context for the re-ranking modes: the completed words before the caret. Prefer the AX
             // field text (it is the source of truth for the partial); fall back to the keystroke
             // tracker for apps that expose no text.
@@ -491,6 +496,7 @@ final class AutocompleteController {
                 resolvedPartial = AutocompleteEngine.partialWord(in: info.text, caretUTF16Offset: info.caret)
                 resolvedAnchor = self.anchor(for: info.element, caret: info.caret, primaryHeight: primaryHeight)
                 contextWords = AutocompleteEngine.precedingWords(in: info.text, caretUTF16Offset: info.caret, count: 2)
+                ghostPlace = cfg.inline ? self.ghostPlace(for: info, primaryHeight: primaryHeight) : nil
             case .unavailable:
                 resolvedPartial = fallback
                 resolvedAnchor = self.mouseAnchor()
@@ -527,8 +533,7 @@ final class AutocompleteController {
                 // Arm the suppressor before the popup becomes visible on screen, not after -- Tab
                 // pressed in the gap between the two used to reach the target app instead of us.
                 me.syncSuppression()
-                me.overlay.show(list, selected: 0, softSelection: true, layout: cfg.layout,
-                                fontSize: cfg.fontSize, anchor: resolvedAnchor)
+                me.present(list, partial: resolvedPartial, ghost: ghostPlace)
             }
         }
     }
@@ -551,6 +556,7 @@ final class AutocompleteController {
         work.async { [weak self] in
             guard let self else { return }
             let anchor: CGRect
+            var ghostPlace: GhostPlace?
             var p1 = fallbackP1
             var p2 = fallbackP2
             switch self.focusState() {
@@ -559,6 +565,7 @@ final class AutocompleteController {
                 return
             case .text(let info):
                 anchor = self.anchor(for: info.element, caret: info.caret, primaryHeight: primaryHeight)
+                ghostPlace = cfg.inline ? self.ghostPlace(for: info, primaryHeight: primaryHeight) : nil
                 let words = AutocompleteEngine.precedingWords(in: info.text, caretUTF16Offset: info.caret, count: 2)
                 p1 = words.first ?? ""
                 p2 = words.count > 1 ? words[1] : ""
@@ -579,8 +586,7 @@ final class AutocompleteController {
                 me.browsing = false
                 me.lastAnchor = anchor
                 me.syncSuppression()
-                me.overlay.show(words, selected: 0, softSelection: true, layout: cfg.layout,
-                                fontSize: cfg.fontSize, anchor: anchor)
+                me.present(words, partial: "", ghost: ghostPlace)
             }
         }
     }
@@ -614,14 +620,62 @@ final class AutocompleteController {
         syncSuppression()
     }
 
-    /// Going into the list shows the selection in full; backing out returns to the first item, which
-    /// Tab would take, shown softly.
+    /// Going into the list shows the selection in full (and replaces the inline text with the list);
+    /// backing out returns to the first item, which Tab would take, shown softly.
     private func setBrowsing(_ on: Bool) {
         guard !candidates.isEmpty, browsing != on else { return }
         browsing = on
         if !on { selectedIndex = 0 }
+        if inlineShown {
+            ghost.hide()
+            inlineShown = false
+        }
         redraw()
         syncSuppression()
+    }
+
+    /// Where inline text can go: the caret at the end of its line, with a precise caret rect (an
+    /// element frame or the mouse would put the text in the wrong place, so those get the list).
+    private struct GhostPlace {
+        let caretCharacter: CGRect
+        let fontSize: CGFloat?
+        let fontName: String?
+    }
+
+    /// Work-queue side: AX calls only.
+    private func ghostPlace(for info: TextInfo, primaryHeight: CGFloat?) -> GhostPlace? {
+        guard info.caret > 0, InlineCompletion.caretAtLineEnd(in: info.text, caret: info.caret),
+              let rect = caretAnchor(for: info.element, caret: info.caret, primaryHeight: primaryHeight),
+              rect.height > 4 else { return nil }
+        let font = fieldFont(info.element, at: info.caret - 1)
+        return GhostPlace(caretCharacter: rect, fontSize: font?.size, fontName: font?.name)
+    }
+
+    /// The font the app draws the character at `offset` in, when it reports one (`AXFont` in the
+    /// attributed string); many native fields do, Electron ones often do not.
+    private func fieldFont(_ element: AXUIElement, at offset: Int) -> (size: CGFloat, name: String?)? {
+        var cfRange = CFRange(location: offset, length: 1)
+        guard let value = AXValueCreate(.cfRange, &cfRange) else { return nil }
+        var result: AnyObject?
+        guard AXUIElementCopyParameterizedAttributeValue(element, kAXAttributedStringForRangeParameterizedAttribute as CFString,
+                                                         value, &result) == .success,
+              let attributed = result as? NSAttributedString, attributed.length > 0,
+              let font = attributed.attribute(NSAttributedString.Key("AXFont"), at: 0, effectiveRange: nil) as? [String: Any],
+              let size = font["AXFontSize"] as? CGFloat, size > 0 else { return nil }
+        return (size, font["AXFontName"] as? String)
+    }
+
+    /// Shows a fresh suggestion: inline after the caret when it fits there, the list otherwise.
+    private func present(_ list: [String], partial: String, ghost place: GhostPlace?) {
+        if let place, let first = list.first, let rest = InlineCompletion.suffix(of: first, after: partial) {
+            overlay.hide()
+            ghost.show(rest, after: place.caretCharacter, fontSize: place.fontSize, fontName: place.fontName)
+            inlineShown = true
+        } else {
+            ghost.hide()
+            inlineShown = false
+            redraw()
+        }
     }
 
     private func redraw() {
@@ -652,6 +706,8 @@ final class AutocompleteController {
         selectedIndex = 0
         browsing = false
         overlay.hide()
+        ghost.hide()
+        inlineShown = false
         refreshGeneration &+= 1 // drop any in-flight refresh so it cannot re-show the popup
         syncSuppression()
     }

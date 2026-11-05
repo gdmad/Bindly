@@ -94,6 +94,7 @@ final class HotkeyCoordinator {
         cfg.learn = s.autocompleteLearn
         cfg.nextWord = s.autocompleteNextWord
         cfg.acceptReturn = s.autocompleteAcceptReturn
+        cfg.inline = s.autocompleteInline
         cfg.contextRanking = s.autocompleteContextRanking
         cfg.appMode = AutocompleteController.AppFilterMode(rawValue: s.autocompleteAppMode) ?? .all
         cfg.apps = Set(s.autocompleteApps)

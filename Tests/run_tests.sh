@@ -33,6 +33,7 @@ swiftc -O \
     BindAll/Autocomplete/LearnedWordAudit.swift \
     BindAll/Autocomplete/AutocompleteInsertion.swift \
     BindAll/Autocomplete/AutocompleteKeyPolicy.swift \
+    BindAll/Autocomplete/InlineCompletion.swift \
     BindAll/Proofread/ProofreadKeyPolicy.swift \
     Tests/main.swift \
     -o "$OUT"
