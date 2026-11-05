@@ -21,6 +21,7 @@ struct GeneralSettingsView: View {
                               isOn: $appState.settings.restoreClipboard)
                 HelpToggleRow("Mask AI Slop", "Normalizes typical 'AI' typography in results: em/en dashes become '-', smart quotes and apostrophes become straight ones, and emoji and unusual unicode are stripped.",
                               isOn: $appState.settings.maskAISlop)
+                UsageDataRow()
                 HelpToggleRow("Keep history", "Stores the last 50 results locally (menu bar > History) so a closed popup or overwritten paste can be recovered. Stored on this Mac only; never includes API keys.",
                               isOn: $appState.settings.historyEnabled)
             }

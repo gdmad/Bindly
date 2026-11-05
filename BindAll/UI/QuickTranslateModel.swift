@@ -39,6 +39,7 @@ final class QuickTranslateModel {
     /// Copies the whole translation, so nothing has to be selected first.
     func copyOutput() {
         guard canCopy else { return }
+        UsageLog.record(.quickTranslate, .accepted, detail: "copy")
         TextInjector.copyToPasteboard(output)
         copied = true
         copiedReset?.cancel()
@@ -78,6 +79,7 @@ final class QuickTranslateModel {
             }
             do {
                 output = try await translation.translate(text, from: src, to: tgt)
+                UsageLog.record(.quickTranslate, .applied)
                 onTranslated(text, output)
             } catch {
                 output = error.localizedDescription

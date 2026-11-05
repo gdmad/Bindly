@@ -203,6 +203,7 @@ final class HotkeyCoordinator {
         // Quick Translate opens an interactive window; it does not need a selection and is allowed
         // even while another action is in flight.
         if matches(s.quickTranslateHotkey) {
+            UsageLog.record(.quickTranslate, .shown, detail: "source:hotkey")
             quickTranslate.toggle()
             return
         }
@@ -217,7 +218,7 @@ final class HotkeyCoordinator {
             translateFromScreen()
         } else if let key = s.actionKeys.first(where: { $0.hotkey.map(matches) == true }) {
             // A custom action key bound to its own shortcut: run its prompt on the selection.
-            runDefaultAction(fixedInstruction: key.prompt)
+            runDefaultAction(fixedInstruction: key.prompt, actionKey: key.key)
         }
     }
 
@@ -275,8 +276,12 @@ final class HotkeyCoordinator {
 
     /// Runs the text pipeline on the current selection. With `fixedInstruction` (a per-key
     /// shortcut) the whole selection is the content; otherwise the separator/key syntax is parsed.
-    private func runDefaultAction(fixedInstruction: String? = nil, forceCopy: Bool = false) {
+    private func runDefaultAction(fixedInstruction: String? = nil, forceCopy: Bool = false,
+                                  actionKey: String? = nil) {
         let settings = appState.settings
+        let feature: UsageFeature = actionKey == nil ? .fix : .actionKey
+        let source = forceCopy ? "source:menu" : "source:hotkey"
+        let started = ContinuousClock.now
         let engine = EngineFactory.make(kind: settings.defaultEngine, appState: appState)
         beginBusy()
         // Capture where the result must land before the (possibly slow) engine call.
@@ -295,6 +300,7 @@ final class HotkeyCoordinator {
 
             guard let text = selection,
                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                UsageLog.record(feature, .failed, reason: "noSelection", detail: actionKey ?? source)
                 self.popup.show(title: "BindAll", text: "No text selected.")
                 return
             }
@@ -324,8 +330,15 @@ final class HotkeyCoordinator {
                 self.recordHistory(kind: .action, input: parsed.content, output: result,
                                    engine: settings.defaultEngine.displayName)
                 TextInjector.replaceSelection(with: result, restorePrevious: settings.restoreClipboard, target: target)
+                UsageLog.record(feature, .applied, detail: actionKey ?? source,
+                                ms: UsageLog.elapsed(since: started))
             } catch {
-                if self.isCancellation(error) { return }
+                if self.isCancellation(error) {
+                    UsageLog.record(feature, .dismissed, reason: "cancelled", detail: actionKey ?? source)
+                    return
+                }
+                UsageLog.record(feature, .failed, reason: "error", detail: actionKey ?? source,
+                                ms: UsageLog.elapsed(since: started))
                 self.popup.show(title: "Error", text: error.localizedDescription)
             }
         }
@@ -342,6 +355,7 @@ final class HotkeyCoordinator {
                 : SelectionReader.currentSelection(previousChangeCount: Int.min)
             guard let text = selection,
                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                UsageLog.record(.translate, .failed, reason: "noSelection")
                 self.popup.show(title: "BindAll", text: "No text selected.")
                 return
             }
@@ -359,7 +373,10 @@ final class HotkeyCoordinator {
     func menuTranslate() { runFromMenu(.translate) }
     func menuScreenTranslate() { translateFromScreen() }
 
-    func menuQuickTranslate() { quickTranslate.toggle() }
+    func menuQuickTranslate() {
+        UsageLog.record(.quickTranslate, .shown, detail: "source:menu")
+        quickTranslate.toggle()
+    }
 
     private func runFromMenu(_ which: MenuAction) {
         guard appState.settings.enabled, !isBusy else { return }
@@ -383,6 +400,7 @@ final class HotkeyCoordinator {
                 let text = try await OCRService.captureAndRecognize()
                 await self.translateAndShow(text, historyKind: .ocr)
             } catch {
+                UsageLog.record(.ocr, .failed, reason: self.isCancellation(error) ? "cancelled" : "error")
                 if self.isCancellation(error) { return }
                 self.popup.show(title: "OCR", text: error.localizedDescription)
             }
@@ -398,6 +416,8 @@ final class HotkeyCoordinator {
     /// Shared translation + popup, using the configured two-language pair.
     private func translateAndShow(_ text: String, historyKind: HistoryEntry.Kind) async {
         let settings = appState.settings
+        let feature: UsageFeature = historyKind == .ocr ? .ocr : .translate
+        let started = ContinuousClock.now
         let detected = LanguageDetector.detect(text)
         let detectedCode = detected?.languageCode?.identifier
         let sourceSetting = settings.sourceLanguage
@@ -442,9 +462,11 @@ final class HotkeyCoordinator {
         do {
             let translation = try await translationCoordinator.translate(text, from: from, to: target)
             recordHistory(kind: historyKind, input: text, output: translation, engine: "Apple Translation")
+            UsageLog.record(feature, .shown, ms: UsageLog.elapsed(since: started))
             popup.show(title: "Translation", text: translation, original: text, sourceLanguage: sourceDisplay,
                        targetLanguage: AppLanguages.name(for: targetCode))
         } catch {
+            UsageLog.record(feature, .failed, reason: "error")
             popup.show(title: "Translation failed", text: error.localizedDescription)
         }
     }

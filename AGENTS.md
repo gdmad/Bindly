@@ -266,6 +266,15 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   `TranslationLayout.restore` then swaps the output's newline runs for the source's. OCR lines are
   first joined into paragraphs (`OCRParagraphs`: small vertical gap and aligned left edge = same
   paragraph; a hyphenated wrap is rejoined), since screen line breaks cut sentences in half.
+- **Usage metrics** (`Store/UsageLog.swift`): local only, JSON lines in
+  `Application Support/BindAll/Usage/usage-YYYY-MM.jsonl`. Each event: feature, kind
+  (shown/accepted/applied/skipped/dismissed/failed), frontmost app, optional ms, and fixed `reason` /
+  `detail` tokens chosen by the code -- never user text. `UsageLog.record` is fire-and-forget from any
+  thread. Recorded today: autocomplete shown/accepted(index)/dismissed(esc, typedOn, navigation,
+  modifier); proofread popup shown/applied(rule)/failed(stale, notApplied)/skipped/dismissed; fix and
+  action keys applied/failed with source and ms; translate/OCR shown/failed; Quick Translate opened,
+  translated, copied; translation popup copied. Settings -> General shows the count, Show in Finder
+  and Clear. Every new feature records its own events.
 - **Writing results back:** the frontmost app is captured when an action starts; the result is pasted
   with Cmd+V (reliable across native and Electron/Chromium apps). If focus moved to another app while
   the engine worked, the original app is re-activated first so the result lands where it started.

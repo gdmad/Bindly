@@ -34,6 +34,8 @@ final class ProofreadController {
     private var provider: LanguageToolProofreadProvider?
     /// Places the user skipped; see `ProofreadSkips`.
     private var skips = ProofreadSkips()
+    /// Whether the fixes popup is open, for the usage log's shown/dismissed pairs.
+    private var popupShown = false
     private let popover = ProofreadPopover()
     private let underlines = UnderlineOverlay()
     private static let log = Logger(subsystem: "com.evgeny.bindall", category: "proofread")
@@ -324,6 +326,8 @@ final class ProofreadController {
 
     private func focusIssue(_ index: Int) {
         guard index >= 0, index < issues.count else { endNavigation(); return }
+        if !popupShown { UsageLog.record(.proofread, .shown) }
+        popupShown = true
         currentIndex = index
         selectedReplacement = 0
         showCurrent()
@@ -451,6 +455,7 @@ final class ProofreadController {
     private func skipCurrent() {
         guard let issue = issues[safe: currentIndex] else { endNavigation(); return }
         skips.insert(issue)
+        UsageLog.record(.proofread, .skipped)
         let index = currentIndex
         issues.remove(at: index)
         redrawUnderlines()
@@ -464,6 +469,7 @@ final class ProofreadController {
     private func handleApplyResult(_ result: IssueApplier.Result, issue: TextIssue, replacement: String) {
         switch result {
         case .applied(let replacedRange):
+            UsageLog.record(.proofread, .applied, detail: issue.ruleId.map { "rule:\($0)" })
             // Captured before endNavigation() resets currentIndex: the issue that was next in order
             // ends up at this same position once the fixed one is gone from the fresh, re-checked list.
             let fixedIndex = currentIndex
@@ -478,6 +484,7 @@ final class ProofreadController {
             underlines.hide()
             recheckAfterWrite(previousText: lastCheckedText, resumeAt: fixedIndex)
         case .stale:
+            UsageLog.record(.proofread, .failed, reason: "stale")
             // The message promises a re-check, so actually run one instead of waiting for the user
             // to type again -- they just clicked a fix and are looking at the field, not typing.
             // The issue that failed keeps its place in the list, so the popup can reopen on it.
@@ -489,6 +496,7 @@ final class ProofreadController {
                 self?.typingPaused(resumeIndex: staleIndex)
             }
         case .failed(let reason):
+            UsageLog.record(.proofread, .failed, reason: "notApplied")
             flash(reason)
         }
     }
@@ -524,7 +532,10 @@ final class ProofreadController {
 
     /// Closes the popup and disarms the key tap, leaving the underlines and the found issues alone:
     /// they belong to the field, not to this popup.
-    private func endNavigation() {
+    /// `reason`, when given, records that an open popup was dismissed and why.
+    private func endNavigation(reason: String? = nil) {
+        if popupShown, let reason { UsageLog.record(.proofread, .dismissed, reason: reason) }
+        popupShown = false
         currentIndex = 0
         selectedReplacement = 0
         popover.hide()
@@ -651,11 +662,11 @@ final class ProofreadController {
             return nil
         case kVK_Escape:
             // Closes the popup only: the underlines stay, they are not part of this popup.
-            DispatchQueue.main.async { [weak self] in self?.endNavigation() }
+            DispatchQueue.main.async { [weak self] in self?.endNavigation(reason: "esc") }
             return nil
         default:
             // Anything else means the user moved on: close, but let the key reach the field.
-            DispatchQueue.main.async { [weak self] in self?.endNavigation() }
+            DispatchQueue.main.async { [weak self] in self?.endNavigation(reason: "typedOn") }
             return Unmanaged.passUnretained(event)
         }
     }

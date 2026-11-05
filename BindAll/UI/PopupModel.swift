@@ -31,6 +31,7 @@ final class PopupModel {
     }
 
     func copyText() {
+        UsageLog.record(.translationPopup, .accepted, detail: "copy")
         TextInjector.copyToPasteboard(text)
         copiedText = true
         copiedReset?.cancel()

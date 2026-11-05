@@ -10,6 +10,7 @@ swiftc -O \
     BindAll/Actions/PromptParser.swift \
     BindAll/Actions/MaskAISlop.swift \
     BindAll/Store/HistoryStore.swift \
+    BindAll/Store/UsageLog.swift \
     BindAll/Engines/AIEngine.swift \
     BindAll/Proofread/TextIssue.swift \
     BindAll/Proofread/WordBoundary.swift \

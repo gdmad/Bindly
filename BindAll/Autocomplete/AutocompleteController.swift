@@ -299,7 +299,7 @@ final class AutocompleteController {
         }
         if keyCode == kVK_Escape {
             invalidateSuppression()
-            DispatchQueue.main.async { [weak self] in self?.clearSuggestion() }
+            DispatchQueue.main.async { [weak self] in self?.clearSuggestion(reason: "esc") }
             return nil
         }
         if let delta = Self.navDelta(for: keyCode, layout: snap.layout) {
@@ -312,7 +312,7 @@ final class AutocompleteController {
         // Kill the snapshot synchronously too: a fast Tab right after this key must NOT be consumed
         // and accepted against a stale `partial` (that duplicated the just-typed letter).
         invalidateSuppression()
-        DispatchQueue.main.async { [weak self] in self?.clearSuggestion() }
+        DispatchQueue.main.async { [weak self] in self?.clearSuggestion(reason: "typedOn") }
         return Unmanaged.passUnretained(event)
     }
 
@@ -375,7 +375,11 @@ final class AutocompleteController {
         // Every keystroke supersedes any refresh still computing on the work queue.
         refreshGeneration &+= 1
         if suspended { return }
-        if modified { resetWord(); return }
+        if modified {
+            if !candidates.isEmpty { UsageLog.record(.autocomplete, .dismissed, reason: "modifier") }
+            resetWord()
+            return
+        }
 
         // Space completes the current word: learn it and (optionally) predict the next word.
         if keyCode == kVK_Space || typed == " " {
@@ -388,6 +392,7 @@ final class AutocompleteController {
         let navKeys: Set<Int> = [kVK_Escape, kVK_Return, kVK_ANSI_KeypadEnter, kVK_LeftArrow, kVK_RightArrow,
                                  kVK_UpArrow, kVK_DownArrow, kVK_Home, kVK_End, kVK_PageUp, kVK_PageDown]
         if navKeys.contains(keyCode) {
+            if !candidates.isEmpty { UsageLog.record(.autocomplete, .dismissed, reason: "navigation") }
             resetWord()
             return
         }
@@ -489,6 +494,7 @@ final class AutocompleteController {
                 guard !list.isEmpty else { me.clearSuggestion(); return }
                 me.partial = resolvedPartial
                 me.typedBuffer = resolvedPartial // keep the fallback buffer in sync with the truth
+                if me.candidates.isEmpty { UsageLog.record(.autocomplete, .shown, detail: "completion") }
                 me.candidates = list
                 me.selectedIndex = 0
                 me.lastAnchor = resolvedAnchor
@@ -541,6 +547,7 @@ final class AutocompleteController {
             self.applyOnMain(gen) { me in
                 guard !words.isEmpty else { me.clearSuggestion(); return }
                 me.partial = "" // nothing typed yet, so accept just types the word
+                if me.candidates.isEmpty { UsageLog.record(.autocomplete, .shown, detail: "nextWord") }
                 me.candidates = words
                 me.selectedIndex = 0
                 me.lastAnchor = anchor
@@ -616,11 +623,14 @@ final class AutocompleteController {
         prevWord2 = prevWord
         prevWord = word
         typedBuffer = ""
+        UsageLog.record(.autocomplete, .accepted, detail: "index:\(selectedIndex)")
         clearSuggestion()
         insert(word: word, replacing: current)
     }
 
-    private func clearSuggestion() {
+    /// `reason`, when given, records that a visible popup was dismissed and why.
+    private func clearSuggestion(reason: String? = nil) {
+        if let reason, !candidates.isEmpty { UsageLog.record(.autocomplete, .dismissed, reason: reason) }
         candidates = []
         selectedIndex = 0
         overlay.hide()

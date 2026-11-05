@@ -998,6 +998,32 @@ eq(OCRParagraphs.join([ocrLine("автодопол-", top: 0.9), ocrLine("нен
 eq(OCRParagraphs.join([ocrLine("Москва -", top: 0.9), ocrLine("Питер", top: 0.85)]),
    "Москва - Питер", "a dash before a capital is kept")
 
+print("UsageLog")
+let usageDir = FileManager.default.temporaryDirectory.appendingPathComponent("bindall-usage-\(UUID().uuidString)")
+let usageLog = UsageLog(directory: usageDir)
+let usageSemaphore = DispatchSemaphore(value: 0)
+nonisolated(unsafe) var usageRead: [UsageEvent] = []
+nonisolated(unsafe) var usageFile = ""
+let usageEvent = UsageEvent(time: Date(timeIntervalSince1970: 1_780_000_000), feature: .autocomplete, kind: .dismissed,
+                            app: "com.tinyspeck.slackmacgap", ms: nil, reason: "esc", detail: nil)
+Task {
+    await usageLog.append(usageEvent)
+    await usageLog.append(UsageEvent(time: .now, feature: .fix, kind: .applied, app: nil, ms: 420, reason: nil, detail: "source:hotkey"))
+    usageRead = await usageLog.events()
+    usageFile = await usageLog.fileURL(for: usageEvent.time).lastPathComponent
+    await usageLog.clear()
+    usageSemaphore.signal()
+}
+usageSemaphore.wait()
+check(usageRead.count == 2 && usageRead.first == usageEvent, "events are appended and read back in order")
+check(usageFile.hasPrefix("usage-") && usageFile.hasSuffix(".jsonl") && usageFile.count == "usage-2026-05.jsonl".count,
+      "one file per month (\(usageFile))")
+let usageEncoder = JSONEncoder(); usageEncoder.dateEncodingStrategy = .iso8601
+let usageKeys = Set(((try? JSONSerialization.jsonObject(with: usageEncoder.encode(usageEvent))) as? [String: Any] ?? [:]).keys)
+check(usageKeys.isSubset(of: ["time", "feature", "kind", "app", "ms", "reason", "detail"]),
+      "an event has only metadata fields, no room for typed text")
+check(!FileManager.default.fileExists(atPath: usageDir.path), "clear removes the data")
+
 print("")
 if failures == 0 {
     print("ALL TESTS PASSED")
