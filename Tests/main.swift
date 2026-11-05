@@ -747,6 +747,8 @@ allChanged.starSelectionEnabled = false
 allChanged.previewFromMenu = false
 allChanged.previewFromHotkeys = true
 allChanged.recentPrompts = ["x"]
+allChanged.maskAISlopRules = ["closers"]
+allChanged.removeTellsWithAI = true
 allChanged.autocompleteContextRanking = false
 allChanged.autocompleteAppMode = "deny"
 allChanged.autocompleteApps = ["com.example.one"]
@@ -1079,6 +1081,26 @@ check(joined(longParts, keepAdded: true) == longNew && joined(longParts, keepAdd
       "the parts rebuild both texts exactly, newlines included")
 check(!TextDiff.hasChanges(TextDiff.words(old: "same text", new: "same text")), "identical texts have no changes")
 check(TextDiff.tokens("  a b") == ["  ", "a ", "b"], "leading whitespace is its own token")
+
+print("MaskAISlop rules")
+eq(MaskAISlop.apply(to: "a — b", rules: []), "a — b", "with no rules nothing changes")
+eq(MaskAISlop.apply(to: "a — b “x”", rules: [.dashes]), "a - b “x”", "only the chosen rule runs")
+eq(MaskAISlop.apply(to: "Use `a — b` or see https://x.com/a—b — ok", rules: [.dashes]),
+   "Use `a — b` or see https://x.com/a—b - ok", "inline code and URLs are left alone")
+eq(MaskAISlop.apply(to: "```\nlet s = “x”\n```\n“y”", rules: [.quotes]), "```\nlet s = “x”\n```\n\"y\"",
+   "fenced code is left alone")
+eq(MaskAISlop.apply(to: "### Plan\nThis is **important** and __clear__.", rules: [.markdown]),
+   "Plan\nThis is important and clear.", "markdown leftovers are removed")
+eq(MaskAISlop.apply(to: "Shipped it! 🎉\nGo 🚀 now", rules: [.decorativeEmoji]), "Shipped it!\nGo 🚀 now",
+   "only emoji at the end of a line go")
+eq(MaskAISlop.apply(to: "Here is the plan.\n\nLet me know if you have any questions!", rules: [.closers]),
+   "Here is the plan.", "a sign-off line is dropped")
+eq(MaskAISlop.apply(to: "План готов.\nЕсли остались вопросы — пишите!", rules: [.closers]), "План готов.",
+   "Russian sign-offs too")
+eq(MaskAISlop.apply(to: "10\u{00A0}km", rules: [.spaces]), "10 km", "non-breaking spaces become spaces")
+eq(MaskAISlop.apply(to: "10\u{00A0}km", rules: []), "10\u{00A0}km", "and stay without the rule")
+check(MaskAISlop.stockPhrases(in: "We're thrilled to delve into this game-changer. Важно отметить, что") == ["delve", "game-changer", "важно отметить"],
+      "stock phrases are found in both languages")
 
 print("UsageLog")
 let usageDir = FileManager.default.temporaryDirectory.appendingPathComponent("bindall-usage-\(UUID().uuidString)")

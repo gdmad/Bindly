@@ -227,6 +227,12 @@ struct Settings: Codable, Equatable {
     var previewFromHotkeys: Bool = false
     /// The last custom prompts, newest first (at most 5).
     var recentPrompts: [String] = []
+    /// Which Mask AI Slop clean-ups run (`MaskAISlopRule` raw values).
+    var maskAISlopRules: [String] = MaskAISlopRule.defaults.map(\.rawValue).sorted()
+    /// "Remove AI tells" also asks the AI to rewrite stock phrases, after the mechanical clean-up.
+    var removeTellsWithAI: Bool = false
+
+    var maskRules: Set<MaskAISlopRule> { Set(maskAISlopRules.compactMap(MaskAISlopRule.init(rawValue:))) }
     var languageToolMode: LanguageToolMode = .free
     var languageToolBaseURL: String = "https://api.languagetool.org/v2"  // used only in self-hosted mode
     var languageToolUsername: String = ""           // Premium account email
@@ -280,7 +286,7 @@ extension Settings {
              proofreadMinLength, proofreadAppMode, proofreadApps,
              historyEnabled, sourceLanguage, targetLanguage,
              correctEnabled, starFieldEnabled, starSelectionEnabled, previewFromMenu, previewFromHotkeys,
-             recentPrompts, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
+             recentPrompts, maskAISlopRules, removeTellsWithAI, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
              openRouterFreeOnly, providers, defaultActionHotkey, translateHotkey,
              screenTranslateHotkey, quickTranslateHotkey
     }
@@ -338,6 +344,8 @@ extension Settings {
         if let v = try c.decodeIfPresent(Bool.self, forKey: .previewFromMenu) { previewFromMenu = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .previewFromHotkeys) { previewFromHotkeys = v }
         if let v = try c.decodeIfPresent([String].self, forKey: .recentPrompts) { recentPrompts = v }
+        if let v = try c.decodeIfPresent([String].self, forKey: .maskAISlopRules) { maskAISlopRules = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .removeTellsWithAI) { removeTellsWithAI = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .languageToolBaseURL) { languageToolBaseURL = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .languageToolUsername) { languageToolUsername = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .languageToolLanguage) { languageToolLanguage = v }

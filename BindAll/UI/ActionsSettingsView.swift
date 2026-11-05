@@ -41,6 +41,8 @@ struct ActionsSettingsView: View {
                 HelpHeader("Separator", "Text after the last separator is treated as the instruction. Example: \"make this formal -- tr\" runs the tr action on the text before the separator.")
             }
 
+            MaskAISlopSection()
+
             Section {
                 ActionKeysSettingsView()
             } header: {

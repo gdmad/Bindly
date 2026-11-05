@@ -7,10 +7,11 @@ import SwiftUI
 final class PreviewController {
     private var panel: NSPanel?
 
-    func show(title: String, original: String, result: String, near point: NSPoint, onApply: @escaping () -> Void) {
+    func show(title: String, original: String, result: String, note: String? = nil, near point: NSPoint,
+              onApply: @escaping () -> Void) {
         close()
         UsageLog.record(.preview, .shown)
-        let model = PreviewModel(title: title, original: original, result: result,
+        let model = PreviewModel(title: title, original: original, result: result, note: note,
                                  onApply: { [weak self] in
                                      UsageLog.record(.preview, .applied)
                                      self?.close()

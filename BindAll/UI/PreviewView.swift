@@ -12,6 +12,11 @@ struct PreviewView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxHeight: .infinity)
+            if let note = model.note {
+                Label(note, systemImage: "exclamationmark.bubble")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
             HStack(spacing: 10) {
                 if !model.hasChanges {
                     Text("No changes").font(.callout).foregroundStyle(.secondary)

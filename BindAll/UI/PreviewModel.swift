@@ -14,12 +14,16 @@ final class PreviewModel {
     let original: String
     let result: String
     let parts: [TextDiff.Part]
+    /// Something worth knowing that the diff does not show (e.g. stock phrases left in the text).
+    let note: String?
     var mode: Mode = .changes
     private(set) var copied = false
     @ObservationIgnored let onApply: () -> Void
     @ObservationIgnored let onClose: () -> Void
 
-    init(title: String, original: String, result: String, onApply: @escaping () -> Void, onClose: @escaping () -> Void) {
+    init(title: String, original: String, result: String, note: String? = nil,
+         onApply: @escaping () -> Void, onClose: @escaping () -> Void) {
+        self.note = note
         self.title = title
         self.original = original
         self.result = result

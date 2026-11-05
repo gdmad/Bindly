@@ -300,6 +300,13 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   and `previewFromHotkeys` (default off) in Actions. **Custom prompt** (`UI/CustomPrompt*`): a key
   panel with the prompt field, the last 5 prompts (`Settings.recentPrompts`), Save as action key,
   Run (preview, Return) or Show (popup only, Opt+Return).
+- **Mask AI Slop rules** (`Actions/MaskAISlopRule.swift`, `MaskAISlop.apply(to:rules:)`): dashes,
+  quotes, ellipsis, spaces, emoji (the original five, on by default), decorative trailing emoji,
+  Markdown leftovers (`**`, `__`, `#` headings), sign-off lines, and stock phrases (listed only).
+  Chosen in Actions -> Mask AI Slop (`Settings.maskAISlopRules`). Inline/fenced code and URLs are
+  protected segments and never changed. **Remove AI tells** (star menu) = the chosen rules plus
+  `MaskAISlopRule.removeTells`, optionally followed by an AI rewrite (`removeTellsWithAI`); its
+  preview notes stock phrases still present.
 - **Usage metrics** (`Store/UsageLog.swift`): local only, JSON lines in
   `Application Support/BindAll/Usage/usage-YYYY-MM.jsonl`. Each event: feature, kind
   (shown/accepted/applied/skipped/dismissed/failed), frontmost app, optional ms, and fixed `reason` /

@@ -19,7 +19,7 @@ struct GeneralSettingsView: View {
             Section("Output") {
                 HelpToggleRow("Restore clipboard after replacing", "When replacing the selection, BindAll puts the result on the clipboard and pastes it. With this on, your previous clipboard contents are restored a moment after pasting, so the tool does not overwrite what you had copied. Off: the result stays on the clipboard.",
                               isOn: $appState.settings.restoreClipboard)
-                HelpToggleRow("Mask AI Slop", "Normalizes typical 'AI' typography in results: em/en dashes become '-', smart quotes and apostrophes become straight ones, and emoji and unusual unicode are stripped.",
+                HelpToggleRow("Mask AI Slop", "Cleans typical 'AI' leftovers out of action results: long dashes, curly quotes, emoji and more. Which clean-ups run is chosen on the Actions tab (Mask AI Slop).",
                               isOn: $appState.settings.maskAISlop)
                 UsageDataRow()
                 HelpToggleRow("Keep history", "Stores the last 50 results locally (menu bar > History) so a closed popup or overwritten paste can be recovered. Stored on this Mac only; never includes API keys.",

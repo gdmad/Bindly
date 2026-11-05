@@ -163,7 +163,7 @@ final class HotkeyCoordinator {
 
     /// What a star menu item does.
     enum StarAction {
-        case fix, spelling, translate
+        case fix, spelling, translate, removeTells
         case actionKey(ActionKey)
         case prompt(String, showOnly: Bool)
     }
@@ -178,6 +178,7 @@ final class HotkeyCoordinator {
         add("Fix", "wand.and.stars") { [weak self] in self?.runStarAction(.fix, context) }
         add("Fix spelling", "textformat.abc") { [weak self] in self?.runStarAction(.spelling, context) }
         add("Translate", "globe") { [weak self] in self?.runStarAction(.translate, context) }
+        add("Remove AI tells", "eraser") { [weak self] in self?.runStarAction(.removeTells, context) }
         let keys = appState.settings.actionKeys.filter { !$0.prompt.isEmpty }
         if !keys.isEmpty {
             menu.addItem(.separator())
@@ -236,6 +237,7 @@ final class HotkeyCoordinator {
         let (feature, title, detail): (UsageFeature, String, String) = switch action {
         case .fix: (.fix, "Fix", "source:star")
         case .spelling: (.spelling, "Fix spelling", "source:star")
+        case .removeTells: (.removeTells, "Remove AI tells", "source:star")
         case .actionKey(let key): (.actionKey, key.label.isEmpty ? key.key : key.label, key.key)
         case .prompt: (.customPrompt, "Custom prompt", "source:star")
         case .translate: (.translate, "Translate", "source:star")
@@ -248,6 +250,8 @@ final class HotkeyCoordinator {
                 switch action {
                 case .spelling:
                     result = try await EngineFactory.makeLanguageTool(appState: self.appState).correct(text)
+                case .removeTells:
+                    result = try await self.removeTells(from: text, settings: settings)
                 case .fix, .actionKey, .prompt, .translate:
                     let instruction: String = switch action {
                     case .actionKey(let key): key.prompt
@@ -256,7 +260,7 @@ final class HotkeyCoordinator {
                     }
                     let engine = EngineFactory.make(kind: settings.defaultEngine, appState: self.appState)
                     result = try await engine.process(text: text, instruction: instruction)
-                    if settings.maskAISlop { result = MaskAISlop.apply(to: result) }
+                    if settings.maskAISlop { result = MaskAISlop.apply(to: result, rules: settings.maskRules) }
                 }
                 if Task.isCancelled { return }
                 self.recordHistory(kind: .action, input: text, output: result, engine: settings.defaultEngine.displayName)
@@ -270,8 +274,14 @@ final class HotkeyCoordinator {
                     UsageLog.record(feature, .applied, detail: detail, ms: ms)
                     self?.replace(context, with: result)
                 }
+                var note: String?
+                if case .removeTells = action {
+                    let left = MaskAISlop.stockPhrases(in: result)
+                    if !left.isEmpty { note = "Stock phrases left: " + left.joined(separator: ", ") }
+                }
                 if settings.previewFromMenu {
-                    self.preview.show(title: title, original: text, result: result, near: context.anchor, onApply: apply)
+                    self.preview.show(title: title, original: text, result: result, note: note,
+                                      near: context.anchor, onApply: apply)
                 } else {
                     apply()
                 }
@@ -282,6 +292,25 @@ final class HotkeyCoordinator {
             }
         }
     }
+
+    /// Mechanical clean-up first (always including Markdown leftovers, trailing emoji and sign-offs),
+    /// then, when asked for, an AI pass over what no rule can fix: stock phrases and filler.
+    private func removeTells(from text: String, settings: Settings) async throws -> String {
+        var result = MaskAISlop.apply(to: text, rules: settings.maskRules.union(MaskAISlopRule.removeTells))
+        if settings.removeTellsWithAI {
+            let engine = EngineFactory.make(kind: settings.defaultEngine, appState: appState)
+            result = try await engine.process(text: result, instruction: Self.removeTellsPrompt)
+            result = MaskAISlop.apply(to: result, rules: settings.maskRules.union(MaskAISlopRule.removeTells))
+        }
+        return result
+    }
+
+    static let removeTellsPrompt = """
+        Rewrite this text so it no longer reads as AI-generated: drop stock phrases (delve, truly, \
+        game-changer, "it's worth noting", "важно отметить" and the like), filler and over-enthusiastic \
+        tone, and use plain punctuation. Keep the meaning, the language, names, numbers and the line \
+        structure. Reply with the rewritten text only.
+        """
 
     /// Puts `result` in place of the context's text: back in its app, select the range, paste.
     private func replace(_ context: StarContext, with result: String) {
@@ -494,7 +523,7 @@ final class HotkeyCoordinator {
                 var result = try await engine.process(text: parsed.content, instruction: parsed.instruction)
                 if Task.isCancelled { return }
                 if settings.maskAISlop {
-                    result = MaskAISlop.apply(to: result)
+                    result = MaskAISlop.apply(to: result, rules: settings.maskRules)
                 }
                 self.recordHistory(kind: .action, input: parsed.content, output: result,
                                    engine: settings.defaultEngine.displayName)
