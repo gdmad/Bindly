@@ -10,7 +10,7 @@ struct AutocompleteSettingsView: View {
         @Bindable var appState = appState
         Form {
             Section {
-                HelpToggleRow("Word autocomplete", "Suggests completions for the word you are typing and can predict the next word; press Tab to insert. Works in most apps; skipped in password fields.",
+                HelpToggleRow("Word autocomplete", "Suggests completions for the word you are typing and can predict the next word. Tab inserts the first one; Down goes into the list to pick another (arrows, then Tab or Return); Esc closes it. Until you press Down the list takes no other keys, so the arrows, Return and switching the input language work as usual and close it. Works in most apps; skipped in password fields.",
                               isOn: $appState.settings.autocompleteEnabled)
             } header: {
                 Text("Autocomplete")

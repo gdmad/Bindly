@@ -36,6 +36,9 @@ final class ProofreadController {
     private var skips = ProofreadSkips()
     /// Whether the fixes popup is open, for the usage log's shown/dismissed pairs.
     private var popupShown = false
+    /// Went into the fixes with ↓: only then do the arrows choose among them.
+    private var browsing = false
+    private var inputSourceObserver: NSObjectProtocol?
     private let popover = ProofreadPopover()
     private let underlines = UnderlineOverlay()
     private static let log = Logger(subsystem: "com.evgeny.bindall", category: "proofread")
@@ -81,10 +84,18 @@ final class ProofreadController {
 
     /// Written on main, read on the tap thread, guarded by its own lock.
     private final class SharedState: @unchecked Sendable {
-        private var lock = os_unfair_lock()
-        private var value = false
+        struct Snapshot {
+            var isActive = false
+            /// Went into the fixes with ↓ (see `ProofreadKeyPolicy`).
+            var browsing = false
+            var atFirst = true
+            var layout = PopupLayout.column
+        }
 
-        var isActive: Bool {
+        private var lock = os_unfair_lock()
+        private var value = Snapshot()
+
+        var snapshot: Snapshot {
             get {
                 os_unfair_lock_lock(&lock)
                 defer { os_unfair_lock_unlock(&lock) }
@@ -96,7 +107,13 @@ final class ProofreadController {
                 os_unfair_lock_unlock(&lock)
             }
         }
+
+        var isActive: Bool {
+            get { snapshot.isActive }
+            set { var s = snapshot; s.isActive = newValue; snapshot = s }
+        }
     }
+
 
     // Auto-popup on click.
     private var mouseMonitor: Any?
@@ -328,6 +345,7 @@ final class ProofreadController {
         guard index >= 0, index < issues.count else { endNavigation(); return }
         if !popupShown { UsageLog.record(.proofread, .shown) }
         popupShown = true
+        // Stepping to another issue keeps you inside the fixes if you were there.
         currentIndex = index
         selectedReplacement = 0
         showCurrent()
@@ -344,13 +362,15 @@ final class ProofreadController {
         guard currentIndex < issues.count else { endNavigation(); return }
         let issue = issues[currentIndex]
 
-        popover.show(issue: issue, selected: selectedReplacement,
+        syncKeySnapshot()
+        popover.show(issue: issue, selected: selectedReplacement, softSelection: !browsing,
                      position: "\(currentIndex + 1) of \(issues.count)",
                      anchor: anchor(for: issue),
                      layout: config.layout,
                      fontSize: config.fontSize,
                      onHover: { [weak self] index in self?.hoverReplacement(index) },
-                     onAccept: { [weak self] index in self?.acceptReplacement(index) })
+                     onAccept: { [weak self] index in self?.acceptReplacement(index) },
+                     onClose: { [weak self] in self?.endNavigation(reason: "closeButton") })
     }
 
     /// The "Skip" row comes after the fixes, so its index is the number of fixes.
@@ -359,7 +379,9 @@ final class ProofreadController {
     /// Mouse hover over a row: mirror it into the keyboard selection.
     private func hoverReplacement(_ index: Int) {
         guard let issue = issues[safe: currentIndex], index >= 0, index <= skipIndex(of: issue),
-              index != selectedReplacement else { return }
+              index != selectedReplacement || !browsing else { return }
+        // Pointing at a fix is choosing among them, the same as going in with ↓.
+        browsing = true
         selectedReplacement = index
         showCurrent()
     }
@@ -397,19 +419,34 @@ final class ProofreadController {
     /// Routes an arrow key by layout. The column keeps fixes on the vertical axis and problem
     /// stepping on the horizontal one; the line swaps them; the tile uses both axes for fixes (Tab
     /// still steps between problems).
+    /// Only reached while browsing the fixes: the policy already decided the arrow belongs to them.
     private func moveArrow(dx: Int, dy: Int) {
         switch config.layout {
-        case .column:
-            if dx != 0 { step(dx) } else { move(dy) }
-        case .line:
-            if dy != 0 { step(dy) } else { move(dx) }
-        case .tile:
-            moveGrid(dx: dx, dy: dy)
+        case .column: move(dy)
+        case .line: move(dx)
+        case .tile: moveGrid(dx: dx, dy: dy)
         }
     }
 
-    /// Moves to another issue, wrapping around: with the popup open, Tab and the horizontal arrows
-    /// walk the problem words, while the vertical ones choose among that word's fixes.
+    /// Going into the fixes shows the selection in full; backing out returns to the first fix, which
+    /// Return would apply, shown softly.
+    private func setBrowsing(_ on: Bool) {
+        guard popupShown, browsing != on else { return }
+        browsing = on
+        if !on { selectedReplacement = 0 }
+        showCurrent()
+    }
+
+    /// Publishes what the key tap needs to decide, after anything that changes it.
+    private func syncKeySnapshot() {
+        var snap = shared.snapshot
+        snap.browsing = browsing
+        snap.atFirst = selectedReplacement == 0
+        snap.layout = config.layout
+        shared.snapshot = snap
+    }
+
+    /// Moves to another issue, wrapping around: Tab and Shift+Tab walk the problem words.
     private func step(_ delta: Int) {
         guard !issues.isEmpty else { endNavigation(); return }
         let next = (currentIndex + delta + issues.count) % issues.count
@@ -536,6 +573,7 @@ final class ProofreadController {
     private func endNavigation(reason: String? = nil) {
         if popupShown, let reason { UsageLog.record(.proofread, .dismissed, reason: reason) }
         popupShown = false
+        browsing = false
         currentIndex = 0
         selectedReplacement = 0
         popover.hide()
@@ -635,38 +673,37 @@ final class ProofreadController {
 
         let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
-        // Any modifier (including Shift) passes through, so Shift+Return still makes a newline.
-        guard !flags.contains(.maskCommand), !flags.contains(.maskControl),
-              !flags.contains(.maskAlternate), !flags.contains(.maskShift) else {
-            return Unmanaged.passUnretained(event)
-        }
+        let snap = shared.snapshot
 
-        switch keyCode {
-        case kVK_UpArrow:
-            DispatchQueue.main.async { [weak self] in self?.moveArrow(dx: 0, dy: -1) }
+        switch ProofreadKeyPolicy.action(keyCode: keyCode, command: flags.contains(.maskCommand),
+                                         control: flags.contains(.maskControl),
+                                         option: flags.contains(.maskAlternate), shift: flags.contains(.maskShift),
+                                         browsing: snap.browsing, atFirst: snap.atFirst, layout: snap.layout) {
+        case .enter:
+            DispatchQueue.main.async { [weak self] in self?.setBrowsing(true) }
             return nil
-        case kVK_DownArrow:
-            DispatchQueue.main.async { [weak self] in self?.moveArrow(dx: 0, dy: 1) }
+        case .leave:
+            DispatchQueue.main.async { [weak self] in self?.setBrowsing(false) }
             return nil
-        case kVK_LeftArrow:
-            DispatchQueue.main.async { [weak self] in self?.moveArrow(dx: -1, dy: 0) }
+        case .move(let dx, let dy):
+            DispatchQueue.main.async { [weak self] in self?.moveArrow(dx: dx, dy: dy) }
             return nil
-        case kVK_RightArrow:
-            DispatchQueue.main.async { [weak self] in self?.moveArrow(dx: 1, dy: 0) }
-            return nil
-        case kVK_Return, kVK_ANSI_KeypadEnter:
+        case .apply:
             DispatchQueue.main.async { [weak self] in self?.accept() }
             return nil
-        case kVK_Tab:
+        case .nextIssue:
             DispatchQueue.main.async { [weak self] in self?.step(1) }
             return nil
-        case kVK_Escape:
-            // Closes the popup only: the underlines stay, they are not part of this popup.
-            DispatchQueue.main.async { [weak self] in self?.endNavigation(reason: "esc") }
+        case .previousIssue:
+            DispatchQueue.main.async { [weak self] in self?.step(-1) }
             return nil
-        default:
-            // Anything else means the user moved on: close, but let the key reach the field.
-            DispatchQueue.main.async { [weak self] in self?.endNavigation(reason: "typedOn") }
+        case .close(let reason):
+            // Closes the popup only: the underlines stay, they are not part of this popup.
+            DispatchQueue.main.async { [weak self] in self?.endNavigation(reason: reason) }
+            return nil
+        case .passAndClose(let reason):
+            // The user moved on (caret, selection, shortcut, typing): close, and let the key through.
+            DispatchQueue.main.async { [weak self] in self?.endNavigation(reason: reason) }
             return Unmanaged.passUnretained(event)
         }
     }
@@ -690,6 +727,12 @@ final class ProofreadController {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.end() }
         }
+        // Switching the input language means the user is about to type, not to pick a fix.
+        inputSourceObserver = DistributedNotificationCenter.default().addObserver(
+            forName: AutocompleteController.inputSourceChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.endNavigation(reason: "languageSwitch") }
+        }
     }
 
     private func stopClickMonitor() {
@@ -697,6 +740,8 @@ final class ProofreadController {
         mouseMonitor = nil
         if let appSwitchObserver { NSWorkspace.shared.notificationCenter.removeObserver(appSwitchObserver) }
         appSwitchObserver = nil
+        if let inputSourceObserver { DistributedNotificationCenter.default().removeObserver(inputSourceObserver) }
+        inputSourceObserver = nil
         clickDebounce?.cancel()
         clickDebounce = nil
     }

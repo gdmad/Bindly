@@ -8,6 +8,8 @@ struct PopupCell: View {
     let fontSize: CGFloat
     /// Column layouts stretch their cells so the selection pill spans the whole row.
     var fillsWidth = false
+    /// A quiet selection: what Tab would take before the list is entered with ↓.
+    var softSelection = false
     /// A leading symbol, for a cell that is an action rather than a word (proofread's "Skip").
     var systemImage: String?
     /// Secondary text for such an action, so it never reads as one of the fixes.
@@ -32,8 +34,7 @@ struct PopupCell: View {
         .padding(.horizontal, PopupMetrics.cellPaddingH)
         .padding(.vertical, PopupMetrics.cellPaddingV)
         .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
-        .background(isSelected ? Color(nsColor: .selectedContentBackgroundColor) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: PopupMetrics.cellRadius))
+        .background(background, in: RoundedRectangle(cornerRadius: PopupMetrics.cellRadius))
         .contentShape(Rectangle())
         // A tap gesture rather than a Button: the panel is non-activating and never key, and
         // applying the fix on a click is the popup's main job -- not worth risking on a control
@@ -46,8 +47,13 @@ struct PopupCell: View {
         }
     }
 
+    private var background: AnyShapeStyle {
+        guard isSelected else { return AnyShapeStyle(.clear) }
+        return softSelection ? AnyShapeStyle(.quaternary) : AnyShapeStyle(Color(nsColor: .selectedContentBackgroundColor))
+    }
+
     private var foreground: AnyShapeStyle {
-        if isSelected { AnyShapeStyle(Color(nsColor: .selectedMenuItemTextColor)) }
+        if isSelected && !softSelection { AnyShapeStyle(Color(nsColor: .selectedMenuItemTextColor)) }
         else if isSecondary { AnyShapeStyle(.secondary) }
         else { AnyShapeStyle(.primary) }
     }

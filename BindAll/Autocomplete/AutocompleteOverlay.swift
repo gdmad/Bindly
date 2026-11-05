@@ -16,12 +16,15 @@ final class AutocompleteOverlay {
     /// screen coordinates, bottom-left origin). `layout` arranges them in a column, a single line, or
     /// a two-row tile. Normally hangs below `anchor`; rises above it instead when the field sits too
     /// low on screen for the list to fit underneath.
-    func show(_ items: [String], selected: Int, layout: PopupLayout, fontSize: CGFloat, anchor: CGRect) {
+    /// `softSelection`: the item is what Tab would take, but the list has not been entered yet, so it
+    /// is marked gently instead of looking like an active selection.
+    func show(_ items: [String], selected: Int, softSelection: Bool = false, layout: PopupLayout,
+              fontSize: CGFloat, anchor: CGRect) {
         let topCount = layout == .tile
             ? PopupTile.topRowCount(for: items, fontSize: fontSize, near: anchor.origin) : 0
         lastTileTopCount = topCount
-        let list = PopupItemsLayout(items: items, selected: selected, layout: layout,
-                                    fontSize: fontSize, tileTopCount: topCount)
+        let list = PopupItemsLayout(items: items, selected: selected, softSelection: softSelection,
+                                    layout: layout, fontSize: fontSize, tileTopCount: topCount)
             .popupChrome()
         presenter.present(list) { PopupPlacement.origin(below: anchor, size: $0) }
     }

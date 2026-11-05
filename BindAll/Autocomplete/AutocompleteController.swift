@@ -53,6 +53,9 @@ final class AutocompleteController {
         var partial = ""
         var layout = PopupLayout.column
         var acceptReturn = true
+        /// Whether the user went into the list with ↓ (see `AutocompleteKeyPolicy`).
+        var browsing = false
+        var atFirst = true
     }
     private var suppression = Suppression()
     private var suppressionLock = os_unfair_lock()
@@ -64,6 +67,9 @@ final class AutocompleteController {
     // Current suggestion state.
     private var candidates: [String] = []
     private var selectedIndex = 0
+    /// Went into the list with ↓: only then do the arrows and Return drive it.
+    private var browsing = false
+    private var inputSourceObserver: NSObjectProtocol?
     private var partial = ""
     private var lastAnchor = CGRect.zero
 
@@ -217,7 +223,18 @@ final class AutocompleteController {
         appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
         ) { [weak self] _ in self?.resetWord() }
+        // Switching the input language means the next keys are not this word any more.
+        inputSourceObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Self.inputSourceChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            if !self.candidates.isEmpty { UsageLog.record(.autocomplete, .dismissed, reason: "languageSwitch") }
+            self.resetWord()
+        }
     }
+
+    /// Posted by the system whenever the selected keyboard input source changes.
+    static let inputSourceChanged = Notification.Name("com.apple.Carbon.TISNotifySelectedKeyboardInputSourceChanged")
 
     func stop() {
         guard running else { return }
@@ -238,6 +255,8 @@ final class AutocompleteController {
         suppressorEnabled = false
         if let observer = appActivationObserver { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
         appActivationObserver = nil
+        if let inputSourceObserver { DistributedNotificationCenter.default().removeObserver(inputSourceObserver) }
+        inputSourceObserver = nil
         setClickMonitor(enabled: false)
         debounce?.cancel()
         debounce = nil
@@ -280,40 +299,45 @@ final class AutocompleteController {
 
         let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
-        let modified = flags.contains(.maskCommand) || flags.contains(.maskControl) || flags.contains(.maskAlternate)
-        let shift = flags.contains(.maskShift)
 
         // Cheap, lock-protected snapshot of the suggestion state; the real state lives on main.
         let snap = readSuppression()
-        guard snap.hasSuggestion, !modified, !shift else { return Unmanaged.passUnretained(event) }
+        guard snap.hasSuggestion else { return Unmanaged.passUnretained(event) }
 
-        // Consume the keys that drive the popup — only as bare keys (any modifier, including Shift,
-        // passes through, so e.g. Shift+Return still makes a newline).
-        let isReturn = keyCode == kVK_Return || keyCode == kVK_ANSI_KeypadEnter
-        if keyCode == kVK_Tab || (isReturn && snap.acceptReturn) {
+        switch AutocompleteKeyPolicy.action(keyCode: keyCode, command: flags.contains(.maskCommand),
+                                            control: flags.contains(.maskControl),
+                                            option: flags.contains(.maskAlternate), shift: flags.contains(.maskShift),
+                                            browsing: snap.browsing, atFirst: snap.atFirst,
+                                            layout: snap.layout, acceptReturn: snap.acceptReturn) {
+        case .pass:
+            return Unmanaged.passUnretained(event)
+        case .accept:
             let word = snap.selectedWord
             let replacing = snap.partial
             invalidateSuppression() // a second fast Tab must not be consumed against the accepted popup
             DispatchQueue.main.async { [weak self] in self?.accept(word: word, replacing: replacing) }
             return nil
-        }
-        if keyCode == kVK_Escape {
+        case .enter:
+            DispatchQueue.main.async { [weak self] in self?.setBrowsing(true) }
+            return nil
+        case .leave:
+            DispatchQueue.main.async { [weak self] in self?.setBrowsing(false) }
+            return nil
+        case .move(let dx, let dy):
+            DispatchQueue.main.async { [weak self] in self?.move(dx: dx, dy: dy) }
+            return nil
+        case .close(let reason):
             invalidateSuppression()
-            DispatchQueue.main.async { [weak self] in self?.clearSuggestion(reason: "esc") }
+            DispatchQueue.main.async { [weak self] in self?.clearSuggestion(reason: reason) }
             return nil
+        case .passAndClose(let reason):
+            // Close now instead of waiting for the monitor's onKey handling to catch up, and kill the
+            // snapshot synchronously too: a fast Tab right after this key must NOT be consumed and
+            // accepted against a stale `partial` (that duplicated the just-typed letter).
+            invalidateSuppression()
+            DispatchQueue.main.async { [weak self] in self?.clearSuggestion(reason: reason) }
+            return Unmanaged.passUnretained(event)
         }
-        if let delta = Self.navDelta(for: keyCode, layout: snap.layout) {
-            DispatchQueue.main.async { [weak self] in self?.move(dx: delta.dx, dy: delta.dy) }
-            return nil
-        }
-        // Any other key isn't part of the nav set: close the popup now (it touches UI, so on main)
-        // instead of waiting for the monitor's onKey boundary handling to catch up, but let the key
-        // through so it still reaches the field (and the monitor, which builds the next word).
-        // Kill the snapshot synchronously too: a fast Tab right after this key must NOT be consumed
-        // and accepted against a stale `partial` (that duplicated the just-typed letter).
-        invalidateSuppression()
-        DispatchQueue.main.async { [weak self] in self?.clearSuggestion(reason: "typedOn") }
-        return Unmanaged.passUnretained(event)
     }
 
     /// Tap-thread side: marks the suggestion dead immediately, so a key arriving before main has
@@ -340,7 +364,8 @@ final class AutocompleteController {
         let snap = Suppression(hasSuggestion: hasSuggestion,
                                selectedWord: candidates.indices.contains(selectedIndex) ? candidates[selectedIndex] : "",
                                partial: partial,
-                               layout: config.layout, acceptReturn: config.acceptReturn)
+                               layout: config.layout, acceptReturn: config.acceptReturn,
+                               browsing: browsing, atFirst: selectedIndex == 0)
         os_unfair_lock_lock(&suppressionLock)
         suppression = snap
         os_unfair_lock_unlock(&suppressionLock)
@@ -497,12 +522,13 @@ final class AutocompleteController {
                 if me.candidates.isEmpty { UsageLog.record(.autocomplete, .shown, detail: "completion") }
                 me.candidates = list
                 me.selectedIndex = 0
+                me.browsing = false
                 me.lastAnchor = resolvedAnchor
                 // Arm the suppressor before the popup becomes visible on screen, not after -- Tab
                 // pressed in the gap between the two used to reach the target app instead of us.
                 me.syncSuppression()
-                me.overlay.show(list, selected: 0, layout: cfg.layout, fontSize: cfg.fontSize,
-                                anchor: resolvedAnchor)
+                me.overlay.show(list, selected: 0, softSelection: true, layout: cfg.layout,
+                                fontSize: cfg.fontSize, anchor: resolvedAnchor)
             }
         }
     }
@@ -550,10 +576,11 @@ final class AutocompleteController {
                 if me.candidates.isEmpty { UsageLog.record(.autocomplete, .shown, detail: "nextWord") }
                 me.candidates = words
                 me.selectedIndex = 0
+                me.browsing = false
                 me.lastAnchor = anchor
                 me.syncSuppression()
-                me.overlay.show(words, selected: 0, layout: cfg.layout, fontSize: cfg.fontSize,
-                                anchor: anchor)
+                me.overlay.show(words, selected: 0, softSelection: true, layout: cfg.layout,
+                                fontSize: cfg.fontSize, anchor: anchor)
             }
         }
     }
@@ -569,30 +596,6 @@ final class AutocompleteController {
 
     /// Which arrow keys drive the suggestion selection for a layout, and in which direction. A key a
     /// layout does not navigate with returns nil and falls through to the "user moved on" close path.
-    private static func navDelta(for keyCode: Int, layout: PopupLayout) -> (dx: Int, dy: Int)? {
-        switch layout {
-        case .column:
-            switch keyCode {
-            case kVK_UpArrow: return (0, -1)
-            case kVK_DownArrow: return (0, 1)
-            default: return nil
-            }
-        case .line:
-            switch keyCode {
-            case kVK_LeftArrow: return (-1, 0)
-            case kVK_RightArrow: return (1, 0)
-            default: return nil
-            }
-        case .tile:
-            switch keyCode {
-            case kVK_UpArrow: return (0, -1)
-            case kVK_DownArrow: return (0, 1)
-            case kVK_LeftArrow: return (-1, 0)
-            case kVK_RightArrow: return (1, 0)
-            default: return nil
-            }
-        }
-    }
 
     private func move(dx: Int, dy: Int) {
         guard !candidates.isEmpty else { return }
@@ -607,9 +610,23 @@ final class AutocompleteController {
         }
         guard next != selectedIndex else { return }
         selectedIndex = next
-        overlay.show(candidates, selected: selectedIndex, layout: config.layout,
-                     fontSize: config.fontSize, anchor: lastAnchor)
+        redraw()
         syncSuppression()
+    }
+
+    /// Going into the list shows the selection in full; backing out returns to the first item, which
+    /// Tab would take, shown softly.
+    private func setBrowsing(_ on: Bool) {
+        guard !candidates.isEmpty, browsing != on else { return }
+        browsing = on
+        if !on { selectedIndex = 0 }
+        redraw()
+        syncSuppression()
+    }
+
+    private func redraw() {
+        overlay.show(candidates, selected: selectedIndex, softSelection: !browsing, layout: config.layout,
+                     fontSize: config.fontSize, anchor: lastAnchor)
     }
 
     /// Inserts `word`, replacing the `partial` the user had typed when the popup showed it.
@@ -633,6 +650,7 @@ final class AutocompleteController {
         if let reason, !candidates.isEmpty { UsageLog.record(.autocomplete, .dismissed, reason: reason) }
         candidates = []
         selectedIndex = 0
+        browsing = false
         overlay.hide()
         refreshGeneration &+= 1 // drop any in-flight refresh so it cannot re-show the popup
         syncSuppression()

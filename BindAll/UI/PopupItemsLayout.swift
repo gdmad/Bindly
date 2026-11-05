@@ -10,6 +10,8 @@ import SwiftUI
 struct PopupItemsLayout: View {
     let items: [String]
     let selected: Int
+    /// The selection is a hint (what Tab takes), not an active choice; see `PopupCell.softSelection`.
+    var softSelection = false
     let layout: PopupLayout
     let fontSize: CGFloat
     /// Items on the first row of a tile, measured in `PopupTile.topRowCount`; 0 = even split.
@@ -47,7 +49,7 @@ struct PopupItemsLayout: View {
 
     private func cell(_ index: Int, fillsWidth: Bool = false) -> some View {
         PopupCell(text: items[index], isSelected: index == selected, fontSize: fontSize,
-                  fillsWidth: fillsWidth, onActivate: onActivate.map { activate in { activate(index) } })
+                  fillsWidth: fillsWidth, softSelection: softSelection, onActivate: onActivate.map { activate in { activate(index) } })
             // The guard avoids a hover -> re-render -> hover feedback loop.
             .onHover { inside in if inside && index != selected { onHover?(index) } }
     }

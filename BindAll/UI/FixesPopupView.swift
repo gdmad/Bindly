@@ -6,6 +6,8 @@ struct FixesPopupView: View {
     let kind: IssueKind
     let replacements: [String]
     let selected: Int
+    /// Before the fixes are entered with ↓ the selection only hints at what Return applies.
+    let softSelection: Bool
     let layout: PopupLayout
     /// Fixes on the first row of a tile, measured in `ProofreadPopover.show()`; 0 = even split.
     let tileTopCount: Int
@@ -15,11 +17,13 @@ struct FixesPopupView: View {
     let fontSize: CGFloat
     let onHover: (Int) -> Void
     let onAccept: (Int) -> Void
+    let onClose: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: PopupMetrics.cellSpacing) {
             FixesPopupHeader(title: title, kind: kind, position: position, fontSize: fontSize,
-                             skipSelected: selected == skipIndex, onHoverSkip: hoverSkip, onSkip: skip)
+                             skipSelected: selected == skipIndex, onHoverSkip: hoverSkip, onSkip: skip,
+                             onClose: onClose)
             if replacements.isEmpty {
                 // Real information, not a hint: secondary rather than tertiary, which is hard to read
                 // on the material.
@@ -28,7 +32,7 @@ struct FixesPopupView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, PopupMetrics.cellPaddingH)
             } else {
-                PopupItemsLayout(items: replacements, selected: selected, layout: layout,
+                PopupItemsLayout(items: replacements, selected: selected, softSelection: softSelection, layout: layout,
                                  fontSize: fontSize, tileTopCount: tileTopCount,
                                  onHover: onHover, onActivate: onAccept)
             }

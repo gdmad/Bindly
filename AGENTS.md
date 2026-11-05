@@ -266,6 +266,16 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   `TranslationLayout.restore` then swaps the output's newline runs for the source's. OCR lines are
   first joined into paragraphs (`OCRParagraphs`: small vertical gap and aligned left edge = same
   paragraph; a hyphenated wrap is rejoined), since screen line breaks cut sentences in half.
+- **Popup keys (Safari / macOS inline predictions model):** a suggestion list or the fixes popup
+  takes no navigation keys until the user goes into it with Down. `AutocompleteKeyPolicy` and
+  `ProofreadKeyPolicy` (pure, tested) decide per key and state (shown vs browsing): shown -- Tab
+  accepts the first suggestion / walks issues (Shift+Tab back), Return applies the first fix
+  (autocomplete: Return is not taken, it may send the message), Down enters, Esc closes; every other
+  arrow, Return, Shift+arrow, any Cmd/Ctrl/Opt shortcut and typing go to the field and close.
+  Browsing -- the layout's arrows move (Up from the first item backs out), Return/Tab accept, Esc
+  backs out. Until entered, the first item is shown with a soft highlight (`PopupCell.softSelection`).
+  Both popups close when the input source changes (`TISNotifySelectedKeyboardInputSourceChanged`).
+  The fixes popup header has Skip (eye) and Close (cross) icons.
 - **Usage metrics** (`Store/UsageLog.swift`): local only, JSON lines in
   `Application Support/BindAll/Usage/usage-YYYY-MM.jsonl`. Each event: feature, kind
   (shown/accepted/applied/skipped/dismissed/failed), frontmost app, optional ms, and fixed `reason` /

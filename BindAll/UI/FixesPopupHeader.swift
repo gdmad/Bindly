@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The popup's top line: what is wrong and where this word sits among the problems found, then the
-/// Skip button.
+/// Skip and Close buttons.
 struct FixesPopupHeader: View {
     let title: String
     let kind: IssueKind
@@ -11,12 +11,14 @@ struct FixesPopupHeader: View {
     let skipSelected: Bool
     let onHoverSkip: () -> Void
     let onSkip: () -> Void
+    let onClose: () -> Void
 
     var body: some View {
         HStack(spacing: PopupMetrics.inlineSpacing) {
             FixesPopupSummary(title: title, kind: kind, position: position, fontSize: fontSize)
             FixesPopupSkipButton(isSelected: skipSelected, fontSize: fontSize,
                                  onHover: onHoverSkip, onActivate: onSkip)
+            FixesPopupCloseButton(fontSize: fontSize, onActivate: onClose)
         }
     }
 }

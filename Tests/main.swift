@@ -998,6 +998,53 @@ eq(OCRParagraphs.join([ocrLine("автодопол-", top: 0.9), ocrLine("нен
 eq(OCRParagraphs.join([ocrLine("Москва -", top: 0.9), ocrLine("Питер", top: 0.85)]),
    "Москва - Питер", "a dash before a capital is kept")
 
+print("AutocompleteKeyPolicy")
+func ac(_ key: Int, browsing: Bool = false, atFirst: Bool = true, layout: PopupLayout = .column, ret: Bool = true,
+        cmd: Bool = false, ctrl: Bool = false, opt: Bool = false, shift: Bool = false) -> AutocompleteKeyPolicy.Action {
+    AutocompleteKeyPolicy.action(keyCode: key, command: cmd, control: ctrl, option: opt, shift: shift,
+                                 browsing: browsing, atFirst: atFirst, layout: layout, acceptReturn: ret)
+}
+// Shown, not entered: only Tab, Down and Esc are taken.
+check(ac(48) == .accept, "Tab accepts the first suggestion")
+check(ac(125) == .enter, "Down goes into the list, as in Safari")
+check(ac(53) == .close(reason: "esc"), "Esc closes")
+check(ac(126) == .passAndClose(reason: "navigation") && ac(123) == .passAndClose(reason: "navigation")
+      && ac(124) == .passAndClose(reason: "navigation"), "Up/Left/Right move the caret and close the list")
+check(ac(36) == .passAndClose(reason: "navigation"), "Return is not taken before entering the list (it may send the message)")
+check(ac(0, shift: true) == .pass, "Shift+letter keeps typing the word")
+check(ac(36, shift: true) == .passAndClose(reason: "navigation"), "Shift+Return makes a newline and closes")
+check(ac(49, ctrl: true) == .passAndClose(reason: "modifier"), "Ctrl+Space (input language) closes the list")
+check(ac(0) == .passAndClose(reason: "typedOn"), "another key goes to the field and closes")
+// Entered.
+check(ac(125, browsing: true, atFirst: true) == .move(dx: 0, dy: 1), "Down moves in the column")
+check(ac(126, browsing: true, atFirst: true) == .leave, "Up from the first item backs out")
+check(ac(126, browsing: true, atFirst: false) == .move(dx: 0, dy: -1), "Up moves when not on the first")
+check(ac(36, browsing: true) == .accept, "Return accepts inside the list")
+check(ac(36, browsing: true, ret: false) == .passAndClose(reason: "navigation"), "unless Accept with Return is off")
+check(ac(53, browsing: true) == .leave, "Esc backs out of the list")
+check(ac(123, browsing: true) == .passAndClose(reason: "navigation"), "Left in a column moves the caret")
+check(ac(124, browsing: true, layout: .line) == .move(dx: 1, dy: 0), "Right moves in a line")
+check(ac(124, browsing: true, layout: .tile) == .move(dx: 1, dy: 0) && ac(125, browsing: true, layout: .tile) == .move(dx: 0, dy: 1),
+      "the tile uses all four arrows")
+
+print("ProofreadKeyPolicy")
+func pk(_ key: Int, browsing: Bool = false, atFirst: Bool = true, layout: PopupLayout = .column,
+        cmd: Bool = false, opt: Bool = false, shift: Bool = false) -> ProofreadKeyPolicy.Action {
+    ProofreadKeyPolicy.action(keyCode: key, command: cmd, control: false, option: opt, shift: shift,
+                              browsing: browsing, atFirst: atFirst, layout: layout)
+}
+check(pk(123) == .passAndClose(reason: "navigation") && pk(124) == .passAndClose(reason: "navigation")
+      && pk(126) == .passAndClose(reason: "navigation"), "Left/Right/Up move the caret and close the fixes")
+check(pk(125) == .enter, "Down goes into the fixes")
+check(pk(48) == .nextIssue && pk(48, shift: true) == .previousIssue, "Tab and Shift+Tab walk the issues")
+check(pk(36) == .apply, "Return applies the first fix")
+check(pk(53) == .close(reason: "esc"), "Esc closes")
+check(pk(49, cmd: true) == .passAndClose(reason: "modifier"), "a shortcut closes and goes through")
+check(pk(125, browsing: true) == .move(dx: 0, dy: 1) && pk(126, browsing: true, atFirst: true) == .leave,
+      "inside: Down moves, Up from the first backs out")
+check(pk(53, browsing: true) == .leave, "inside: Esc backs out")
+check(pk(36, browsing: true) == .apply, "inside: Return applies the selected fix")
+
 print("UsageLog")
 let usageDir = FileManager.default.temporaryDirectory.appendingPathComponent("bindall-usage-\(UUID().uuidString)")
 let usageLog = UsageLog(directory: usageDir)

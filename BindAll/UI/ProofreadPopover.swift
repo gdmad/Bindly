@@ -14,8 +14,9 @@ final class ProofreadPopover {
 
     /// Shows `issue`'s fixes with `selected` highlighted, placed above `anchor` -- the word's rect in
     /// AppKit screen coordinates. `onHover`/`onAccept` receive the row index the mouse is on.
-    func show(issue: TextIssue, selected: Int, position: String, anchor: CGRect, layout: PopupLayout,
-              fontSize: CGFloat, onHover: @escaping (Int) -> Void, onAccept: @escaping (Int) -> Void) {
+    func show(issue: TextIssue, selected: Int, softSelection: Bool, position: String, anchor: CGRect,
+              layout: PopupLayout, fontSize: CGFloat, onHover: @escaping (Int) -> Void,
+              onAccept: @escaping (Int) -> Void, onClose: @escaping () -> Void) {
         let topCount = layout == .tile
             ? PopupTile.topRowCount(for: issue.replacements, fontSize: fontSize,
                                     near: NSPoint(x: anchor.minX, y: anchor.maxY))
@@ -25,12 +26,14 @@ final class ProofreadPopover {
                                   kind: issue.kind,
                                   replacements: issue.replacements,
                                   selected: selected,
+                                  softSelection: softSelection,
                                   layout: layout,
                                   tileTopCount: topCount,
                                   position: position,
                                   fontSize: fontSize,
                                   onHover: onHover,
-                                  onAccept: onAccept)
+                                  onAccept: onAccept,
+                                  onClose: onClose)
         presenter.present(view) { PopupPlacement.origin(above: anchor, size: $0) }
     }
 
