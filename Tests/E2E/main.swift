@@ -23,7 +23,7 @@ func skip(_ name: String, _ why: String) {
 
 // MARK: - TextEdit field
 
-let docURL = outDir.appending(path: "e2e-doc.txt")
+let docURL = outDir.appending(path: "e2e-doc-\(Int(Date().timeIntervalSince1970)).txt")
 var textEditPid: pid_t = 0
 
 func textEditField() -> AXUIElement? {
@@ -59,16 +59,20 @@ func clearField() {
 
 func openTextEdit() -> Bool {
     try? "".write(to: docURL, atomically: true, encoding: .utf8)
-    let open = Process()
-    open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-    open.arguments = ["-a", "TextEdit", docURL.path]
-    try? open.run(); open.waitUntilExit()
+    func openDoc() {
+        let open = Process()
+        open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        open.arguments = ["-a", "TextEdit", docURL.path]
+        try? open.run(); open.waitUntilExit()
+    }
+    openDoc()
     guard E2E.wait(8, { NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.TextEdit").first != nil }) else { return false }
     textEditPid = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.TextEdit").first!.processIdentifier
-    return E2E.wait(6) {
-        focusTextEdit()
-        return textEditField() != nil
+    for _ in 0..<2 {
+        if E2E.wait(8, { focusTextEdit(); return textEditField() != nil }) { return true }
+        openDoc()
     }
+    return false
 }
 
 /// Quartz rect of the first occurrence of `word` in the TextEdit field.
@@ -409,28 +413,36 @@ func trayScenario() {
 // MARK: - Run
 
 guard E2E.testApp != nil else { print("BindAll E2E is not running"); exit(2) }
-guard openTextEdit() else { print("could not open a TextEdit document"); exit(2) }
-// Accessibility for the test build: without it nothing reacts to typing.
-clearField()
-let probeStart = Date()
-E2E.type("Проверка доступа прив")
-let alive = E2E.wait(4) { !E2E.events(since: probeStart).isEmpty }
-if !alive {
-    print("BindAll E2E does not react: grant it Accessibility (System Settings → Privacy & Security → Accessibility) and run again.")
-    exit(3)
-}
-
 let only = Set((ProcessInfo.processInfo.environment["E2E_ONLY"] ?? "").split(separator: ",").map(String.init))
+let textEditGroups = ["autocomplete", "proofread", "stars", "removeTells", "quick", "tray"]
+let needsTextEdit = only.isEmpty || !only.isDisjoint(with: textEditGroups)
 func run(_ name: String, _ body: () -> Void) { if only.isEmpty || only.contains(name) { body() } }
-run("autocomplete", autocompleteScenarios)
-run("proofread", proofreadScenarios)
-run("stars", starScenarios)
-run("removeTells", removeTellsScenario)
-run("quick", quickTranslateScenario)
-run("tray", trayScenario)
 
-clearField()
-E2E.key(kVK_ANSI_W, .maskCommand)
+if needsTextEdit {
+    guard openTextEdit() else { print("could not open a TextEdit document"); exit(2) }
+    // Accessibility for the test build: without it nothing reacts to typing.
+    clearField()
+    let probeStart = Date()
+    E2E.type("Проверка доступа прив")
+    if !E2E.wait(4, { !E2E.events(since: probeStart).isEmpty }) {
+        print("BindAll E2E does not react: grant it Accessibility (System Settings → Privacy & Security → Accessibility) and run again.")
+        exit(3)
+    }
+    run("autocomplete", autocompleteScenarios)
+    run("proofread", proofreadScenarios)
+    run("stars", starScenarios)
+    run("removeTells", removeTellsScenario)
+    run("quick", quickTranslateScenario)
+    run("tray", trayScenario)
+    clearField()
+    let close = Process()
+    close.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+    close.arguments = ["-e", "tell application \"TextEdit\" to close (every document whose name is \"\(docURL.lastPathComponent)\") saving no"]
+    try? close.run(); close.waitUntilExit()
+    try? FileManager.default.removeItem(at: docURL)
+}
+run("slack") { electronScenarios(slackTarget) }
+run("claude") { electronScenarios(claudeTarget) }
 
 var report = "# BindAll E2E\n\n| Group | Scenario | Result | Note |\n|---|---|---|---|\n"
 for row in rows { report += "| \(row.group) | \(row.name) | \(row.status) | \(row.note.replacingOccurrences(of: "|", with: "/")) |\n" }

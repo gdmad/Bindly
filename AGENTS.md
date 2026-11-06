@@ -330,7 +330,10 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   "BindAll Suggestions", "BindAll Inline", "BindAll Star", "BindAll Preview", "BindAll Prompt",
   "BindAll Quick Translate"), their AX trees and its usage events. Report: `.build/e2e/report.md`.
   Once: grant "BindAll E2E" Accessibility; quit the real BindAll first. `E2E_ONLY=proofread,quick`
-  runs single groups. Never sends a bare Return outside TextEdit and BindAll's own windows. SwiftUI
+  runs single groups; `slack` and `claude` drive those apps (no TextEdit then): Slack in an empty
+  "New message" draft, Claude only in the composer of the window in front, left empty by hand, and
+  never with Esc (Esc stops a Claude Code session in that app). Chromium word geometry comes from the
+  field's AXStaticText children. Never sends a bare Return outside TextEdit and BindAll's own windows. SwiftUI
   fields ignore Unicode-only synthesized keys, so the driver sets their text through AX.
 
 

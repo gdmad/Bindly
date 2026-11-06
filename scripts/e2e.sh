@@ -43,7 +43,7 @@ for _ in 1 2 3; do open "$APP" && break; sleep 1; done
 sleep 3
 
 echo "==> Driver"
-swiftc -O Tests/E2E/Harness.swift Tests/E2E/main.swift -o "$OUT/driver"
+swiftc -O Tests/E2E/*.swift -o "$OUT/driver"
 set +e
 E2E_ONLY="${E2E_ONLY:-}" "$OUT/driver" "$OUT"
 STATUS=$?

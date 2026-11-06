@@ -11,7 +11,7 @@ struct StarButton: View {
         Button(label, systemImage: "sparkle", action: action)
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(Color.brand)
             .frame(width: StarButton.size, height: StarButton.size)
             .contentShape(.rect)

@@ -75,6 +75,17 @@ enum E2E {
         }
     }
 
+    static func doubleClick(_ point: CGPoint) {
+        for state in [1, 2] {
+            for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+                let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)
+                event?.setIntegerValueField(.mouseEventClickState, value: Int64(state))
+                event?.post(tap: .cghidEventTap)
+                usleep(30_000)
+            }
+        }
+    }
+
     // MARK: Accessibility
 
     static func attr(_ element: AXUIElement, _ name: String) -> AnyObject? {
