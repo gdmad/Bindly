@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 OUT="$(mktemp -d)/LogicTests"
 swiftc -O \
     BindAll/Store/ActionKey.swift \
+    BindAll/Store/PushToTalkKey.swift \
     BindAll/Store/Settings.swift \
     BindAll/Actions/PromptParser.swift \
     BindAll/Actions/MaskAISlopRule.swift \
@@ -28,6 +29,7 @@ swiftc -O \
     BindAll/Proofread/FixAll.swift \
     BindAll/Proofread/PersonalDictionary.swift \
     BindAll/Proofread/PreSendPolicy.swift \
+    BindAll/Voice/HoldKeyPolicy.swift \
     BindAll/Proofread/ListMarkers.swift \
     BindAll/Proofread/AppOffsetMap.swift \
     BindAll/Engines/TranslationLayout.swift \

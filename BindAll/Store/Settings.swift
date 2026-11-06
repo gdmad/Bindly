@@ -212,6 +212,13 @@ struct Settings: Codable, Equatable {
     // History of recent results (menu-bar submenu)
     var historyEnabled: Bool = true
 
+    // Push to Talk: hold the key, speak, release. Off until the user turns it on (microphone).
+    var pushToTalkEnabled: Bool = false
+    var pushToTalkKey: PushToTalkKey = .rightOption
+    var pushToTalkLanguage: String = "auto"     // BCP-47 code or "auto" (the keyboard layout)
+    var pushToTalkTranslate: Bool = false
+    var pushToTalkTargetLanguage: String = "en"
+
     // Translation. Source may be "auto" (detect). With an explicit source, the configured pair is
     // bidirectional (text is translated to whichever of source/target it is NOT).
     var sourceLanguage: String = "auto"   // BCP-47 code or "auto"
@@ -286,7 +293,8 @@ extension Settings {
              autocompleteAcceptReturn, autocompleteInline, autocompleteContextRanking, autocompleteAppMode, autocompleteApps,
              proofreadMaxReplacements, proofreadLayout,
              proofreadMinLength, proofreadAppMode, proofreadApps, personalDictionary, preSendCheck,
-             historyEnabled, sourceLanguage, targetLanguage,
+             historyEnabled, pushToTalkEnabled, pushToTalkKey, pushToTalkLanguage, pushToTalkTranslate,
+             pushToTalkTargetLanguage, sourceLanguage, targetLanguage,
              correctEnabled, starFieldEnabled, starSelectionEnabled, previewFromMenu, previewFromHotkeys,
              recentPrompts, maskAISlopRules, removeTellsWithAI, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
              openRouterFreeOnly, providers, defaultActionHotkey, translateHotkey,
@@ -340,6 +348,11 @@ extension Settings {
         if let v = try c.decodeIfPresent([String].self, forKey: .personalDictionary) { personalDictionary = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .preSendCheck) { preSendCheck = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .historyEnabled) { historyEnabled = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .pushToTalkEnabled) { pushToTalkEnabled = v }
+        if let v = try c.decodeIfPresent(PushToTalkKey.self, forKey: .pushToTalkKey) { pushToTalkKey = v }
+        if let v = try c.decodeIfPresent(String.self, forKey: .pushToTalkLanguage) { pushToTalkLanguage = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .pushToTalkTranslate) { pushToTalkTranslate = v }
+        if let v = try c.decodeIfPresent(String.self, forKey: .pushToTalkTargetLanguage) { pushToTalkTargetLanguage = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .sourceLanguage) { sourceLanguage = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .targetLanguage) { targetLanguage = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .correctEnabled) { correctEnabled = v }

@@ -10,6 +10,7 @@ struct SettingsTabContent: View {
         case .translation: TranslationSettingsView()
         case .autocomplete: AutocompleteSettingsView()
         case .proofread: ProofreadSettingsView()
+        case .voice: VoiceSettingsView()
         case .providers: ProvidersSettingsView()
         }
     }

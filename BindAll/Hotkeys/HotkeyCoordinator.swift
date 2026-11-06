@@ -11,6 +11,7 @@ final class HotkeyCoordinator {
     private let appState: AppState
     private let monitor = HotkeyMonitor()
     private let translationCoordinator = TranslationCoordinator()
+    private let voice = PushToTalkController()
     private let popup = PopupController()
     private let autocomplete = AutocompleteController()
     private let proofread = ProofreadController()
@@ -49,6 +50,11 @@ final class HotkeyCoordinator {
         updateAutocomplete()
         updateProofread()
         setupStars()
+        voice.translate = { [weak self] text, code in
+            guard let self else { return text }
+            return try await self.translateDictation(text, to: code)
+        }
+        updateVoice()
 
         // Every settings change -- or a key/token change in the Keychain -- re-applies everything; each
         // step is cheap and idempotent. The first value is the current one, already applied just
@@ -64,6 +70,7 @@ final class HotkeyCoordinator {
                 self.updateAutocomplete()
                 self.updateProofread()
                 self.updateStars()
+                self.updateVoice()
             }
         }
 
@@ -156,6 +163,29 @@ final class HotkeyCoordinator {
         stars.appAllowed = { [weak self] in self?.proofreadAppAllowed() ?? false }
         stars.onOpen = { [weak self] context, view in self?.openStarMenu(context, at: view) }
         updateStars()
+    }
+
+    private func updateVoice() {
+        let s = appState.settings
+        var cfg = PushToTalkController.Config()
+        cfg.enabled = s.enabled && s.pushToTalkEnabled
+        cfg.key = s.pushToTalkKey
+        cfg.language = s.pushToTalkLanguage
+        cfg.translate = s.pushToTalkTranslate
+        cfg.targetLanguage = s.pushToTalkTargetLanguage
+        cfg.restoreClipboard = s.restoreClipboard
+        cfg.fontSize = CGFloat(max(10, min(20, s.popupFontSize)))
+        voice.configure(cfg)
+    }
+
+    /// Push to Talk's "translate before inserting": Apple Translation, nothing when it is already
+    /// in that language.
+    private func translateDictation(_ text: String, to code: String) async throws -> String {
+        let detected = LanguageDetector.detect(text)
+        if detected?.languageCode?.identifier == code { return text }
+        let translation = try await translationCoordinator.translate(text, from: detected, to: Locale.Language(identifier: code))
+        recordHistory(kind: .translate, input: text, output: translation, engine: "Apple Translation")
+        return translation
     }
 
     private func updateStars() {
@@ -405,6 +435,7 @@ final class HotkeyCoordinator {
     }
 
     func stop() {
+        voice.stop()
         stars.stop()
         settingsObserver?.cancel()
         settingsObserver = nil

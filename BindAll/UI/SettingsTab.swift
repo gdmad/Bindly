@@ -3,7 +3,7 @@ import Foundation
 /// The settings sections, in tab-bar order. Every feature owns one tab, and that tab carries
 /// everything about it -- starting with its own on/off switch.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case general, actions, translation, autocomplete, proofread, providers
+    case general, actions, translation, autocomplete, proofread, voice, providers
 
     var id: Self { self }
 
@@ -14,6 +14,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .translation: "Translation"
         case .autocomplete: "Autocomplete"
         case .proofread: "Proofread"
+        case .voice: "Voice"
         case .providers: "Providers"
         }
     }
@@ -25,6 +26,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .translation: "globe"
         case .autocomplete: "text.append"
         case .proofread: "text.magnifyingglass"
+        case .voice: "mic"
         case .providers: "cloud"
         }
     }

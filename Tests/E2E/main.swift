@@ -497,6 +497,51 @@ func translateInPlaceScenario() {
     record("Apply puts the translation in place", E2E.wait(5, latin), "now: \(fieldText())")
 }
 
+func voiceScenario() {
+    group = "Push to Talk"
+    clearField()
+    E2E.key(kVK_RightArrow)
+
+    E2E.rightOption(down: true)
+    E2E.pause(0.1)
+    E2E.rightOption(down: false)
+    E2E.pause(1.5)
+    record("a quick tap does nothing", fieldText().isEmpty && E2E.window("BindAll Voice") == nil)
+
+    E2E.rightOption(down: true)
+    E2E.key(kVK_ANSI_J)
+    E2E.pause(0.6)
+    E2E.rightOption(down: false)
+    E2E.pause(1.0)
+    record("Option with another key never records", E2E.window("BindAll Voice") == nil,
+           "windows \(E2E.windows().map(\.name))")
+    clearField()
+    E2E.key(kVK_RightArrow)
+
+    E2E.rightOption(down: true)
+    let listening = E2E.wait(3) { E2E.window("BindAll Voice") != nil }
+    record("holding the key shows the note", listening)
+    E2E.pause(2.5)
+    if let note = E2E.window("BindAll Voice") { E2E.snapshot(note.bounds, to: outDir.appending(path: "voice.png")) }
+    E2E.rightOption(down: false)
+    let typed = E2E.wait(15) { fieldText().lowercased().contains("проверка голосового ввода") }
+    record("releasing types what was said", typed, "now: \(fieldText())")
+    record("the note goes away", E2E.wait(3) { E2E.window("BindAll Voice") == nil })
+
+    clearField()
+    E2E.key(kVK_RightArrow)
+    E2E.rightOption(down: true)
+    _ = E2E.wait(3) { E2E.window("BindAll Voice") != nil }
+    E2E.pause(2.5)
+    E2E.rightOption(down: false, shift: true)
+    let english = E2E.wait(20) {
+        let text = fieldText()
+        return !text.isEmpty && text.range(of: "[А-Яа-яЁё]", options: .regularExpression) == nil
+            && text.lowercased().contains("voice")
+    }
+    record("with Shift it types the translation", english, "now: \(fieldText())")
+}
+
 func snapshotField(_ name: String) {
     if let el = textEditField(), let frame = E2E.frame(el) {
         E2E.snapshot(frame.intersection(CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: 160)),
@@ -688,7 +733,7 @@ func trayScenario() {
 
 guard E2E.testApp != nil else { print("BindAll E2E is not running"); exit(2) }
 let only = Set((ProcessInfo.processInfo.environment["E2E_ONLY"] ?? "").split(separator: ",").map(String.init))
-let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "explain", "preSend", "translateInPlace", "stars", "removeTells", "quick", "tray"]
+let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "explain", "preSend", "translateInPlace", "voice", "stars", "removeTells", "quick", "tray"]
 let needsTextEdit = only.isEmpty || !only.isDisjoint(with: textEditGroups)
 func run(_ name: String, _ body: () -> Void) { if only.isEmpty || only.contains(name) { body() } }
 
@@ -710,6 +755,7 @@ if needsTextEdit {
     run("explain", explainScenario)
     run("preSend", preSendScenario)
     run("translateInPlace", translateInPlaceScenario)
+    run("voice", voiceScenario)
     run("stars", starScenarios)
     run("removeTells", removeTellsScenario)
     run("quick", quickTranslateScenario)

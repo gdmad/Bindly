@@ -86,6 +86,17 @@ enum E2E {
         }
     }
 
+    /// The right Option key alone, as a modifier change (`kVK_RightOption`, device bit for "right").
+    static func rightOption(down: Bool, shift: Bool = false) {
+        let event = CGEvent(keyboardEventSource: nil, virtualKey: 61, keyDown: down)!
+        event.type = .flagsChanged
+        var flags: CGEventFlags = down ? [.maskAlternate, CGEventFlags(rawValue: 0x40)] : []
+        if shift { flags.insert(.maskShift) }
+        event.flags = flags
+        event.post(tap: .cghidEventTap)
+        usleep(20_000)
+    }
+
     // MARK: Accessibility
 
     static func attr(_ element: AXUIElement, _ name: String) -> AnyObject? {

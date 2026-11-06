@@ -39,6 +39,11 @@ BindAll/
 │   ├── TranslationLayout.swift # pure: puts the source's line breaks back into a translation
 │   ├── OCRParagraphs.swift     # pure: joins wrapped OCR lines back into paragraphs
 │   └── OCRService.swift        # screencapture region + Vision text recognition
+├── Voice/                      # Push to Talk (off by default)
+│   ├── HoldKeyPolicy.swift            # pure: hold / quick tap / used as a modifier / Esc
+│   ├── HoldKeyMonitor.swift           # key tap on its own thread (right Option or a custom key)
+│   ├── SpeechRecorder.swift           # AVAudioEngine (or a test file) -> SpeechAnalyzer
+│   └── PushToTalkController.swift     # session: note by the caret, optional translation, paste
 ├── Autocomplete/               # word completion while typing (off by default)
 │   ├── AutocompleteEngine.swift       # NSSpellChecker completions/guesses + recasing + partial-word; Mode (baseline/context/semantic) + scorer re-ranking
 │   ├── AutocompleteController.swift   # two CGEventTaps on own thread (listen-only monitor + active suppressor); AX/keystroke word; suggestions, next-word, accept
@@ -286,6 +291,17 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   `FixAll.apply` (pure) re-reads the field, relocates each issue and applies its first fix from the
   end, skipping overlaps; `ProofreadController.onFixAll` hands the field as a `StarContext` to the
   coordinator, which always shows the preview and writes the result the way star actions do.
+- **Push to Talk** (`Voice/`, Settings -> Voice, off by default): hold right Option (`kVK_RightOption`
+  via `flagsChanged`; or a custom key, which the tap keeps out of the app), speak, release; the
+  transcript is pasted where the caret is (`TextInjector.replaceSelection`, `FocusTarget` captured at
+  the start). Recording starts after `HoldKeyPolicy.minHold` (0.3 s) with no other key pressed, so a
+  tap or Option+letter never turns the microphone on; another key or Esc while recording cancels.
+  `SpeechRecorder` uses `SpeechTranscriber` where it supports the language and `DictationTranscriber`
+  otherwise (Russian is only there), both on-device, models via `AssetInventory`. The language is the
+  setting or the keyboard layout's. "Translate before inserting" (or Shift held at release, which
+  flips it once) runs Apple Translation first; if that fails the dictation goes to the clipboard.
+  The note by the caret is the "BindAll Voice" panel (`VoiceIndicatorView`). `PushToTalkTestAudio`
+  (UserDefaults, set only by scripts/e2e.sh) feeds a `say` recording instead of the microphone.
 - **Translation layout:** Apple's model (macOS 27) translates each line as its own segment and
   joins the output with blank lines. The whole text still goes in one request (context matters);
   `TranslationLayout.restore` then swaps the output's newline runs for the source's. OCR lines are

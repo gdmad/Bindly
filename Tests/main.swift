@@ -759,6 +759,11 @@ allChanged.proofreadAppMode = "allow"
 allChanged.proofreadApps = ["com.example.two"]
 allChanged.personalDictionary = ["Swearl"]
 allChanged.preSendCheck = true
+allChanged.pushToTalkEnabled = true
+allChanged.pushToTalkKey = .shortcut(HotkeyConfig(keyCode: 49, modifiers: HotkeyModifiers(command: false, control: true), repeatCount: 1))
+allChanged.pushToTalkLanguage = "ru"
+allChanged.pushToTalkTranslate = true
+allChanged.pushToTalkTargetLanguage = "de"
 allChanged.historyEnabled = false
 allChanged.sourceLanguage = "de"
 allChanged.targetLanguage = "fr"
@@ -1225,6 +1230,36 @@ do {
     check(ps(53, warning: true) == .dismiss, "Esc goes back to the text")
     check(ps(0, warning: true) == .passAndDismiss, "typing on goes through and drops the warning")
     eq(PreSendPolicy.warningText(count: 1).prefix(12).description, "1 issue left", "singular wording")
+}
+
+print("HoldKeyPolicy")
+do {
+    var p = HoldKeyPolicy()
+    check(p.handle(.keyDown(at: 0)) == .none && p.handle(.tick(at: 0.1)) == .none, "nothing happens before the hold time")
+    check(p.handle(.tick(at: 0.35)) == .start && p.isRecording, "holding long enough starts recording")
+    check(p.handle(.keyUp(at: 2, shift: false)) == .finish(shift: false), "release finishes")
+
+    var tap = HoldKeyPolicy()
+    _ = tap.handle(.keyDown(at: 0))
+    check(tap.handle(.keyUp(at: 0.1, shift: false)) == .none, "a quick tap does nothing")
+    check(tap.handle(.tick(at: 1)) == .none, "and no late start after release")
+
+    var modifier = HoldKeyPolicy()
+    _ = modifier.handle(.keyDown(at: 0))
+    _ = modifier.handle(.otherKey)
+    check(modifier.handle(.tick(at: 1)) == .none, "used as a modifier: never records")
+    check(modifier.handle(.keyUp(at: 1.2, shift: false)) == .none, "and its release is ignored")
+    check(modifier.handle(.keyDown(at: 2)) == .none && modifier.handle(.tick(at: 2.4)) == .start, "the next hold works again")
+
+    var cancel = HoldKeyPolicy()
+    _ = cancel.handle(.keyDown(at: 0)); _ = cancel.handle(.tick(at: 0.5))
+    check(cancel.handle(.otherKey) == .cancel, "another key while recording cancels")
+    var esc = HoldKeyPolicy()
+    _ = esc.handle(.keyDown(at: 0)); _ = esc.handle(.tick(at: 0.5))
+    check(esc.handle(.escape) == .cancel, "Esc while recording cancels")
+    var shifted = HoldKeyPolicy()
+    _ = shifted.handle(.keyDown(at: 0)); _ = shifted.handle(.tick(at: 0.5))
+    check(shifted.handle(.keyUp(at: 1, shift: true)) == .finish(shift: true), "Shift at release is reported")
 }
 
 if failures == 0 {

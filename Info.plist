@@ -19,9 +19,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.9.31</string>
+	<string>0.9.32</string>
 	<key>CFBundleVersion</key>
-	<string>92</string>
+	<string>93</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
@@ -30,5 +30,9 @@
 	<string>BindAll needs to send keystrokes to paste processed text back into the active app.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>BindAll</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Push to Talk listens while you hold its key and turns your speech into text on this Mac.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Push to Talk uses Apple speech recognition on this Mac to type what you say.</string>
 </dict>
 </plist>
