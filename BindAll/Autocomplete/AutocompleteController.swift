@@ -112,6 +112,9 @@ final class AutocompleteController {
     private var suspended: Bool { suspendCount > 0 }
 
     var isRunning: Bool { running }
+    /// A suggestion appeared or went; Return may belong to it (see `PreSendGuard`).
+    var onSuggestionChange: ((Bool) -> Void)?
+    private var lastReportedSuggestion = false
 
     // MARK: - Experiment switch
 
@@ -385,6 +388,10 @@ final class AutocompleteController {
             CGEvent.tapEnable(tap: tap, enable: hasSuggestion)
         }
         setClickMonitor(enabled: running)
+        if hasSuggestion != lastReportedSuggestion {
+            lastReportedSuggestion = hasSuggestion
+            onSuggestionChange?(hasSuggestion)
+        }
     }
 
     /// The popup ignores mouse events, so a click never reaches it: without this it keeps floating on

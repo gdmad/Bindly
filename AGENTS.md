@@ -57,6 +57,8 @@ BindAll/
 │   ├── ProofreadSkips.swift           # pure: places the user skipped (rule + text + context keys)
 │   ├── FixAll.swift                   # pure: every issue's first fix applied at once
 │   ├── PersonalDictionary.swift       # pure: words never flagged as misspellings
+│   ├── PreSendPolicy.swift            # pure: what a key does for the check before sending
+│   ├── PreSendGuard.swift             # its Return tap (own thread, on only while armed)
 │   ├── ListMarkers.swift              # pure: list numbers/bullets glued to their item ("1.Buy")
 │   ├── AppOffsetMap.swift             # pure: value offsets <-> the app's own (Slack drops some newlines)
 │   ├── ProofreadLanguage.swift        # language resolution; ru/uk disambiguation for "auto"
@@ -271,6 +273,13 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   stay). The book icon beside Skip (`FixesPopupAddWordButton`, spelling issues only) adds the word
   through `ProofreadController.onAddWord`; the list is edited in Settings -> Proofread
   (`PersonalDictionarySection`).
+- **Check before sending** (`preSendCheck`, default on): in chat apps (`PreSendPolicy.chatApps`) a
+  plain Return while the field shows issues is held once and the popup says how many are left;
+  Return again sends, Tab opens the first issue, Cmd+Return is Fix all, Esc drops it, any other key
+  goes through. `PreSendGuard` is an active keyDown tap on its own thread, enabled only while armed
+  (issues in a frontmost chat field, no fixes popup, no autocomplete suggestion via
+  `AutocompleteController.onSuggestionChange`) or warning; keys aimed at another process are never
+  touched. `PreSendExtraApps` (UserDefaults, set only by scripts/e2e.sh) adds TextEdit for the E2E.
 - **Fix all:** with two or more fixable issues the fixes popup ends with a "Fix all (N)" cell
   (`FixesPopupFixAllButton`); ⌘Return in the popup does the same (`ProofreadKeyPolicy.fixAll`).
   `FixAll.apply` (pure) re-reads the field, relocates each issue and applies its first fix from the

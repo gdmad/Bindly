@@ -127,6 +127,7 @@ final class HotkeyCoordinator {
         cfg.appMode = ProofreadController.AppFilterMode(rawValue: s.proofreadAppMode) ?? .all
         cfg.apps = Set(s.proofreadApps)
         cfg.dictionary = PersonalDictionary.set(s.personalDictionary)
+        cfg.preSend = s.preSendCheck
         proofread.configure(cfg,
                             engine: EngineFactory.makeLanguageTool(appState: appState),
                             language: s.languageToolLanguage)
@@ -134,6 +135,7 @@ final class HotkeyCoordinator {
         proofread.onSessionChange = { [weak self] active in
             if active { self?.autocomplete.suspend() } else { self?.autocomplete.resume() }
         }
+        autocomplete.onSuggestionChange = { [weak self] visible in self?.proofread.setSuggestionVisible(visible) }
         proofread.onAddWord = { [weak self] word in
             guard let self else { return }
             self.appState.settings.personalDictionary = PersonalDictionary.adding(word, to: self.appState.settings.personalDictionary)

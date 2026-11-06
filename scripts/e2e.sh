@@ -34,6 +34,8 @@ settings = {
 data = json.dumps(settings).encode().hex()
 subprocess.run(["defaults", "write", "com.evgeny.bindall.e2e", "BindAll.settings.v1", "-data", data], check=True)
 PY
+# TextEdit stands in for a chat app for the pre-send check: a Return that gets through is a newline.
+defaults write com.evgeny.bindall.e2e PreSendExtraApps -array com.apple.TextEdit
 rm -rf "$HOME/Library/Application Support/BindAll E2E/Usage" "$HOME/Library/Application Support/BindAll E2E/history.json"
 
 echo "==> Launching"

@@ -27,6 +27,7 @@ swiftc -O \
     BindAll/Proofread/ProofreadSkips.swift \
     BindAll/Proofread/FixAll.swift \
     BindAll/Proofread/PersonalDictionary.swift \
+    BindAll/Proofread/PreSendPolicy.swift \
     BindAll/Proofread/ListMarkers.swift \
     BindAll/Proofread/AppOffsetMap.swift \
     BindAll/Engines/TranslationLayout.swift \

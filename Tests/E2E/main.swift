@@ -412,6 +412,45 @@ func explainScenario() {
     }
 }
 
+func preSendScenario() {
+    group = "Before sending"
+    func warningUp() -> Bool {
+        E2E.window("BindAll Fixes") != nil && E2E.dumpTestWindows("BindAll Fixes").contains("Return sends anyway")
+    }
+    func press(_ code: Int, _ flags: CGEventFlags = []) {
+        E2E.allowBareReturn = true
+        E2E.key(code, flags)
+        E2E.allowBareReturn = false
+    }
+    clearField()
+    E2E.type("Здесь малако осталось")
+    guard E2E.wait(12, { E2E.underlineCount() >= 1 }) else { record("Before sending", false, "no underline"); return }
+    let text = fieldText()
+
+    press(kVK_Return)
+    record("Return with an issue left shows the warning", E2E.wait(2) { warningUp() })
+    record("…and is held back", fieldText() == text, "now: \(fieldText().debugDescription)")
+    press(kVK_Escape)
+    record("Esc takes the warning down, nothing sent", E2E.wait(2) { !warningUp() } && fieldText() == text)
+
+    press(kVK_Return)
+    _ = E2E.wait(2) { warningUp() }
+    E2E.key(kVK_Tab)
+    record("Tab opens the first issue", E2E.wait(3) { E2E.window("BindAll Fixes") != nil && !warningUp() } && fieldText() == text)
+    press(kVK_Escape)
+    E2E.wait(2) { E2E.window("BindAll Fixes") == nil }
+
+    press(kVK_Return)
+    _ = E2E.wait(2) { warningUp() }
+    press(kVK_Return)
+    record("Return again goes through", E2E.wait(2) { fieldText().hasSuffix("\n") }, "now: \(fieldText().debugDescription)")
+
+    E2E.key(kVK_Delete)
+    E2E.pause(0.5)
+    press(kVK_Return, .maskShift)
+    record("Shift+Return is never held", E2E.wait(2) { fieldText().hasSuffix("\n") } && !warningUp())
+}
+
 func snapshotField(_ name: String) {
     if let el = textEditField(), let frame = E2E.frame(el) {
         E2E.snapshot(frame.intersection(CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: 160)),
@@ -599,7 +638,7 @@ func trayScenario() {
 
 guard E2E.testApp != nil else { print("BindAll E2E is not running"); exit(2) }
 let only = Set((ProcessInfo.processInfo.environment["E2E_ONLY"] ?? "").split(separator: ",").map(String.init))
-let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "explain", "stars", "removeTells", "quick", "tray"]
+let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "explain", "preSend", "stars", "removeTells", "quick", "tray"]
 let needsTextEdit = only.isEmpty || !only.isDisjoint(with: textEditGroups)
 func run(_ name: String, _ body: () -> Void) { if only.isEmpty || only.contains(name) { body() } }
 
@@ -619,6 +658,7 @@ if needsTextEdit {
     run("dictionary", dictionaryScenario)
     run("history", historyScenario)
     run("explain", explainScenario)
+    run("preSend", preSendScenario)
     run("stars", starScenarios)
     run("removeTells", removeTellsScenario)
     run("quick", quickTranslateScenario)

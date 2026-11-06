@@ -758,6 +758,7 @@ allChanged.proofreadMinLength = 42
 allChanged.proofreadAppMode = "allow"
 allChanged.proofreadApps = ["com.example.two"]
 allChanged.personalDictionary = ["Swearl"]
+allChanged.preSendCheck = false
 allChanged.historyEnabled = false
 allChanged.sourceLanguage = "de"
 allChanged.targetLanguage = "fr"
@@ -1204,6 +1205,26 @@ do {
     shown.showOnly = true
     let round = (try? JSONEncoder().encode(shown)).flatMap { try? JSONDecoder().decode(ActionKey.self, from: $0) }
     check(round?.showOnly == true, "showOnly survives a round trip")
+}
+
+print("PreSendPolicy")
+do {
+    func ps(_ key: Int, cmd: Bool = false, shift: Bool = false, armed: Bool = true, warning: Bool = false,
+            pid: pid_t = 7) -> PreSendPolicy.Action {
+        PreSendPolicy.action(keyCode: key, command: cmd, shift: shift, option: false, control: false,
+                             state: PreSendPolicy.State(armed: armed, warning: warning, pid: 7), targetPid: pid)
+    }
+    check(ps(36) == .warn, "Return with issues left is held back once")
+    check(ps(36, armed: false) == .pass, "Return with no issues goes through")
+    check(ps(36, shift: true) == .pass && ps(36, cmd: true) == .pass, "Shift+Return and Cmd+Return are not held")
+    check(ps(0) == .pass, "typing goes through")
+    check(ps(36, pid: 9) == .pass, "a key for another app is never touched")
+    check(ps(36, warning: true) == .send, "Return again sends")
+    check(ps(48, warning: true) == .review, "Tab shows the issues")
+    check(ps(36, cmd: true, warning: true) == .fixAll, "Cmd+Return fixes all")
+    check(ps(53, warning: true) == .dismiss, "Esc goes back to the text")
+    check(ps(0, warning: true) == .passAndDismiss, "typing on goes through and drops the warning")
+    eq(PreSendPolicy.warningText(count: 1).prefix(12).description, "1 issue left", "singular wording")
 }
 
 if failures == 0 {

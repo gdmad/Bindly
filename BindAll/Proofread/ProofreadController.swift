@@ -30,6 +30,8 @@ final class ProofreadController {
         var apps: Set<String> = []
         /// `PersonalDictionary.set` of the user's words.
         var dictionary: Set<String> = []
+        /// "Check before sending" in chat apps (`PreSendPolicy.chatApps`).
+        var preSend = true
     }
 
     private var config = Config()
@@ -131,6 +133,9 @@ final class ProofreadController {
 
     /// Set by the coordinator so a proofread session can silence autocomplete: both features eat Tab.
     var onSessionChange: ((Bool) -> Void)?
+    private let preSend = PreSendGuard()
+    /// An autocomplete suggestion is up: its Return wins over the pre-send check.
+    private var suggestionVisible = false
 
     var isSessionActive: Bool { !issues.isEmpty && target != nil }
 
@@ -149,6 +154,7 @@ final class ProofreadController {
     // MARK: - Lifecycle
 
     func configure(_ config: Config, engine: LanguageToolEngine, language: String) {
+        if preSend.onAction == nil { preSend.onAction = { [weak self] in self?.handlePreSend($0) } }
         let dictionaryChanged = config.dictionary != self.config.dictionary
         self.config = config
         if dictionaryChanged, !issues.isEmpty {
@@ -185,6 +191,7 @@ final class ProofreadController {
     }
 
     func stop() {
+        preSend.stop()
         end()
         stopClickMonitor()
         stopTypingMonitor()
@@ -351,7 +358,54 @@ final class ProofreadController {
         return true
     }
 
+    func setSuggestionVisible(_ visible: Bool) {
+        suggestionVisible = visible
+        syncPreSend()
+    }
+
+    /// Arms the pre-send check while a chat app's field shows issues and nothing else wants Return.
+    private func syncPreSend() {
+        let pid = target?.pid
+        let inChat = pid.flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }
+            .map { PreSendPolicy.chatApps.contains($0) || Self.extraChatApps.contains($0) } ?? false
+        let armed = config.enabled && config.preSend && inChat && !issues.isEmpty && !popupShown && !suggestionVisible
+            && NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
+        preSend.update { state in
+            state.armed = armed
+            state.pid = pid ?? 0
+            if !armed && !inChat { state.warning = false }
+        }
+    }
+
+    /// Only the E2E build sets this (scripts/e2e.sh): TextEdit stands in for a chat app there, where
+    /// a Return that gets through is a visible newline instead of a sent message.
+    private static let extraChatApps = Set(UserDefaults.standard.stringArray(forKey: "PreSendExtraApps") ?? [])
+
+    private func handlePreSend(_ action: PreSendPolicy.Action) {
+        switch action {
+        case .warn:
+            UsageLog.record(.proofread, .shown, detail: "presend")
+            popover.showMessage(PreSendPolicy.warningText(count: issues.count), anchor: currentAnchor(), fontSize: config.fontSize)
+        case .send:
+            UsageLog.record(.proofread, .dismissed, reason: "sentAnyway", detail: "presend")
+            popover.hide()
+        case .review:
+            UsageLog.record(.proofread, .accepted, detail: "presend:review")
+            popover.hide()
+            showFirstIssue()
+        case .fixAll:
+            UsageLog.record(.proofread, .accepted, detail: "presend:fixAll")
+            popover.hide()
+            fixAll()
+        case .dismiss, .passAndDismiss:
+            popover.hide()
+        case .pass:
+            break
+        }
+    }
+
     private func redrawUnderlines() {
+        defer { syncPreSend() }
         guard !issues.isEmpty, let element = target?.element else {
             underlines.hide()
             return
@@ -377,6 +431,7 @@ final class ProofreadController {
         selectedReplacement = 0
         showCurrent()
         setActive(true)
+        syncPreSend()
     }
 
     /// Shows the popup for the current issue. Never highlights the word in the user's field: editors
@@ -639,6 +694,7 @@ final class ProofreadController {
         selectedReplacement = 0
         popover.hide()
         setActive(false)
+        syncPreSend()
     }
 
     /// Forgets everything found in the field and takes the underlines down. Used when the focus
@@ -654,6 +710,7 @@ final class ProofreadController {
         lastCheckedText = ""
         target = nil
         underlines.hide()
+        syncPreSend()
     }
 
     private func end() {

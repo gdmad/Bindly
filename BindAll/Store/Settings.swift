@@ -207,6 +207,7 @@ struct Settings: Codable, Equatable {
     var proofreadAppMode: String = "all"       // "all" | "allow" | "deny"
     var proofreadApps: [String] = []           // bundle identifiers for allow/deny
     var personalDictionary: [String] = []     // words never flagged as misspelled
+    var preSendCheck: Bool = true              // chat apps: Return with issues left asks first
 
     // History of recent results (menu-bar submenu)
     var historyEnabled: Bool = true
@@ -284,7 +285,7 @@ extension Settings {
              popupFontSize, autocompleteLanguages, autocompleteLearn, autocompleteNextWord,
              autocompleteAcceptReturn, autocompleteInline, autocompleteContextRanking, autocompleteAppMode, autocompleteApps,
              proofreadMaxReplacements, proofreadLayout,
-             proofreadMinLength, proofreadAppMode, proofreadApps, personalDictionary,
+             proofreadMinLength, proofreadAppMode, proofreadApps, personalDictionary, preSendCheck,
              historyEnabled, sourceLanguage, targetLanguage,
              correctEnabled, starFieldEnabled, starSelectionEnabled, previewFromMenu, previewFromHotkeys,
              recentPrompts, maskAISlopRules, removeTellsWithAI, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
@@ -337,6 +338,7 @@ extension Settings {
         if let v = try c.decodeIfPresent(String.self, forKey: .proofreadAppMode) { proofreadAppMode = v }
         if let v = try c.decodeIfPresent([String].self, forKey: .proofreadApps) { proofreadApps = v }
         if let v = try c.decodeIfPresent([String].self, forKey: .personalDictionary) { personalDictionary = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .preSendCheck) { preSendCheck = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .historyEnabled) { historyEnabled = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .sourceLanguage) { sourceLanguage = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .targetLanguage) { targetLanguage = v }
