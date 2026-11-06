@@ -31,6 +31,9 @@ final class ProofreadController {
     }
 
     private var config = Config()
+    /// "Fix all": the field (as a star context), the corrected text and how many fixes it holds.
+    /// The coordinator shows the preview and writes the result, the way the star's actions do.
+    var onFixAll: ((StarContext, String, Int) -> Void)?
     private var provider: LanguageToolProofreadProvider?
     /// Places the user skipped; see `ProofreadSkips`.
     private var skips = ProofreadSkips()
@@ -384,7 +387,9 @@ final class ProofreadController {
                      fontSize: config.fontSize,
                      onHover: { [weak self] index in self?.hoverReplacement(index) },
                      onAccept: { [weak self] index in self?.acceptReplacement(index) },
-                     onClose: { [weak self] in self?.endNavigation(reason: "closeButton") })
+                     onClose: { [weak self] in self?.endNavigation(reason: "closeButton") },
+                     fixAllCount: FixAll.fixable(issues).count,
+                     onFixAll: { [weak self] in self?.fixAll() })
         syncKeySnapshot() // where the popup landed decides which arrow goes into it
     }
 
@@ -501,6 +506,22 @@ final class ProofreadController {
             self.isApplying = false
             self.handleApplyResult(result, issue: issue, replacement: replacement)
         }
+    }
+
+    /// Every issue's first fix at once. The field is re-read so the result is built on what is there
+    /// now; the preview (or the write) is left to `onFixAll`.
+    private func fixAll() {
+        guard !isApplying, let target, let onFixAll else { return }
+        let text = ProofreadAX.currentText(of: target.element) ?? target.text
+        let outcome = FixAll.apply(issues, to: text)
+        guard outcome.fixed > 0 else { flash("Nothing to fix."); return }
+        let anchor = currentAnchor()
+        endNavigation(reason: "fixAll")
+        UsageLog.record(.proofread, .shown, detail: "fixAll:\(outcome.fixed)")
+        onFixAll(StarContext(element: target.element, pid: target.pid, text: text,
+                             selection: NSRange(location: 0, length: 0), offsetMap: target.offsetMap,
+                             anchor: NSPoint(x: anchor.minX, y: anchor.minY)),
+                 outcome.text, outcome.fixed)
     }
 
     /// "Not here": forgets this one place for the rest of the session and moves on to whatever
@@ -707,6 +728,9 @@ final class ProofreadController {
             return nil
         case .apply:
             DispatchQueue.main.async { [weak self] in self?.accept() }
+            return nil
+        case .fixAll:
+            DispatchQueue.main.async { [weak self] in self?.fixAll() }
             return nil
         case .nextIssue:
             DispatchQueue.main.async { [weak self] in self?.step(1) }

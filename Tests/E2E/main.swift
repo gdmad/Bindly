@@ -228,6 +228,49 @@ func proofreadScenarios() {
     }
 }
 
+func fixAllScenario() {
+    group = "Fix all"
+    clearField()
+    E2E.type("Вчера малако было свежее, а ощибка в слове и граматика тоже. ")
+    guard E2E.wait(12, { E2E.underlineCount() >= 3 }), let word = wordRect("ощибка") else {
+        record("Fix all", false, "underlines \(E2E.underlineCount())"); return
+    }
+    E2E.click(CGPoint(x: word.midX, y: word.midY))
+    guard E2E.wait(4, { E2E.window("BindAll Fixes") != nil }) else { record("Fix all", false, "popup did not open"); return }
+    let button = E2E.testElement(window: "BindAll Fixes") {
+        ((E2E.attr($0, kAXDescriptionAttribute) as? String) ?? (E2E.attr($0, kAXTitleAttribute) as? String) ?? "").hasPrefix("Fix all")
+    }
+    record("the popup offers Fix all", button != nil)
+    guard let button, let frame = E2E.frame(button) else { E2E.key(kVK_Escape); return }
+    E2E.click(CGPoint(x: frame.midX, y: frame.midY))
+    let preview = E2E.wait(4) { E2E.window("BindAll Preview") != nil }
+    record("Fix all shows a preview", preview)
+    guard preview else { return }
+    E2E.allowBareReturn = true
+    E2E.key(kVK_Return)
+    E2E.allowBareReturn = false
+    let fixed = E2E.wait(5) { !fieldText().contains("малако") && !fieldText().contains("ощибка") && !fieldText().contains("граматика") }
+    record("Apply fixes every word at once", fixed, "now: \(fieldText())")
+    record("the underlines go", E2E.wait(8) { E2E.underlineCount() == 0 }, "left \(E2E.underlineCount())")
+
+    // ⌘Return from the popup does the same.
+    clearField()
+    E2E.type("Опять малако и ощибка здесь. ")
+    if E2E.wait(12, { E2E.underlineCount() >= 2 }), let typo = wordRect("ощибка") {
+        E2E.click(CGPoint(x: typo.midX, y: typo.midY))
+        if E2E.wait(4, { E2E.window("BindAll Fixes") != nil }) {
+            E2E.key(kVK_Return, .maskCommand)
+            record("⌘Return in the popup opens the Fix all preview", E2E.wait(4) { E2E.window("BindAll Preview") != nil })
+            if let close = E2E.testElement(window: "BindAll Preview", E2E.named("Cancel")) ?? E2E.testElement(window: "BindAll Preview", E2E.named("Close")) {
+                E2E.press(close)
+            } else {
+                E2E.key(kVK_Escape)
+            }
+            E2E.wait(2) { E2E.window("BindAll Preview") == nil }
+        }
+    }
+}
+
 func snapshotField(_ name: String) {
     if let el = textEditField(), let frame = E2E.frame(el) {
         E2E.snapshot(frame.intersection(CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: 160)),
@@ -414,7 +457,7 @@ func trayScenario() {
 
 guard E2E.testApp != nil else { print("BindAll E2E is not running"); exit(2) }
 let only = Set((ProcessInfo.processInfo.environment["E2E_ONLY"] ?? "").split(separator: ",").map(String.init))
-let textEditGroups = ["autocomplete", "proofread", "stars", "removeTells", "quick", "tray"]
+let textEditGroups = ["autocomplete", "proofread", "fixAll", "stars", "removeTells", "quick", "tray"]
 let needsTextEdit = only.isEmpty || !only.isDisjoint(with: textEditGroups)
 func run(_ name: String, _ body: () -> Void) { if only.isEmpty || only.contains(name) { body() } }
 
@@ -430,6 +473,7 @@ if needsTextEdit {
     }
     run("autocomplete", autocompleteScenarios)
     run("proofread", proofreadScenarios)
+    run("fixAll", fixAllScenario)
     run("stars", starScenarios)
     run("removeTells", removeTellsScenario)
     run("quick", quickTranslateScenario)

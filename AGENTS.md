@@ -55,6 +55,7 @@ BindAll/
 │   ├── ProofreadCache.swift           # paragraph segmentation + per-paragraph issue cache
 │   ├── HiddenBreaks.swift             # pure: block breaks Chromium leaves out of AXValue (align leaves, check text, map back, seam candidates)
 │   ├── ProofreadSkips.swift           # pure: places the user skipped (rule + text + context keys)
+│   ├── FixAll.swift                   # pure: every issue's first fix applied at once
 │   ├── ListMarkers.swift              # pure: list numbers/bullets glued to their item ("1.Buy")
 │   ├── AppOffsetMap.swift             # pure: value offsets <-> the app's own (Slack drops some newlines)
 │   ├── ProofreadLanguage.swift        # language resolution; ru/uk disambiguation for "auto"
@@ -102,6 +103,7 @@ BindAll/
 │   ├── ProofreadPopover.swift  # the fixes popup: presenter + placement above the word
 │   ├── FixesPopupView.swift    # the fixes popup's content: header + PopupItemsLayout
 │   ├── FixesPopupHeader / FixesPopupSummary / FixesPopupSkipButton .swift # kind + wording + counter, then the Skip icon
+│   ├── FixesPopupFixAllButton.swift   # "Fix all (N)" cell under the fixes
 │   ├── PopupMessageView.swift  # one-line notice in the same chrome
 │   ├── FirstMouseHostingView.swift # NSHostingView that accepts the first click on a never-key panel
 │   ├── HistoryPanelView.swift / HistoryRow.swift / HistoryDetail.swift # History popover from the menu bar
@@ -261,6 +263,11 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   (index = `replacements.count`) or clicked. It hides that one place for the rest of the session via
   `ProofreadSkips`, keyed by rule + text + 6 characters of context each side, so it survives
   re-checks and edits elsewhere while the same word in another place still shows.
+- **Fix all:** with two or more fixable issues the fixes popup ends with a "Fix all (N)" cell
+  (`FixesPopupFixAllButton`); ⌘Return in the popup does the same (`ProofreadKeyPolicy.fixAll`).
+  `FixAll.apply` (pure) re-reads the field, relocates each issue and applies its first fix from the
+  end, skipping overlaps; `ProofreadController.onFixAll` hands the field as a `StarContext` to the
+  coordinator, which always shows the preview and writes the result the way star actions do.
 - **Translation layout:** Apple's model (macOS 27) translates each line as its own segment and
   joins the output with blank lines. The whole text still goes in one request (context matters);
   `TranslationLayout.restore` then swaps the output's newline runs for the source's. OCR lines are

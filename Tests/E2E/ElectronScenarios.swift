@@ -153,8 +153,18 @@ func electronScenarios(_ target: ElectronTarget) {
     // Skips are remembered per rule, word and nearby text for the whole run, in every app: each
     // target gets its own neighbours so an earlier group's Skip does not hide this one's typo.
     let joiner = target.name == "Slack" ? "и" : "да"
-    E2E.type("Вот малако \(joiner) ощибка, граматика в тексте ")
+    let sentence = "Вот малако \(joiner) ощибка, граматика в тексте "
+    E2E.wait(3) { NSWorkspace.shared.frontmostApplication?.processIdentifier == pid }
+    E2E.type(sentence)
     E2E.pause(0.5)
+    if !text().contains("граматика") {
+        // Right after the switch from another app the first keys can land before the composer has focus.
+        print("    first typing was lost; focusing the composer again")
+        target.openComposer(pid)
+        clearComposer()
+        E2E.type(sentence)
+        E2E.pause(0.5)
+    }
     record("typing reaches the composer", text().contains("граматика"), "value: \(text())")
 
     let underlined = E2E.wait(15) { E2E.underlineCount() >= 3 }
@@ -267,6 +277,26 @@ func electronScenarios(_ target: ElectronTarget) {
         }
     } else {
         record("clicking the star opens its menu", false, "no star on the selection")
+    }
+
+    // MARK: Fix all
+
+    clearComposer()
+    E2E.type("Снова малако \(joiner) граматика тут ")
+    if E2E.wait(12, { E2E.underlineCount() >= 2 }), openFixes("граматика") != nil,
+       let button = E2E.testElement(window: "BindAll Fixes", {
+           ((E2E.attr($0, kAXDescriptionAttribute) as? String) ?? (E2E.attr($0, kAXTitleAttribute) as? String) ?? "").hasPrefix("Fix all")
+       }) ?? nil, let frame = E2E.frame(button) {
+        E2E.click(CGPoint(x: frame.midX, y: frame.midY))
+        if E2E.wait(4, { E2E.window("BindAll Preview") != nil }),
+           let apply = E2E.testElement(window: "BindAll Preview", E2E.named("Apply")), let applyFrame = E2E.frame(apply) {
+            E2E.click(CGPoint(x: applyFrame.midX, y: applyFrame.midY))
+            record("Fix all fixes every word at once", E2E.wait(6) { !text().contains("граматика") && !text().contains("малако") }, "now: \(text())")
+        } else {
+            record("Fix all fixes every word at once", false, "no preview")
+        }
+    } else {
+        record("Fix all fixes every word at once", false, "no Fix all in the popup; underlines \(E2E.underlineCount())")
     }
 
     // MARK: Autocomplete

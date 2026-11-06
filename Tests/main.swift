@@ -1046,6 +1046,8 @@ check(pk(123) == .passAndClose(reason: "navigation") && pk(124) == .passAndClose
 check(pk(125) == .enter, "Down goes into the fixes")
 check(pk(48) == .nextIssue && pk(48, shift: true) == .previousIssue, "Tab and Shift+Tab walk the issues")
 check(pk(36) == .apply, "Return applies the first fix")
+check(pk(36, cmd: true) == .fixAll && pk(36, browsing: true) == .apply, "Cmd+Return is Fix all, plain Return one fix")
+check(pk(36, cmd: true, shift: true) == .passAndClose(reason: "modifier"), "Cmd+Shift+Return is not Fix all")
 check(pk(53) == .close(reason: "esc"), "Esc closes")
 check(pk(49, cmd: true) == .passAndClose(reason: "modifier"), "a shortcut closes and goes through")
 check(pk(125, browsing: true) == .move(dx: 0, dy: 1) && pk(126, browsing: true, atFirst: true) == .leave,
@@ -1149,6 +1151,24 @@ check(usageKeys.isSubset(of: ["time", "feature", "kind", "app", "ms", "reason", 
 check(!FileManager.default.fileExists(atPath: usageDir.path), "clear removes the data")
 
 print("")
+print("FixAll")
+do {
+    let text = "Тут малако и ощибка."
+    let milk = issue(4, 6, original: "малако", replacements: ["молоко", "малака"])
+    let typo = issue(13, 6, original: "ощибка", replacements: ["ошибка"])
+    let none = issue(0, 3, original: "Тут", replacements: [])
+    let all = FixAll.apply([milk, typo, none], to: text)
+    eq(all.text, "Тут молоко и ошибка.", "every issue gets its first fix")
+    check(all.fixed == 2, "an issue without a fix is left and not counted")
+    check(FixAll.fixable([milk, none]).count == 1, "only issues with a fix are fixable")
+    let moved = FixAll.apply([milk, typo], to: "Ну, тут малако и ощибка.")
+    eq(moved.text, "Ну, тут молоко и ошибка.", "issues are relocated when the text moved")
+    let clash = FixAll.apply([issue(4, 6, original: "малако", replacements: ["молоко"]),
+                              issue(4, 8, original: "малако и", replacements: ["X"])], to: text)
+    check(clash.fixed == 1, "overlapping issues are fixed once")
+    check(FixAll.apply([typo], to: "совсем другой текст").fixed == 0, "a vanished issue is skipped")
+}
+
 if failures == 0 {
     print("ALL TESTS PASSED")
     exit(0)

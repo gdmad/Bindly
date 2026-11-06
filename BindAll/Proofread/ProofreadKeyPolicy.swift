@@ -12,6 +12,8 @@ enum ProofreadKeyPolicy {
         /// Back out of the fixes; the popup stays.
         case leave
         case apply
+        /// ⌘Return: every issue's first fix, through the preview.
+        case fixAll
         case nextIssue
         case previousIssue
         case close(reason: String)
@@ -21,10 +23,11 @@ enum ProofreadKeyPolicy {
     /// nearest the word -- so ↑ goes into the fixes and ↓ comes back out.
     static func action(keyCode: Int, command: Bool, control: Bool, option: Bool, shift: Bool,
                        browsing: Bool, atFirst: Bool, layout: PopupLayout, opensUpward: Bool = false) -> Action {
+        let isReturn = keyCode == kVK_Return || keyCode == kVK_ANSI_KeypadEnter
+        if isReturn && command && !control && !option && !shift { return .fixAll }
         if command || control || option { return .passAndClose(reason: "modifier") }
         if keyCode == kVK_Tab { return shift ? .previousIssue : .nextIssue }
         if shift { return .passAndClose(reason: "typedOn") }
-        let isReturn = keyCode == kVK_Return || keyCode == kVK_ANSI_KeypadEnter
         if isReturn { return .apply }
         guard browsing else {
             if keyCode == (opensUpward ? kVK_UpArrow : kVK_DownArrow) { return .enter }

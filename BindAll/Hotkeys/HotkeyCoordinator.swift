@@ -133,6 +133,14 @@ final class HotkeyCoordinator {
         proofread.onSessionChange = { [weak self] active in
             if active { self?.autocomplete.suspend() } else { self?.autocomplete.resume() }
         }
+        // Many words change at once, so the result is always previewed before it is written.
+        proofread.onFixAll = { [weak self] context, result, count in
+            self?.preview.show(title: "Fix all (\(count))", original: context.text, result: result,
+                               near: context.anchor) { [weak self] in
+                UsageLog.record(.proofread, .applied, detail: "fixAll:\(count)")
+                self?.replace(context, with: result)
+            }
+        }
     }
 
     // MARK: - Stars

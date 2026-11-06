@@ -20,6 +20,9 @@ struct FixesPopupView: View {
     let onClose: () -> Void
     /// Above the word the fixes list bottom-up, the first nearest the word.
     var bottomUp = false
+    /// Issues "Fix all" would change; the button shows from two up.
+    var fixAllCount = 0
+    var onFixAll: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: PopupMetrics.cellSpacing) {
@@ -38,6 +41,9 @@ struct FixesPopupView: View {
                                  bottomUp: bottomUp,
                                  fontSize: fontSize, tileTopCount: tileTopCount,
                                  onHover: onHover, onActivate: onAccept)
+            }
+            if fixAllCount >= 2 {
+                FixesPopupFixAllButton(count: fixAllCount, fontSize: fontSize, onActivate: onFixAll)
             }
         }
         .frame(minWidth: PopupMetrics.minWidth, maxWidth: PopupMetrics.maxWidth, alignment: .leading)
