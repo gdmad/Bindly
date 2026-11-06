@@ -308,7 +308,10 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   (debounced), hidden on key-down/scroll; follows the Proofread app filter; skips BindAll itself,
   password and tiny fields. Uses `ProofreadAX.focus(analyze: false)` (no hidden-break walk) and the
   offset map for the selection's end. A click opens an `NSMenu` built by the coordinator: Fix, Fix
-  spelling (LanguageTool `correct`), Translate (popup), action keys, Custom prompt..., History (the
+  spelling (LanguageTool `correct`), Translate (popup), Explain and Summarize (show-only: the result
+  goes to the popup, the text is untouched, nothing is recorded in history), action keys (a key with
+  `ActionKey.showOnly` shows its result too, from the star and from its own shortcut), Custom
+  prompt..., History (the
   last 8 results, `HistoryMenuTitle`; picking one puts its output in place through the preview when
   `previewFromMenu` is on; only with history on), and for the field star "N issues: show the first". `StarContext` captures element, value, selection and map;
   replacing re-activates the app, selects `appRange` and pastes.

@@ -176,7 +176,7 @@ final class HotkeyCoordinator {
 
     /// What a star menu item does.
     enum StarAction {
-        case fix, spelling, translate, removeTells
+        case fix, spelling, translate, removeTells, explain, summarize
         case actionKey(ActionKey)
         case prompt(String, showOnly: Bool)
     }
@@ -192,6 +192,8 @@ final class HotkeyCoordinator {
         add("Fix spelling", "textformat.abc") { [weak self] in self?.runStarAction(.spelling, context) }
         add("Translate", "globe") { [weak self] in self?.runStarAction(.translate, context) }
         add("Remove AI tells", "eraser") { [weak self] in self?.runStarAction(.removeTells, context) }
+        add("Explain", "questionmark.bubble") { [weak self] in self?.runStarAction(.explain, context) }
+        add("Summarize", "text.alignleft") { [weak self] in self?.runStarAction(.summarize, context) }
         let keys = appState.settings.actionKeys.filter { !$0.prompt.isEmpty }
         if !keys.isEmpty {
             menu.addItem(.separator())
@@ -285,6 +287,13 @@ final class HotkeyCoordinator {
         case .actionKey(let key): (.actionKey, key.label.isEmpty ? key.key : key.label, key.key)
         case .prompt: (.customPrompt, "Custom prompt", "source:star")
         case .translate: (.translate, "Translate", "source:star")
+        case .explain: (.explain, "Explain", "source:star")
+        case .summarize: (.summarize, "Summary", "source:star")
+        }
+        let showOnly = switch action {
+        case .explain, .summarize, .prompt(_, true): true
+        case .actionKey(let key): key.showOnly
+        default: false
         }
         currentTask = Task { [weak self] in
             guard let self else { return }
@@ -296,10 +305,12 @@ final class HotkeyCoordinator {
                     result = try await EngineFactory.makeLanguageTool(appState: self.appState).correct(text)
                 case .removeTells:
                     result = try await self.removeTells(from: text, settings: settings)
-                case .fix, .actionKey, .prompt, .translate:
+                case .fix, .actionKey, .prompt, .translate, .explain, .summarize:
                     let instruction: String = switch action {
                     case .actionKey(let key): key.prompt
                     case .prompt(let prompt, _): prompt
+                    case .explain: Self.explainPrompt
+                    case .summarize: Self.summarizePrompt
                     default: settings.defaultPrompt
                     }
                     let engine = EngineFactory.make(kind: settings.defaultEngine, appState: self.appState)
@@ -307,13 +318,15 @@ final class HotkeyCoordinator {
                     if settings.maskAISlop { result = MaskAISlop.apply(to: result, rules: settings.maskRules) }
                 }
                 if Task.isCancelled { return }
-                self.recordHistory(kind: .action, input: text, output: result, engine: settings.defaultEngine.displayName)
                 let ms = UsageLog.elapsed(since: started)
-                if case .prompt(_, true) = action {
+                // Show-only results are read, not inserted: they stay out of the history the star
+                // menu offers for putting text back in place.
+                if showOnly {
                     UsageLog.record(feature, .shown, detail: detail, ms: ms)
                     self.popup.show(title: title, text: result, original: text)
                     return
                 }
+                self.recordHistory(kind: .action, input: text, output: result, engine: settings.defaultEngine.displayName)
                 let apply = { [weak self] in
                     UsageLog.record(feature, .applied, detail: detail, ms: ms)
                     self?.replace(context, with: result)
@@ -348,6 +361,16 @@ final class HotkeyCoordinator {
         }
         return result
     }
+
+    static let explainPrompt = """
+        Explain what this text says and means in plain words, briefly, in the same language as the \
+        text. Spell out jargon, abbreviations and anything implied. Reply with the explanation only.
+        """
+
+    static let summarizePrompt = """
+        Summarize this text in one to three sentences, in the same language as the text. Keep names, \
+        numbers and decisions. Reply with the summary only.
+        """
 
     static let removeTellsPrompt = """
         Rewrite this text so it no longer reads as AI-generated: drop stock phrases (delve, truly, \
@@ -460,7 +483,7 @@ final class HotkeyCoordinator {
             translateFromScreen()
         } else if let key = s.actionKeys.first(where: { $0.hotkey.map(matches) == true }) {
             // A custom action key bound to its own shortcut: run its prompt on the selection.
-            runDefaultAction(fixedInstruction: key.prompt, actionKey: key.key)
+            runDefaultAction(fixedInstruction: key.prompt, actionKey: key.key, showOnly: key.showOnly)
         }
     }
 
@@ -519,7 +542,7 @@ final class HotkeyCoordinator {
     /// Runs the text pipeline on the current selection. With `fixedInstruction` (a per-key
     /// shortcut) the whole selection is the content; otherwise the separator/key syntax is parsed.
     private func runDefaultAction(fixedInstruction: String? = nil, forceCopy: Bool = false,
-                                  actionKey: String? = nil) {
+                                  actionKey: String? = nil, showOnly: Bool = false) {
         let settings = appState.settings
         let feature: UsageFeature = actionKey == nil ? .fix : .actionKey
         let source = forceCopy ? "source:menu" : "source:hotkey"
@@ -568,6 +591,11 @@ final class HotkeyCoordinator {
                 if Task.isCancelled { return }
                 if settings.maskAISlop {
                     result = MaskAISlop.apply(to: result, rules: settings.maskRules)
+                }
+                if showOnly {
+                    UsageLog.record(feature, .shown, detail: actionKey ?? source, ms: UsageLog.elapsed(since: started))
+                    self.popup.show(title: actionKey.map { "Action \($0)" } ?? "Result", text: result, original: parsed.content)
+                    return
                 }
                 self.recordHistory(kind: .action, input: parsed.content, output: result,
                                    engine: settings.defaultEngine.displayName)

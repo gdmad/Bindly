@@ -380,6 +380,38 @@ func pickMenuItem(downs: Int = 0, ups: Int = 0, thenRight: Bool = false) {
     E2E.allowBareReturn = false
 }
 
+func explainScenario() {
+    group = "Explain"
+    guard let pid = E2E.testApp?.processIdentifier else { return }
+    for (name, downs) in [("Explain", 5), ("Summarize", 6)] {
+        clearField()
+        let text = "Совещание переносится на четверг, потому что заказчик не успел прислать ТЗ. "
+        E2E.type(text)
+        E2E.pause(1.0)
+        E2E.key(kVK_ANSI_A, .maskCommand)
+        E2E.pause(1.2)
+        guard let star = E2E.window("BindAll Star")?.bounds else { record(name, false, "no star"); continue }
+        E2E.click(CGPoint(x: star.midX, y: star.midY))
+        E2E.pause(0.6)
+        let app = AXUIElementCreateApplication(pid)
+        if let item = E2E.find(in: app, depth: 6, { (E2E.attr($0, kAXTitleAttribute) as? String) == name }) {
+            E2E.press(item)
+        } else {
+            pickMenuItem(downs: downs)
+        }
+        let shown = E2E.wait(40) { E2E.window("BindAll Translation") != nil }
+        var body = ""
+        if shown, let panel = E2E.find(in: app, depth: 2, { (E2E.attr($0, kAXTitleAttribute) as? String) == "BindAll Translation" }) {
+            body = E2E.dump(panel, depth: 12)
+            E2E.snapshot(E2E.window("BindAll Translation")!.bounds, to: outDir.appending(path: "\(name.lowercased()).png"))
+        }
+        record("\(name) shows its result in a popup", shown && !body.contains("Error"), shown ? "" : "no popup")
+        record("\(name) leaves the text alone", fieldText() == text, "now: \(fieldText())")
+        E2E.key(kVK_Escape)
+        E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+    }
+}
+
 func snapshotField(_ name: String) {
     if let el = textEditField(), let frame = E2E.frame(el) {
         E2E.snapshot(frame.intersection(CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: 160)),
@@ -567,7 +599,7 @@ func trayScenario() {
 
 guard E2E.testApp != nil else { print("BindAll E2E is not running"); exit(2) }
 let only = Set((ProcessInfo.processInfo.environment["E2E_ONLY"] ?? "").split(separator: ",").map(String.init))
-let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "stars", "removeTells", "quick", "tray"]
+let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "explain", "stars", "removeTells", "quick", "tray"]
 let needsTextEdit = only.isEmpty || !only.isDisjoint(with: textEditGroups)
 func run(_ name: String, _ body: () -> Void) { if only.isEmpty || only.contains(name) { body() } }
 
@@ -586,6 +618,7 @@ if needsTextEdit {
     run("fixAll", fixAllScenario)
     run("dictionary", dictionaryScenario)
     run("history", historyScenario)
+    run("explain", explainScenario)
     run("stars", starScenarios)
     run("removeTells", removeTellsScenario)
     run("quick", quickTranslateScenario)

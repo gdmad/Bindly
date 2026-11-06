@@ -1195,6 +1195,17 @@ do {
     check(long.count <= HistoryMenuTitle.maxLength && long.hasSuffix("…"), "a long result is cut with an ellipsis")
 }
 
+print("ActionKey showOnly")
+do {
+    let old = #"{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","key":"w","label":"L","prompt":"P"}"#
+    let decoded = try? JSONDecoder().decode(ActionKey.self, from: Data(old.utf8))
+    check(decoded?.showOnly == false && decoded?.key == "w", "a key saved before showOnly decodes as replacing")
+    var shown = ActionKey(key: "e", label: "Explain", prompt: "Explain")
+    shown.showOnly = true
+    let round = (try? JSONEncoder().encode(shown)).flatMap { try? JSONDecoder().decode(ActionKey.self, from: $0) }
+    check(round?.showOnly == true, "showOnly survives a round trip")
+}
+
 if failures == 0 {
     print("ALL TESTS PASSED")
     exit(0)

@@ -55,6 +55,8 @@ struct ActionKeyRow: View {
                 }
 
                 HStack {
+                    Toggle("Show the result, do not replace the text", isOn: $key.showOnly)
+                        .controlSize(.small)
                     Spacer()
                     Button("Delete", systemImage: "trash", role: .destructive, action: delete)
                         .controlSize(.small)

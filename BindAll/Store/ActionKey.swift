@@ -12,6 +12,8 @@ struct ActionKey: Identifiable, Codable, Hashable {
     /// Optional global shortcut that runs this action on the current selection directly,
     /// without typing the separator suffix. Decodes as nil from older stored settings.
     var hotkey: HotkeyConfig?
+    /// Shows the result in a popup instead of replacing the text (an explanation, a summary).
+    var showOnly = false
 
     static let defaults: [ActionKey] = [
         ActionKey(
@@ -40,4 +42,19 @@ struct ActionKey: Identifiable, Codable, Hashable {
             prompt: "Rewrite the text as a short, polite, constructive request. Start with \"Привет!\" and form a complete question or request (e.g. \"когда\" -> \"Привет! Когда будет готово?\", \"пришли отчет\" -> \"Привет! Можешь прислать отчёт?\"). Same language. Output only the result."
         ),
     ]
+}
+
+extension ActionKey {
+    private enum CodingKeys: String, CodingKey { case id, key, label, prompt, hotkey, showOnly }
+
+    /// Older settings have no `showOnly`; it defaults to replacing, as before.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        key = try c.decode(String.self, forKey: .key)
+        label = try c.decode(String.self, forKey: .label)
+        prompt = try c.decode(String.self, forKey: .prompt)
+        hotkey = try c.decodeIfPresent(HotkeyConfig.self, forKey: .hotkey)
+        showOnly = try c.decodeIfPresent(Bool.self, forKey: .showOnly) ?? false
+    }
 }
