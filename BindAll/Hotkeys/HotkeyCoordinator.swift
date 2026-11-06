@@ -178,7 +178,7 @@ final class HotkeyCoordinator {
 
     /// What a star menu item does.
     enum StarAction {
-        case fix, spelling, translate, removeTells, explain, summarize
+        case fix, spelling, translate, translateInPlace, removeTells, explain, summarize
         case actionKey(ActionKey)
         case prompt(String, showOnly: Bool)
     }
@@ -193,6 +193,7 @@ final class HotkeyCoordinator {
         add("Fix", "wand.and.stars") { [weak self] in self?.runStarAction(.fix, context) }
         add("Fix spelling", "textformat.abc") { [weak self] in self?.runStarAction(.spelling, context) }
         add("Translate", "globe") { [weak self] in self?.runStarAction(.translate, context) }
+        add("Translate in place", "character.bubble") { [weak self] in self?.runStarAction(.translateInPlace, context) }
         add("Remove AI tells", "eraser") { [weak self] in self?.runStarAction(.removeTells, context) }
         add("Explain", "questionmark.bubble") { [weak self] in self?.runStarAction(.explain, context) }
         add("Summarize", "text.alignleft") { [weak self] in self?.runStarAction(.summarize, context) }
@@ -279,6 +280,11 @@ final class HotkeyCoordinator {
             Task { await translateAndShow(text, historyKind: .translate) }
             return
         }
+        if case .translateInPlace = action {
+            UsageLog.record(.star, .accepted, detail: "translateInPlace")
+            Task { await translateAndShow(text, historyKind: .translate, replacing: context) }
+            return
+        }
         guard !isBusy else { return }
         beginBusy()
         let started = ContinuousClock.now
@@ -288,7 +294,7 @@ final class HotkeyCoordinator {
         case .removeTells: (.removeTells, "Remove AI tells", "source:star")
         case .actionKey(let key): (.actionKey, key.label.isEmpty ? key.key : key.label, key.key)
         case .prompt: (.customPrompt, "Custom prompt", "source:star")
-        case .translate: (.translate, "Translate", "source:star")
+        case .translate, .translateInPlace: (.translate, "Translate", "source:star")
         case .explain: (.explain, "Explain", "source:star")
         case .summarize: (.summarize, "Summary", "source:star")
         }
@@ -307,7 +313,7 @@ final class HotkeyCoordinator {
                     result = try await EngineFactory.makeLanguageTool(appState: self.appState).correct(text)
                 case .removeTells:
                     result = try await self.removeTells(from: text, settings: settings)
-                case .fix, .actionKey, .prompt, .translate, .explain, .summarize:
+                case .fix, .actionKey, .prompt, .translate, .translateInPlace, .explain, .summarize:
                     let instruction: String = switch action {
                     case .actionKey(let key): key.prompt
                     case .prompt(let prompt, _): prompt
@@ -695,7 +701,9 @@ final class HotkeyCoordinator {
     }
 
     /// Shared translation + popup, using the configured two-language pair.
-    private func translateAndShow(_ text: String, historyKind: HistoryEntry.Kind) async {
+    /// With `context` the translation replaces the star's text (through the preview when that is on)
+    /// instead of opening in the popup.
+    private func translateAndShow(_ text: String, historyKind: HistoryEntry.Kind, replacing context: StarContext? = nil) async {
         let settings = appState.settings
         let feature: UsageFeature = historyKind == .ocr ? .ocr : .translate
         let started = ContinuousClock.now
@@ -744,6 +752,19 @@ final class HotkeyCoordinator {
             let translation = try await translationCoordinator.translate(text, from: from, to: target)
             recordHistory(kind: historyKind, input: text, output: translation, engine: "Apple Translation")
             UsageLog.record(feature, .shown, ms: UsageLog.elapsed(since: started))
+            if let context {
+                let title = "Translate: \(sourceDisplay) → \(AppLanguages.name(for: targetCode))"
+                let apply: () -> Void = { [weak self] in
+                    UsageLog.record(feature, .applied, detail: "inPlace")
+                    self?.replace(context, with: translation)
+                }
+                if settings.previewFromMenu {
+                    preview.show(title: title, original: text, result: translation, near: context.anchor, onApply: apply)
+                } else {
+                    apply()
+                }
+                return
+            }
             popup.show(title: "Translation", text: translation, original: text, sourceLanguage: sourceDisplay,
                        targetLanguage: AppLanguages.name(for: targetCode))
         } catch {

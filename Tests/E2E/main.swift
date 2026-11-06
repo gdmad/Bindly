@@ -383,7 +383,7 @@ func pickMenuItem(downs: Int = 0, ups: Int = 0, thenRight: Bool = false) {
 func explainScenario() {
     group = "Explain"
     guard let pid = E2E.testApp?.processIdentifier else { return }
-    for (name, downs) in [("Explain", 5), ("Summarize", 6)] {
+    for (name, downs) in [("Explain", 6), ("Summarize", 7)] {
         clearField()
         let text = "Совещание переносится на четверг, потому что заказчик не успел прислать ТЗ. "
         E2E.type(text)
@@ -449,6 +449,33 @@ func preSendScenario() {
     E2E.pause(0.5)
     press(kVK_Return, .maskShift)
     record("Shift+Return is never held", E2E.wait(2) { fieldText().hasSuffix("\n") } && !warningUp())
+}
+
+func translateInPlaceScenario() {
+    group = "Translate in place"
+    guard let pid = E2E.testApp?.processIdentifier else { return }
+    clearField()
+    E2E.type("Добрый день, коллеги")
+    E2E.pause(1.0)
+    E2E.key(kVK_ANSI_A, .maskCommand)
+    E2E.pause(1.2)
+    guard let star = E2E.window("BindAll Star")?.bounds else { record("Translate in place", false, "no star"); return }
+    E2E.click(CGPoint(x: star.midX, y: star.midY))
+    E2E.pause(0.6)
+    if let item = E2E.find(in: AXUIElementCreateApplication(pid), depth: 6, { (E2E.attr($0, kAXTitleAttribute) as? String) == "Translate in place" }) {
+        E2E.press(item)
+    } else {
+        pickMenuItem(downs: 4)
+    }
+    let preview = E2E.wait(20) { E2E.window("BindAll Preview") != nil }
+    record("it shows the translation in the preview", preview, preview ? "" : "windows \(E2E.windows().map(\.name))")
+    record("nothing changes before Apply", fieldText() == "Добрый день, коллеги")
+    guard preview else { return }
+    E2E.allowBareReturn = true
+    E2E.key(kVK_Return)
+    E2E.allowBareReturn = false
+    let latin = { fieldText().range(of: #"^[A-Za-z ,.!']+$"#, options: .regularExpression) != nil }
+    record("Apply puts the translation in place", E2E.wait(5, latin), "now: \(fieldText())")
 }
 
 func snapshotField(_ name: String) {
@@ -638,7 +665,7 @@ func trayScenario() {
 
 guard E2E.testApp != nil else { print("BindAll E2E is not running"); exit(2) }
 let only = Set((ProcessInfo.processInfo.environment["E2E_ONLY"] ?? "").split(separator: ",").map(String.init))
-let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "explain", "preSend", "stars", "removeTells", "quick", "tray"]
+let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "explain", "preSend", "translateInPlace", "stars", "removeTells", "quick", "tray"]
 let needsTextEdit = only.isEmpty || !only.isDisjoint(with: textEditGroups)
 func run(_ name: String, _ body: () -> Void) { if only.isEmpty || only.contains(name) { body() } }
 
@@ -659,6 +686,7 @@ if needsTextEdit {
     run("history", historyScenario)
     run("explain", explainScenario)
     run("preSend", preSendScenario)
+    run("translateInPlace", translateInPlaceScenario)
     run("stars", starScenarios)
     run("removeTells", removeTellsScenario)
     run("quick", quickTranslateScenario)

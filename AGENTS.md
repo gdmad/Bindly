@@ -317,7 +317,8 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   (debounced), hidden on key-down/scroll; follows the Proofread app filter; skips BindAll itself,
   password and tiny fields. Uses `ProofreadAX.focus(analyze: false)` (no hidden-break walk) and the
   offset map for the selection's end. A click opens an `NSMenu` built by the coordinator: Fix, Fix
-  spelling (LanguageTool `correct`), Translate (popup), Explain and Summarize (show-only: the result
+  spelling (LanguageTool `correct`), Translate (popup), Translate in place (Apple Translation, same
+  language pair rules as Translate, the result replaces the text through the preview), Explain and Summarize (show-only: the result
   goes to the popup, the text is untouched, nothing is recorded in history), action keys (a key with
   `ActionKey.showOnly` shows its result too, from the star and from its own shortcut), Custom
   prompt..., History (the
