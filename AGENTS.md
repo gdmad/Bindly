@@ -322,6 +322,18 @@ count for that key is reached (only counts with a larger sibling wait out the ti
 
 ## Build & test
 
+- **End-to-end** (`./scripts/e2e.sh`, `Tests/E2E/`): builds a separate app "BindAll E2E"
+  (`com.evgeny.bindall.e2e`, signed with the dev certificate so its Accessibility grant survives
+  rebuilds) with its own UserDefaults and data folder (`AppPaths`: `Application Support/BindAll E2E`),
+  writes test settings, launches it and drives TextEdit with synthesized input, then checks the field
+  text, the test build's windows (panels are named: "BindAll Underlines: N", "BindAll Fixes",
+  "BindAll Suggestions", "BindAll Inline", "BindAll Star", "BindAll Preview", "BindAll Prompt",
+  "BindAll Quick Translate"), their AX trees and its usage events. Report: `.build/e2e/report.md`.
+  Once: grant "BindAll E2E" Accessibility; quit the real BindAll first. `E2E_ONLY=proofread,quick`
+  runs single groups. Never sends a bare Return outside TextEdit and BindAll's own windows. SwiftUI
+  fields ignore Unicode-only synthesized keys, so the driver sets their text through AX.
+
+
 ```bash
 xcodebuild -scheme BindAll -configuration Debug build      # build
 ./Tests/run_tests.sh                                       # pure-logic unit tests

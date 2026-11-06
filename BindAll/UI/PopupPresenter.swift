@@ -24,9 +24,17 @@ final class PopupPresenter {
     /// Returns where the panel went, so the caller can tell whether it landed above its anchor.
     @discardableResult
     func present<Content: View>(_ view: Content, origin: (NSSize) -> NSPoint) -> NSRect {
-        let host = FirstMouseHostingView(rootView: view)
         let panel = self.panel ?? makePanel()
-        panel.contentView = host
+        // Update the view in place when it is the same kind: replacing the panel's content on every
+        // redraw (hover, selection) dropped a click that landed in between -- the Close icon's.
+        let host: FirstMouseHostingView<Content>
+        if let existing = panel.contentView as? FirstMouseHostingView<Content> {
+            existing.rootView = view
+            host = existing
+        } else {
+            host = FirstMouseHostingView(rootView: view)
+            panel.contentView = host
+        }
         panel.layoutIfNeeded()
         let size = host.fittingSize
         panel.setContentSize(size)

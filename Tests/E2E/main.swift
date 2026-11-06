@@ -200,6 +200,9 @@ func proofreadScenarios() {
         }
     }
 
+    // Skip moves the open popup on to the next issue; close it so the click lands on the word.
+    E2E.key(kVK_Escape)
+    E2E.wait(2) { E2E.window("BindAll Fixes") == nil }
     if let grammar = wordRect("граматика") {
         E2E.click(CGPoint(x: grammar.midX, y: grammar.midY))
         if E2E.wait(4, { E2E.window("BindAll Fixes") != nil }),
@@ -207,7 +210,12 @@ func proofreadScenarios() {
            let frame = E2E.frame(close) {
             let panel = E2E.window("BindAll Fixes")?.bounds ?? .zero
             E2E.click(CGPoint(x: frame.midX, y: frame.midY))
-            record("the cross closes the fixes", E2E.wait(2) { E2E.window("BindAll Fixes") == nil },
+            let first = E2E.wait(2) { E2E.window("BindAll Fixes") == nil }
+            if !first {
+                E2E.click(CGPoint(x: frame.midX, y: frame.midY))
+                print("    cross: first click ignored, second \(E2E.wait(2) { E2E.window("BindAll Fixes") == nil } ? "worked" : "ignored too")")
+            }
+            record("the cross closes the fixes", first,
                    "button \(frame), panel \(panel)")
         } else {
             record("the cross closes the fixes", false, "popup or its Close button not found")
@@ -336,7 +344,13 @@ func quickTranslateScenario() {
         E2E.pause(0.3)
     }
     let focusNote = "frontmost before click: \(frontmost)"
-    E2E.type(ProcessInfo.processInfo.environment["E2E_QT_TEXT"] ?? "Добрый день, коллеги", toPid: pidQT)
+    // SwiftUI fields take synthesized text unreliably (a person's real keys work); set it through
+    // Accessibility, then a real key so the field registers the edit.
+    if let input = E2E.find(in: AXUIElementCreateApplication(pidQT), depth: 16, { (E2E.attr($0, kAXRoleAttribute) as? String) == "AXTextField" }) {
+        AXUIElementSetAttributeValue(input, kAXValueAttribute as CFString, "Добрый день, коллеги" as CFString)
+        E2E.pause(0.2)
+        E2E.key(kVK_End)
+    }
     E2E.pause(0.3)
     let typedQT = E2E.find(in: AXUIElementCreateApplication(pidQT), depth: 16, { (E2E.attr($0, kAXRoleAttribute) as? String) == "AXTextField" }).map(E2E.value) ?? "?"
     print("    quick translate input after typing: \(typedQT.debugDescription)")
