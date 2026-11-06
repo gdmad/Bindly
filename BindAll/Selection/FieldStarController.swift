@@ -22,6 +22,10 @@ final class FieldStarController {
     private var appObserver: NSObjectProtocol?
     private var pending: Task<Void, Never>?
     private var shownKind: String?
+    private var shownElement: AXUIElement?
+    /// Where the mouse was last released (AppKit coordinates): a selection made with the mouse ends
+    /// there, which places the star when the app reports no geometry for the selection.
+    private var lastMouseUp: NSPoint?
 
     private var enabled: Bool { config.fieldEnabled || config.selectionEnabled }
 
@@ -59,6 +63,7 @@ final class FieldStarController {
     }
 
     private func observed(_ event: NSEvent) {
+        if event.type == .leftMouseUp { lastMouseUp = NSEvent.mouseLocation }
         switch event.type {
         case .keyDown, .scrollWheel:
             // Typing moves the selection and scrolling moves the field: get out of the way at once.
@@ -90,10 +95,18 @@ final class FieldStarController {
         }
         let screenHeight = NSScreen.screens.first?.frame.height ?? fieldQuartz.maxY
         let size = StarButton.size
-        if target.selection.length > 0, config.selectionEnabled,
-           let end = selectionEndRect(target, screenHeight: screenHeight) {
-            // Below the end of the selection: editors put their own toolbar above it.
-            let origin = NSPoint(x: end.maxX + 2, y: end.minY - size - 2)
+        if target.selection.length > 0, config.selectionEnabled {
+            // Below the end of the selection: editors put their own toolbar above it. Without
+            // geometry for the selection, where the mouse let go is where it ended.
+            let origin: NSPoint
+            if let end = selectionEndRect(target, screenHeight: screenHeight) {
+                origin = NSPoint(x: end.maxX + 2, y: end.minY - size - 2)
+            } else if let mouse = lastMouseUp {
+                origin = NSPoint(x: mouse.x + 4, y: mouse.y - size - 4)
+            } else {
+                let field = UnderlineGeometry.appKitRect(fromQuartz: fieldQuartz, primaryScreenHeight: screenHeight)
+                origin = NSPoint(x: field.maxX - size - 6, y: field.minY + 6)
+            }
             show(target, kind: "selection", origin: origin, label: "Actions for the selection")
         } else if config.fieldEnabled, target.selection.length == 0 {
             let field = UnderlineGeometry.appKitRect(fromQuartz: fieldQuartz, primaryScreenHeight: screenHeight)
@@ -117,16 +130,20 @@ final class FieldStarController {
                                   selection: kind == "selection" ? target.selection : NSRange(location: 0, length: 0),
                                   offsetMap: target.offsetMap,
                                   anchor: NSPoint(x: origin.x + StarButton.size / 2, y: origin.y))
-        if shownKind != kind { UsageLog.record(.star, .shown, detail: kind) }
+        // Counted once per field and kind, not on every re-show after typing or scrolling.
+        let sameField = shownElement.map { CFEqual($0, target.element) } ?? false
+        if !(sameField && shownKind == kind) { UsageLog.record(.star, .shown, detail: kind) }
         shownKind = kind
+        shownElement = target.element
         panel.show(at: origin, label: label) { [weak self] view in
             UsageLog.record(.star, .accepted, detail: "open:\(kind)")
             self?.onOpen?(context, view)
         }
     }
 
+    /// Leaves `shownKind` / `shownElement` alone: hiding while typing must not make the next show
+    /// count as a new one.
     private func hide() {
         panel.hide()
-        shownKind = nil
     }
 }

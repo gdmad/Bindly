@@ -47,10 +47,7 @@ final class HistoryStore {
         if let fileURL {
             self.fileURL = fileURL
         } else {
-            let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            let dir = base.appendingPathComponent("BindAll", isDirectory: true)
-            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            self.fileURL = dir.appendingPathComponent("history.json")
+            self.fileURL = AppPaths.supportDirectory.appendingPathComponent("history.json")
         }
         load()
     }

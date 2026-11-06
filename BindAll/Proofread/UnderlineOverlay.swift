@@ -84,6 +84,8 @@ final class UnderlineOverlay {
         let panel = self.panel ?? makePanel()
         let view = (panel.contentView as? UnderlineView) ?? UnderlineView()
         view.segments = segments
+        // The count rides in the (never shown) window name, where the end-to-end test reads it.
+        panel.title = "BindAll Underlines: \(segments.count)"
         panel.contentView = view
         panel.setFrame(panelFrame, display: true)
         panel.orderFront(nil) // NOT makeKey: the text field must keep focus.
@@ -111,6 +113,7 @@ final class UnderlineOverlay {
     private func makePanel() -> NSPanel {
         let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                             backing: .buffered, defer: true)
+        panel.title = "BindAll Underlines"
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false

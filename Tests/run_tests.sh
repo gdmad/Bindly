@@ -10,6 +10,7 @@ swiftc -O \
     BindAll/Actions/PromptParser.swift \
     BindAll/Actions/MaskAISlopRule.swift \
     BindAll/Actions/MaskAISlop.swift \
+    BindAll/Store/AppPaths.swift \
     BindAll/Store/HistoryStore.swift \
     BindAll/Store/UsageLog.swift \
     BindAll/Engines/AIEngine.swift \

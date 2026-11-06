@@ -42,7 +42,7 @@ actor UsageLog {
     }
 
     nonisolated static var defaultDirectory: URL {
-        URL.applicationSupportDirectory.appending(path: "BindAll/Usage", directoryHint: .isDirectory)
+        AppPaths.supportDirectory.appending(path: "Usage", directoryHint: .isDirectory)
     }
 
     /// Fire-and-forget: callers on the main thread never wait for the disk.

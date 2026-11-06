@@ -56,6 +56,8 @@ final class AutocompleteController {
         /// Whether the user went into the list with ↓ (see `AutocompleteKeyPolicy`).
         var browsing = false
         var atFirst = true
+        /// The list sits above the caret: ↑ goes into it.
+        var opensUpward = false
     }
     private var suppression = Suppression()
     private var suppressionLock = os_unfair_lock()
@@ -312,7 +314,8 @@ final class AutocompleteController {
                                             control: flags.contains(.maskControl),
                                             option: flags.contains(.maskAlternate), shift: flags.contains(.maskShift),
                                             browsing: snap.browsing, atFirst: snap.atFirst,
-                                            layout: snap.layout, acceptReturn: snap.acceptReturn) {
+                                            layout: snap.layout, acceptReturn: snap.acceptReturn,
+                                            opensUpward: snap.opensUpward) {
         case .pass:
             return Unmanaged.passUnretained(event)
         case .accept:
@@ -369,7 +372,8 @@ final class AutocompleteController {
                                selectedWord: candidates.indices.contains(selectedIndex) ? candidates[selectedIndex] : "",
                                partial: partial,
                                layout: config.layout, acceptReturn: config.acceptReturn,
-                               browsing: browsing, atFirst: selectedIndex == 0)
+                               browsing: browsing, atFirst: selectedIndex == 0,
+                               opensUpward: !inlineShown && overlay.placedAbove)
         os_unfair_lock_lock(&suppressionLock)
         suppression = snap
         os_unfair_lock_unlock(&suppressionLock)
@@ -676,6 +680,8 @@ final class AutocompleteController {
             inlineShown = false
             redraw()
         }
+        // Where the list landed decides which arrow goes into it.
+        syncSuppression()
     }
 
     private func redraw() {

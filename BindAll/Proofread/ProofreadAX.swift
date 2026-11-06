@@ -71,6 +71,12 @@ enum ProofreadAX {
                     selection = range
                 }
             }
+            // Electron fields can report an empty range while text is selected; the selected text
+            // itself is still there, so find it next to the caret.
+            if selection.length == 0, let selected = selectedText(of: candidate), !selected.isEmpty,
+               let found = Self.locate(selected, in: text, near: selection.location) {
+                selection = found
+            }
             return .axField(ProofTarget(element: candidate, pid: pid, text: text,
                                         caret: selection.location, selection: selection, breaks: breaks,
                                         offsetMap: map))
@@ -227,6 +233,23 @@ enum ProofreadAX {
             return nil
         }
         return result as? String
+    }
+
+    /// The occurrence of `needle` in `text` closest to `offset` (a selection starts or ends at the caret).
+    static func locate(_ needle: String, in text: String, near offset: Int) -> NSRange? {
+        let ns = text as NSString
+        var best: NSRange?
+        var search = NSRange(location: 0, length: ns.length)
+        while true {
+            let found = ns.range(of: needle, options: [.literal], range: search)
+            guard found.location != NSNotFound else { break }
+            let distance = min(abs(found.location - offset), abs(NSMaxRange(found) - offset))
+            if best.map({ min(abs($0.location - offset), abs(NSMaxRange($0) - offset)) > distance }) ?? true { best = found }
+            let next = found.location + 1
+            guard next < ns.length else { break }
+            search = NSRange(location: next, length: ns.length - next)
+        }
+        return best
     }
 
     /// The app's own text, read through `AXStringForRange` in chunks (Slack refuses one range over the

@@ -41,6 +41,10 @@ struct PopupCell: View {
         // whose behaviour in such a panel cannot be checked here. The traits and the action
         // below give assistive tech what a Button would have.
         .onTapGesture { onActivate?() }
+        // One element with a name, also when only the icon is drawn (Skip, Close) -- otherwise the
+        // icon-only cells dropped out of the accessibility tree altogether.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
         .accessibilityAddTraits(traits)
         .accessibilityActions {
             if let onActivate { Button(text, action: onActivate) }

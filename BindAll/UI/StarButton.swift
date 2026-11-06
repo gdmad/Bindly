@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The single violet star BindAll puts at the end of a selection or in the corner of a text field.
+/// The single violet star BindAll puts at the end of a selection or in the corner of a text field:
+/// just the star, no badge around it.
 struct StarButton: View {
     /// "Actions for the selection" / "Actions for this text", for VoiceOver and the tooltip.
     let label: String
@@ -10,15 +11,13 @@ struct StarButton: View {
         Button(label, systemImage: "sparkle", action: action)
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(Color.brand)
             .frame(width: StarButton.size, height: StarButton.size)
-            .background(.regularMaterial, in: .circle)
-            .overlay { Circle().strokeBorder(Color.brand.opacity(0.35), lineWidth: 0.5) }
-            .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
-            .contentShape(.circle)
+            .contentShape(.rect)
             .help(label)
     }
 
+    /// The click target; the star itself is smaller.
     static let size: CGFloat = 20
 }

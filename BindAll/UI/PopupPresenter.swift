@@ -12,20 +12,28 @@ final class PopupPresenter {
     /// can be clicked.
     private let ignoresMouseEvents: Bool
 
-    init(ignoresMouseEvents: Bool) {
+    /// Names the panel (never shown on a borderless panel); lets the end-to-end test tell windows apart.
+    private let name: String
+
+    init(ignoresMouseEvents: Bool, name: String) {
         self.ignoresMouseEvents = ignoresMouseEvents
+        self.name = name
     }
 
     /// Shows `view`, placed by `origin`, which is handed the view's fitted size.
-    func present<Content: View>(_ view: Content, origin: (NSSize) -> NSPoint) {
+    /// Returns where the panel went, so the caller can tell whether it landed above its anchor.
+    @discardableResult
+    func present<Content: View>(_ view: Content, origin: (NSSize) -> NSPoint) -> NSRect {
         let host = FirstMouseHostingView(rootView: view)
         let panel = self.panel ?? makePanel()
         panel.contentView = host
         panel.layoutIfNeeded()
         let size = host.fittingSize
         panel.setContentSize(size)
-        panel.setFrameOrigin(origin(size))
+        let placed = origin(size)
+        panel.setFrameOrigin(placed)
         panel.orderFront(nil) // NOT makeKey: the text field must keep focus.
+        return NSRect(origin: placed, size: size)
     }
 
     func hide() {
@@ -34,6 +42,7 @@ final class PopupPresenter {
 
     private func makePanel() -> NSPanel {
         let panel = PopupPanel.make(ignoresMouseEvents: ignoresMouseEvents)
+        panel.title = name
         self.panel = panel
         return panel
     }

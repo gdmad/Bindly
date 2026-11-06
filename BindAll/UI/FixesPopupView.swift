@@ -18,6 +18,8 @@ struct FixesPopupView: View {
     let onHover: (Int) -> Void
     let onAccept: (Int) -> Void
     let onClose: () -> Void
+    /// Above the word the fixes list bottom-up, the first nearest the word.
+    var bottomUp = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: PopupMetrics.cellSpacing) {
@@ -33,6 +35,7 @@ struct FixesPopupView: View {
                     .padding(.horizontal, PopupMetrics.cellPaddingH)
             } else {
                 PopupItemsLayout(items: replacements, selected: selected, softSelection: softSelection, layout: layout,
+                                 bottomUp: bottomUp,
                                  fontSize: fontSize, tileTopCount: tileTopCount,
                                  onHover: onHover, onActivate: onAccept)
             }

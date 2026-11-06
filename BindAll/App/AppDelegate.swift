@@ -124,6 +124,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         enabled.state = appState.settings.enabled ? .on : .off
         menu.addItem(enabled)
 
+        let stars = NSMenuItem(title: "Stars", action: #selector(toggleStars), keyEquivalent: "")
+        stars.target = self
+        stars.state = appState.settings.starFieldEnabled || appState.settings.starSelectionEnabled ? .on : .off
+        menu.addItem(stars)
+
         // Only surface the Accessibility action when it still needs granting (first run / re-sign).
         if !appState.accessibilityGranted {
             let grant = NSMenuItem(title: "Grant Accessibility…", action: #selector(grantAccessibility), keyEquivalent: "")
@@ -232,6 +237,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     // MARK: - Actions
+
+    /// Both stars at once; Settings -> General keeps them separately.
+    @objc private func toggleStars() {
+        let on = !(appState.settings.starFieldEnabled || appState.settings.starSelectionEnabled)
+        appState.settings.starFieldEnabled = on
+        appState.settings.starSelectionEnabled = on
+        rebuildMenu()
+    }
 
     @objc private func toggleEnabled() {
         appState.settings.enabled.toggle()

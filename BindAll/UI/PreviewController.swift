@@ -27,6 +27,7 @@ final class PreviewController {
         panel.titlebarAppearsTransparent = true
         panel.titleVisibility = .hidden
         [.closeButton, .miniaturizeButton, .zoomButton].forEach { panel.standardWindowButton($0)?.isHidden = true }
+        panel.title = "BindAll Preview"
         panel.level = .floating
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
@@ -43,11 +44,8 @@ final class PreviewController {
     }
 
     private func place(_ panel: NSPanel, near point: NSPoint) {
-        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(point) }) ?? NSScreen.main else { return }
         let size = panel.frame.size
-        let visible = screen.visibleFrame
-        let x = min(max(point.x - size.width / 2, visible.minX + 8), visible.maxX - size.width - 8)
-        let y = min(max(point.y - size.height - 12, visible.minY + 8), visible.maxY - size.height - 8)
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
+        panel.setFrameOrigin(PopupPlacement.clamp(NSPoint(x: point.x - size.width / 2, y: point.y - size.height - 12),
+                                                  size: size, near: point))
     }
 }

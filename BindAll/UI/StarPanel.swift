@@ -30,6 +30,7 @@ final class StarPanel {
 
     private func makePanel() -> NSPanel {
         let panel = PopupPanel.make(ignoresMouseEvents: false)
+        panel.title = "BindAll Star"
         self.panel = panel
         return panel
     }

@@ -1102,6 +1102,26 @@ eq(MaskAISlop.apply(to: "10\u{00A0}km", rules: []), "10\u{00A0}km", "and stay wi
 check(MaskAISlop.stockPhrases(in: "We're thrilled to delve into this game-changer. Важно отметить, что") == ["delve", "game-changer", "важно отметить"],
       "stock phrases are found in both languages")
 
+print("Key policies above the text")
+check(AutocompleteKeyPolicy.action(keyCode: 126, command: false, control: false, option: false, shift: false,
+                                   browsing: false, atFirst: true, layout: .column, acceptReturn: true, opensUpward: true) == .enter,
+      "a list above the caret is entered with Up")
+check(AutocompleteKeyPolicy.action(keyCode: 125, command: false, control: false, option: false, shift: false,
+                                   browsing: false, atFirst: true, layout: .column, acceptReturn: true, opensUpward: true)
+      == .passAndClose(reason: "navigation"), "and Down moves the caret instead")
+check(AutocompleteKeyPolicy.action(keyCode: 126, command: false, control: false, option: false, shift: false,
+                                   browsing: true, atFirst: true, layout: .column, acceptReturn: true, opensUpward: true) == .move(dx: 0, dy: 1),
+      "inside a list above, Up walks away from the text")
+check(AutocompleteKeyPolicy.action(keyCode: 125, command: false, control: false, option: false, shift: false,
+                                   browsing: true, atFirst: true, layout: .column, acceptReturn: true, opensUpward: true) == .leave,
+      "and Down from the first item backs out")
+check(ProofreadKeyPolicy.action(keyCode: 126, command: false, control: false, option: false, shift: false,
+                                browsing: false, atFirst: true, layout: .column, opensUpward: true) == .enter,
+      "the fixes popup above the word is entered with Up")
+check(ProofreadKeyPolicy.action(keyCode: 125, command: false, control: false, option: false, shift: false,
+                                browsing: false, atFirst: true, layout: .column, opensUpward: true) == .passAndClose(reason: "navigation"),
+      "Down moves the caret")
+
 print("UsageLog")
 let usageDir = FileManager.default.temporaryDirectory.appendingPathComponent("bindall-usage-\(UUID().uuidString)")
 let usageLog = UsageLog(directory: usageDir)

@@ -32,6 +32,7 @@ final class InlineGhostOverlay {
     private func makePanel() -> NSPanel {
         let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                             backing: .buffered, defer: true)
+        panel.title = "BindAll Inline"
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false

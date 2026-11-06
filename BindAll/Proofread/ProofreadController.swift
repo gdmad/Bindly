@@ -90,6 +90,8 @@ final class ProofreadController {
             var browsing = false
             var atFirst = true
             var layout = PopupLayout.column
+            /// The popup sits above the word: ↑ goes into the fixes.
+            var opensUpward = true
         }
 
         private var lock = os_unfair_lock()
@@ -383,6 +385,7 @@ final class ProofreadController {
                      onHover: { [weak self] index in self?.hoverReplacement(index) },
                      onAccept: { [weak self] index in self?.acceptReplacement(index) },
                      onClose: { [weak self] in self?.endNavigation(reason: "closeButton") })
+        syncKeySnapshot() // where the popup landed decides which arrow goes into it
     }
 
     /// The "Skip" row comes after the fixes, so its index is the number of fixes.
@@ -455,6 +458,7 @@ final class ProofreadController {
         snap.browsing = browsing
         snap.atFirst = selectedReplacement == 0
         snap.layout = config.layout
+        snap.opensUpward = popover.placedAbove
         shared.snapshot = snap
     }
 
@@ -690,7 +694,8 @@ final class ProofreadController {
         switch ProofreadKeyPolicy.action(keyCode: keyCode, command: flags.contains(.maskCommand),
                                          control: flags.contains(.maskControl),
                                          option: flags.contains(.maskAlternate), shift: flags.contains(.maskShift),
-                                         browsing: snap.browsing, atFirst: snap.atFirst, layout: snap.layout) {
+                                         browsing: snap.browsing, atFirst: snap.atFirst, layout: snap.layout,
+                                         opensUpward: snap.opensUpward) {
         case .enter:
             DispatchQueue.main.async { [weak self] in self?.setBrowsing(true) }
             return nil

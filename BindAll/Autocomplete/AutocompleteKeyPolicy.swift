@@ -21,8 +21,11 @@ enum AutocompleteKeyPolicy {
 
     /// `browsing` is whether the user went into the list. `atFirst` is whether the first item is
     /// selected, so ↑ from it backs out again, as in Safari.
+    /// `opensUpward`: the list sits above the text, its first item at the bottom, nearest the caret --
+    /// so ↑ goes into it and ↓ comes back out, mirroring the list below.
     static func action(keyCode: Int, command: Bool, control: Bool, option: Bool, shift: Bool,
-                       browsing: Bool, atFirst: Bool, layout: PopupLayout, acceptReturn: Bool) -> Action {
+                       browsing: Bool, atFirst: Bool, layout: PopupLayout, acceptReturn: Bool,
+                       opensUpward: Bool = false) -> Action {
         if command || control || option { return .passAndClose(reason: "modifier") }
         let isReturn = keyCode == kVK_Return || keyCode == kVK_ANSI_KeypadEnter
         if shift {
@@ -31,21 +34,27 @@ enum AutocompleteKeyPolicy {
         }
         if keyCode == kVK_Tab { return .accept }
         guard browsing else {
-            switch keyCode {
-            case kVK_DownArrow: return .enter
-            case kVK_Escape: return .close(reason: "esc")
-            default:
-                return navigation.contains(keyCode) || isReturn ? .passAndClose(reason: "navigation")
-                                                                 : .passAndClose(reason: "typedOn")
-            }
+            if keyCode == (opensUpward ? kVK_UpArrow : kVK_DownArrow) { return .enter }
+            if keyCode == kVK_Escape { return .close(reason: "esc") }
+            return navigation.contains(keyCode) || isReturn ? .passAndClose(reason: "navigation")
+                                                             : .passAndClose(reason: "typedOn")
         }
         if isReturn { return acceptReturn ? .accept : .passAndClose(reason: "navigation") }
         if keyCode == kVK_Escape { return .leave }
-        if let delta = delta(for: keyCode, layout: layout) {
+        if let delta = delta(for: keyCode, layout: layout, opensUpward: opensUpward) {
             if atFirst, delta.dy < 0 || (layout == .line && delta.dx < 0) { return .leave }
             return .move(dx: delta.dx, dy: delta.dy)
         }
         return navigation.contains(keyCode) ? .passAndClose(reason: "navigation") : .passAndClose(reason: "typedOn")
+    }
+
+    /// `delta(for:layout:)` seen from a list above the text: the vertical arrows swap meaning, so
+    /// "towards the text" stays the way out whichever side the list is on.
+    static func delta(for keyCode: Int, layout: PopupLayout, opensUpward: Bool) -> (dx: Int, dy: Int)? {
+        guard var d = delta(for: keyCode, layout: layout) else { return nil }
+        guard opensUpward, keyCode == kVK_UpArrow || keyCode == kVK_DownArrow else { return d }
+        if layout == .line { d.dx = -d.dx } else { d.dy = -d.dy }
+        return d
     }
 
     /// The arrows that move inside the list for each layout; the others move the caret.

@@ -25,7 +25,12 @@ struct QuickTranslateView: View {
             await model.translation.run(with: session)
         }
         .onExitCommand(perform: model.onClose)
-        .onAppear { inputFocused = true }
+        // After the window is key: focusing from onAppear alone is lost while the window appears,
+        // and typing then went to the app underneath.
+        .task {
+            await Task.yield()
+            inputFocused = true
+        }
     }
 
     private func clear() {

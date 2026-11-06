@@ -40,6 +40,7 @@ final class QuickTranslateController: NSObject, NSWindowDelegate {
         // stays put; floating panels make that sheet flash and fail.
         let window = NSWindow(contentViewController: hosting)
         window.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
+        window.title = "BindAll Quick Translate"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         [.closeButton, .miniaturizeButton, .zoomButton].forEach { window.standardWindowButton($0)?.isHidden = true }

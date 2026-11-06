@@ -26,6 +26,7 @@ final class PopupController {
         [.closeButton, .miniaturizeButton, .zoomButton].forEach { panel.standardWindowButton($0)?.isHidden = true }
         // Only the header moves the panel (`WindowDragHandle`): dragging across the body selects text.
         panel.isMovableByWindowBackground = false
+        panel.title = "BindAll Translation"
         panel.level = .floating
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false

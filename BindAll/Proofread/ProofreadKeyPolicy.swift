@@ -17,25 +17,27 @@ enum ProofreadKeyPolicy {
         case close(reason: String)
     }
 
+    /// `opensUpward`: the popup sits above the word (its usual place), its first fix at the bottom
+    /// nearest the word -- so ↑ goes into the fixes and ↓ comes back out.
     static func action(keyCode: Int, command: Bool, control: Bool, option: Bool, shift: Bool,
-                       browsing: Bool, atFirst: Bool, layout: PopupLayout) -> Action {
+                       browsing: Bool, atFirst: Bool, layout: PopupLayout, opensUpward: Bool = false) -> Action {
         if command || control || option { return .passAndClose(reason: "modifier") }
         if keyCode == kVK_Tab { return shift ? .previousIssue : .nextIssue }
         if shift { return .passAndClose(reason: "typedOn") }
         let isReturn = keyCode == kVK_Return || keyCode == kVK_ANSI_KeypadEnter
         if isReturn { return .apply }
         guard browsing else {
+            if keyCode == (opensUpward ? kVK_UpArrow : kVK_DownArrow) { return .enter }
             switch keyCode {
-            case kVK_DownArrow: return .enter
             case kVK_Escape: return .close(reason: "esc")
-            case kVK_LeftArrow, kVK_RightArrow, kVK_UpArrow, kVK_Home, kVK_End, kVK_PageUp, kVK_PageDown:
+            case kVK_LeftArrow, kVK_RightArrow, kVK_UpArrow, kVK_DownArrow, kVK_Home, kVK_End, kVK_PageUp, kVK_PageDown:
                 return .passAndClose(reason: "navigation")
             default:
                 return .passAndClose(reason: "typedOn")
             }
         }
         if keyCode == kVK_Escape { return .leave }
-        if let delta = AutocompleteKeyPolicy.delta(for: keyCode, layout: layout) {
+        if let delta = AutocompleteKeyPolicy.delta(for: keyCode, layout: layout, opensUpward: opensUpward) {
             if atFirst, delta.dy < 0 || (layout == .line && delta.dx < 0) { return .leave }
             return .move(dx: delta.dx, dy: delta.dy)
         }

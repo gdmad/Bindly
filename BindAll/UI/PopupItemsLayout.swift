@@ -13,6 +13,9 @@ struct PopupItemsLayout: View {
     /// The selection is a hint (what Tab takes), not an active choice; see `PopupCell.softSelection`.
     var softSelection = false
     let layout: PopupLayout
+    /// The list sits above its anchor: a column then lists bottom-up, so the first item is the one
+    /// nearest the text and ↑ walks away from it.
+    var bottomUp = false
     let fontSize: CGFloat
     /// Items on the first row of a tile, measured in `PopupTile.topRowCount`; 0 = even split.
     var tileTopCount = 0
@@ -25,7 +28,9 @@ struct PopupItemsLayout: View {
         switch layout {
         case .column:
             VStack(alignment: .leading, spacing: PopupMetrics.columnSpacing) {
-                ForEach(items.indices, id: \.self) { cell($0, fillsWidth: true) }
+                ForEach(bottomUp ? Array(items.indices.reversed()) : Array(items.indices), id: \.self) {
+                    cell($0, fillsWidth: true)
+                }
             }
         case .line:
             HStack(spacing: PopupMetrics.cellSpacing) {
