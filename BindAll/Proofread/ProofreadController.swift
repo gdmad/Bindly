@@ -136,6 +136,7 @@ final class ProofreadController {
     private let preSend = PreSendGuard()
     /// An autocomplete suggestion is up: its Return wins over the pre-send check.
     private var suggestionVisible = false
+    private var menuOpen = false
 
     var isSessionActive: Bool { !issues.isEmpty && target != nil }
 
@@ -358,6 +359,12 @@ final class ProofreadController {
         return true
     }
 
+    /// BindAll's own menu (the star's) is tracking: its Return picks an item, never "send".
+    func setMenuOpen(_ open: Bool) {
+        menuOpen = open
+        syncPreSend()
+    }
+
     func setSuggestionVisible(_ visible: Bool) {
         suggestionVisible = visible
         syncPreSend()
@@ -368,7 +375,7 @@ final class ProofreadController {
         let pid = target?.pid
         let inChat = pid.flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }
             .map { PreSendPolicy.chatApps.contains($0) || Self.extraChatApps.contains($0) } ?? false
-        let armed = config.enabled && config.preSend && inChat && !issues.isEmpty && !popupShown && !suggestionVisible
+        let armed = config.enabled && config.preSend && inChat && !issues.isEmpty && !popupShown && !suggestionVisible && !menuOpen
             && NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
         preSend.update { state in
             state.armed = armed

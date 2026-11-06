@@ -69,10 +69,29 @@ func openTextEdit() -> Bool {
     guard E2E.wait(8, { NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.TextEdit").first != nil }) else { return false }
     textEditPid = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.TextEdit").first!.processIdentifier
     for _ in 0..<2 {
-        if E2E.wait(8, { focusTextEdit(); return textEditField() != nil }) { return true }
+        if E2E.wait(8, { focusTextEdit(); return textEditField() != nil }) {
+            moveTextEditToMainScreen()
+            return true
+        }
         openDoc()
     }
     return false
+}
+
+/// Keeps every run on the primary display: menus and panels behave differently on a second one.
+func moveTextEditToMainScreen() {
+    let app = AXUIElementCreateApplication(textEditPid)
+    guard let window = (E2E.attr(app, kAXWindowsAttribute) as? [AXUIElement])?.first else { return }
+    var origin = CGPoint(x: 120, y: 100)
+    var size = CGSize(width: 720, height: 420)
+    for _ in 0..<3 {
+        if let v = AXValueCreate(.cgSize, &size) { AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, v) }
+        if let p = AXValueCreate(.cgPoint, &origin) { AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, p) }
+        E2E.pause(0.4)
+        if let frame = E2E.frame(window), abs(frame.minX - origin.x) < 2 { break }
+    }
+    print("    TextEdit window at \(E2E.frame(window) ?? .zero)")
+    focusTextEdit()
 }
 
 /// Quartz rect of the first occurrence of `word` in the TextEdit field.
@@ -513,6 +532,10 @@ func starScenarios() {
     if menuUp {
         if let item { E2E.press(item) } else { pickMenuItem(downs: 2) }
         let preview = E2E.wait(15) { E2E.window("BindAll Preview") != nil }
+        if !preview {
+            E2E.snapshot(CGRect(x: 100, y: 60, width: 900, height: 600), to: outDir.appending(path: "star-no-preview.png"))
+            print("    windows: \(E2E.windows().map { "\($0.name) \($0.bounds)" }); used \(item == nil ? "keys" : "AX")")
+        }
         record("Fix spelling shows a preview", preview)
         if preview {
             E2E.snapshot(E2E.window("BindAll Preview")!.bounds, to: outDir.appending(path: "preview.png"))

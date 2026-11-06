@@ -17,8 +17,10 @@ final class StarPanel {
         })
         hostRef = host
         panel.contentView = host
-        panel.setFrame(NSRect(origin: origin, size: NSSize(width: StarButton.size, height: StarButton.size)),
-                       display: true)
+        // AX geometry is fractional; a panel between device pixels gets resampled and the star blurs.
+        let rect = NSRect(origin: origin, size: NSSize(width: StarButton.size, height: StarButton.size))
+        let screen = NSScreen.screens.first { $0.frame.contains(origin) } ?? NSScreen.main
+        panel.setFrame(screen?.backingAlignedRect(rect, options: .alignAllEdgesNearest) ?? rect.integral, display: true)
         panel.orderFront(nil)
         isVisible = true
     }

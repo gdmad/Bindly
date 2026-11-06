@@ -218,7 +218,10 @@ final class HotkeyCoordinator {
                 }
             }
         }
+        // popUp blocks until the menu closes, so the flag spans exactly the tracking.
+        proofread.setMenuOpen(true)
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.height + 2), in: view)
+        proofread.setMenuOpen(false)
     }
 
     /// Recent results; picking one puts it in place of the star's text, through the preview when

@@ -107,6 +107,7 @@ BindAll/
 │   ├── FixesPopupView.swift    # the fixes popup's content: header + PopupItemsLayout
 │   ├── FixesPopupHeader / FixesPopupSummary / FixesPopupSkipButton .swift # kind + wording + counter, then the Skip icon
 │   ├── FixesPopupFixAllButton.swift   # "Fix all (N)" cell under the fixes
+│   ├── StarShape.swift                # the star as a vector path
 │   ├── FixesPopupAddWordButton.swift  # book icon: add the word to the personal dictionary
 │   ├── PersonalDictionarySection.swift # Settings -> Proofread: the dictionary's words
 │   ├── PopupMessageView.swift  # one-line notice in the same chrome
@@ -277,7 +278,7 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   plain Return while the field shows issues is held once and the popup says how many are left;
   Return again sends, Tab opens the first issue, Cmd+Return is Fix all, Esc drops it, any other key
   goes through. `PreSendGuard` is an active keyDown tap on its own thread, enabled only while armed
-  (issues in a frontmost chat field, no fixes popup, no autocomplete suggestion via
+  (issues in a frontmost chat field, no fixes popup, no star menu tracking, no autocomplete suggestion via
   `AutocompleteController.onSuggestionChange`) or warning; keys aimed at another process are never
   touched. `PreSendExtraApps` (UserDefaults, set only by scripts/e2e.sh) adds TextEdit for the E2E.
 - **Fix all:** with two or more fixable issues the fixes popup ends with a "Fix all (N)" cell
@@ -310,8 +311,9 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   precise caret rect, the list is shown as before. The caret rect comes from
   `ProofreadAX.boundsForRange`, which falls back to the field's text leaves (Slack, Claude and
   other Chromium fields answer only there).
-- **Stars** (`Selection/FieldStarController.swift`): one violet `sparkle` (`Color.brand`, the icon's
-  violet) in a click-through-free non-activating panel (`StarPanel`) -- at the end of the selection
+- **Stars** (`Selection/FieldStarController.swift`): one violet four-point star (`StarShape`, a vector
+  path, 10 pt in a 20 pt target; `Color.brand`, the icon's violet; the panel frame is pixel-aligned
+  with `backingAlignedRect` so it stays sharp) in a click-through-free non-activating panel (`StarPanel`) -- at the end of the selection
   (below it, away from editors' own selection toolbars) when something is selected, otherwise in the
   focused field's bottom-right corner; never both. Re-evaluated on mouse-up, key-up and app switch
   (debounced), hidden on key-down/scroll; follows the Proofread app filter; skips BindAll itself,

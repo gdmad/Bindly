@@ -8,16 +8,20 @@ struct StarButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(label, systemImage: "sparkle", action: action)
-            .labelStyle(.iconOnly)
-            .buttonStyle(.plain)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(Color.brand)
-            .frame(width: StarButton.size, height: StarButton.size)
-            .contentShape(.rect)
-            .help(label)
+        Button(action: action) {
+            StarShape()
+                .fill(Color.brand)
+                .frame(width: StarButton.starSize, height: StarButton.starSize)
+                .frame(width: StarButton.size, height: StarButton.size)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .help(label)
     }
 
     /// The click target; the star itself is smaller.
     static let size: CGFloat = 20
+    /// Even, so the star's center falls on a pixel boundary inside the 20 pt target.
+    static let starSize: CGFloat = 10
 }
