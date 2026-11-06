@@ -809,15 +809,12 @@ final class AutocompleteController {
         return rect.offsetBy(dx: 6, dy: 6)
     }
 
-    /// AppKit rect of the caret, derived from the AX caret rect (Quartz, top-left).
+    /// AppKit rect of the caret, derived from the rect of the character before it (Quartz, top-left).
+    /// Chromium answers that on the field's text leaves, not on the field.
     private func caretAnchor(for element: AXUIElement, caret: Int, primaryHeight: CGFloat?) -> CGRect? {
-        var cfRange = CFRange(location: max(0, caret - 1), length: 1)
-        guard let rangeValue = AXValueCreate(.cfRange, &cfRange) else { return nil }
-        var boundsRef: AnyObject?
-        guard AXUIElementCopyParameterizedAttributeValue(element, kAXBoundsForRangeParameterizedAttribute as CFString,
-                                                         rangeValue, &boundsRef) == .success else { return nil }
-        var rect = CGRect.zero
-        guard AXValueGetValue(boundsRef as! AXValue, .cgRect, &rect), rect.width > 0 || rect.height > 0 else { return nil }
+        guard let rect = ProofreadAX.boundsForRange(NSRange(location: max(0, caret - 1), length: 1), in: element) else {
+            return nil
+        }
         let base = primaryHeight ?? rect.maxY
         return UnderlineGeometry.appKitRect(fromQuartz: rect, primaryScreenHeight: base)
     }

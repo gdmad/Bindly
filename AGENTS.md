@@ -283,7 +283,9 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   gray right after the caret by `InlineGhostOverlay` (click-through panel). The font comes from the
   field's `AXFont` attribute when reported, otherwise from the line height. Tab accepts as usual;
   Down replaces the inline text with the list (browsing). Mid-line, for corrections, or with no
-  precise caret rect (Slack reports an empty rect for the field), the list is shown as before.
+  precise caret rect, the list is shown as before. The caret rect comes from
+  `ProofreadAX.boundsForRange`, which falls back to the field's text leaves (Slack, Claude and
+  other Chromium fields answer only there).
 - **Stars** (`Selection/FieldStarController.swift`): one violet `sparkle` (`Color.brand`, the icon's
   violet) in a click-through-free non-activating panel (`StarPanel`) -- at the end of the selection
   (below it, away from editors' own selection toolbars) when something is selected, otherwise in the
@@ -333,7 +335,8 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   runs single groups; `slack` and `claude` drive those apps (no TextEdit then): Slack in an empty
   "New message" draft, Claude only in the composer of the window in front, left empty by hand, and
   never with Esc (Esc stops a Claude Code session in that app). Chromium word geometry comes from the
-  field's AXStaticText children. Never sends a bare Return outside TextEdit and BindAll's own windows. SwiftUI
+  field's AXStaticText children. Skips last for the whole run in every app, so each group types its
+  own sentence. Never sends a bare Return outside TextEdit and BindAll's own windows. SwiftUI
   fields ignore Unicode-only synthesized keys, so the driver sets their text through AX.
 
 
