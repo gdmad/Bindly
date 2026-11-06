@@ -207,7 +207,7 @@ struct Settings: Codable, Equatable {
     var proofreadAppMode: String = "all"       // "all" | "allow" | "deny"
     var proofreadApps: [String] = []           // bundle identifiers for allow/deny
     var personalDictionary: [String] = []     // words never flagged as misspelled
-    var preSendCheck: Bool = true              // chat apps: Return with issues left asks first
+    var preSendCheck: Bool = false             // chat apps: Return with issues left asks first
 
     // History of recent results (menu-bar submenu)
     var historyEnabled: Bool = true

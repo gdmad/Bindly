@@ -31,7 +31,7 @@ final class ProofreadController {
         /// `PersonalDictionary.set` of the user's words.
         var dictionary: Set<String> = []
         /// "Check before sending" in chat apps (`PreSendPolicy.chatApps`).
-        var preSend = true
+        var preSend = false
     }
 
     private var config = Config()

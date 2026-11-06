@@ -28,7 +28,7 @@ settings = {
     "enabled": True, "correctEnabled": True, "autocompleteEnabled": True, "autocompleteInline": True,
     "autocompleteLanguages": ["ru"], "languageToolMode": "free", "languageToolLanguage": "ru-RU",
     "proofreadMinLength": 5, "starFieldEnabled": True, "starSelectionEnabled": True,
-    "previewFromMenu": True, "defaultEngine": "apple", "historyEnabled": True,
+    "previewFromMenu": True, "defaultEngine": "apple", "historyEnabled": True, "preSendCheck": True,
     "sourceLanguage": "ru", "targetLanguage": "en",
 }
 data = json.dumps(settings).encode().hex()

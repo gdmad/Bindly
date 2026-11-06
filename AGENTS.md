@@ -273,7 +273,7 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   stay). The book icon beside Skip (`FixesPopupAddWordButton`, spelling issues only) adds the word
   through `ProofreadController.onAddWord`; the list is edited in Settings -> Proofread
   (`PersonalDictionarySection`).
-- **Check before sending** (`preSendCheck`, default on): in chat apps (`PreSendPolicy.chatApps`) a
+- **Check before sending** (`preSendCheck`, default off): in chat apps (`PreSendPolicy.chatApps`) a
   plain Return while the field shows issues is held once and the popup says how many are left;
   Return again sends, Tab opens the first issue, Cmd+Return is Fix all, Esc drops it, any other key
   goes through. `PreSendGuard` is an active keyDown tap on its own thread, enabled only while armed
