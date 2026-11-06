@@ -12,6 +12,7 @@ swiftc -O \
     BindAll/Actions/MaskAISlop.swift \
     BindAll/Store/AppPaths.swift \
     BindAll/Store/HistoryStore.swift \
+    BindAll/Store/HistoryMenuTitle.swift \
     BindAll/Store/UsageLog.swift \
     BindAll/Engines/AIEngine.swift \
     BindAll/Proofread/TextIssue.swift \

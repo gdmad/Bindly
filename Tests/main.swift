@@ -1184,6 +1184,17 @@ do {
     eqArr(PersonalDictionary.adding("  ", to: []), [], "a blank word is ignored")
 }
 
+print("HistoryMenuTitle")
+do {
+    func entry(_ output: String) -> HistoryEntry {
+        HistoryEntry(date: Date(), kind: .action, input: "in", output: output, engine: "Apple")
+    }
+    eq(HistoryMenuTitle.title(for: entry("Short one")), "Short one", "a short result is shown as is")
+    eq(HistoryMenuTitle.title(for: entry("Line one\nline two")), "Line one line two", "lines are joined into one")
+    let long = HistoryMenuTitle.title(for: entry(String(repeating: "слово ", count: 20)))
+    check(long.count <= HistoryMenuTitle.maxLength && long.hasSuffix("…"), "a long result is cut with an ellipsis")
+}
+
 if failures == 0 {
     print("ALL TESTS PASSED")
     exit(0)

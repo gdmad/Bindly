@@ -202,6 +202,7 @@ final class HotkeyCoordinator {
         }
         menu.addItem(.separator())
         add("Custom prompt…", "text.bubble") { [weak self] in self?.askForPrompt(context) }
+        if let history = historyMenu(for: context) { menu.addItem(history) }
         if !context.isSelection {
             let count = proofread.issueCount(in: context.element)
             if count > 0 {
@@ -213,6 +214,36 @@ final class HotkeyCoordinator {
             }
         }
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.height + 2), in: view)
+    }
+
+    /// Recent results; picking one puts it in place of the star's text, through the preview when
+    /// that is on. Nil when history is off or empty.
+    private func historyMenu(for context: StarContext) -> NSMenuItem? {
+        let entries = HistoryStore.shared.entries.prefix(HistoryMenuTitle.count)
+        guard appState.settings.historyEnabled, !entries.isEmpty else { return nil }
+        let submenu = NSMenu()
+        for entry in entries {
+            let item = ClosureMenuItem(title: HistoryMenuTitle.title(for: entry)) { [weak self] in
+                self?.insertFromHistory(entry, context)
+            }
+            item.toolTip = "\(entry.kind.label) · \(entry.engine)\n\(entry.output)"
+            submenu.addItem(item)
+        }
+        let item = NSMenuItem(title: "History", action: nil, keyEquivalent: "")
+        item.image = NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: nil)
+        item.submenu = submenu
+        return item
+    }
+
+    private func insertFromHistory(_ entry: HistoryEntry, _ context: StarContext) {
+        UsageLog.record(.star, .accepted, detail: "history")
+        let apply: () -> Void = { [weak self] in self?.replace(context, with: entry.output) }
+        if appState.settings.previewFromMenu {
+            preview.show(title: "From history", original: context.subject, result: entry.output,
+                         near: context.anchor, onApply: apply)
+        } else {
+            apply()
+        }
     }
 
     private func askForPrompt(_ context: StarContext) {

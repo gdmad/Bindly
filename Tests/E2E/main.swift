@@ -311,6 +311,75 @@ func dictionaryScenario() {
     record("the word is saved in the settings", saved.contains("бзыграмка"))
 }
 
+func historyScenario() {
+    group = "History"
+    guard let pid = E2E.testApp?.processIdentifier else { return }
+    let app = AXUIElementCreateApplication(pid)
+    func openStarMenu() -> Bool {
+        E2E.key(kVK_ANSI_A, .maskCommand)
+        // The field star moves to the selection a moment after ⌘A; read its place once it settled.
+        E2E.pause(1.2)
+        guard E2E.wait(4, { E2E.window("BindAll Star") != nil }), let star = E2E.window("BindAll Star")?.bounds else {
+            print("    no star; windows \(E2E.windows().map(\.name)), text \(fieldText())")
+            return false
+        }
+        E2E.click(CGPoint(x: star.midX, y: star.midY))
+        E2E.pause(0.6)
+        return true
+    }
+    func item(_ match: @escaping (String) -> Bool) -> AXUIElement? {
+        var hit: AXUIElement?
+        E2E.wait(1) {
+            hit = E2E.find(in: app, depth: 8) { (E2E.attr($0, kAXTitleAttribute) as? String).map(match) ?? false }
+            return hit != nil
+        }
+        return hit
+    }
+    func applyPreview() -> Bool {
+        guard E2E.wait(15, { E2E.window("BindAll Preview") != nil }) else { return false }
+        E2E.allowBareReturn = true
+        E2E.key(kVK_Return)
+        E2E.allowBareReturn = false
+        return true
+    }
+
+    // A result to remember.
+    clearField()
+    E2E.type("Этот текст для звёздачки. ")
+    E2E.pause(1.0)
+    guard openStarMenu() else { record("History", false, "no star"); return }
+    if let fix = item({ $0 == "Fix spelling" }) { E2E.press(fix) } else { pickMenuItem(downs: 2) }
+    guard applyPreview(), E2E.wait(5, { !fieldText().contains("звёздачки") }) else { record("History", false, "Fix spelling did not apply"); return }
+    let remembered = fieldText().trimmingCharacters(in: .whitespacesAndNewlines)
+
+    clearField()
+    E2E.type("Совсем другой текст. ")
+    E2E.pause(1.0)
+    guard openStarMenu() else { record("the star menu lists History", false, "no star"); return }
+    // History is the last item; its newest entry is first in the submenu.
+    if let history = item({ $0 == "History" }) {
+        E2E.press(history)
+        E2E.pause(0.5)
+        if let entry = item({ $0.contains("звёздоч") }) { E2E.press(entry) } else { pickMenuItem() }
+    } else {
+        pickMenuItem(ups: 1, thenRight: true)
+    }
+    record("picking the newest History entry shows a preview", applyPreview())
+    record("Apply puts the result in place", E2E.wait(5) { fieldText().trimmingCharacters(in: .whitespacesAndNewlines) == remembered },
+           "now: \(fieldText()), expected: \(remembered)")
+}
+
+/// Picks an item of the open star menu with the keyboard (the menu is not always in the AX tree):
+/// `downs` steps from the top, or `ups` from the bottom, then Return (the menu takes it, not the app).
+func pickMenuItem(downs: Int = 0, ups: Int = 0, thenRight: Bool = false) {
+    for _ in 0..<downs { E2E.key(kVK_DownArrow) }
+    for _ in 0..<ups { E2E.key(kVK_UpArrow) }
+    if thenRight { E2E.key(kVK_RightArrow); E2E.pause(0.3) }
+    E2E.allowBareReturn = true
+    E2E.key(kVK_Return)
+    E2E.allowBareReturn = false
+}
+
 func snapshotField(_ name: String) {
     if let el = textEditField(), let frame = E2E.frame(el) {
         E2E.snapshot(frame.intersection(CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: 160)),
@@ -341,9 +410,10 @@ func starScenarios() {
     E2E.pause(0.6)
     let pid = E2E.testApp!.processIdentifier
     let item = E2E.find(in: AXUIElementCreateApplication(pid), depth: 6) { (E2E.attr($0, kAXTitleAttribute) as? String) == "Fix spelling" }
-    record("clicking the star opens its menu", item != nil)
-    if let item {
-        E2E.press(item)
+    let menuUp = item != nil || E2E.windows().contains { $0.name.isEmpty && $0.bounds.height > 100 }
+    record("clicking the star opens its menu", menuUp)
+    if menuUp {
+        if let item { E2E.press(item) } else { pickMenuItem(downs: 2) }
         let preview = E2E.wait(15) { E2E.window("BindAll Preview") != nil }
         record("Fix spelling shows a preview", preview)
         if preview {
@@ -497,7 +567,7 @@ func trayScenario() {
 
 guard E2E.testApp != nil else { print("BindAll E2E is not running"); exit(2) }
 let only = Set((ProcessInfo.processInfo.environment["E2E_ONLY"] ?? "").split(separator: ",").map(String.init))
-let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "stars", "removeTells", "quick", "tray"]
+let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "stars", "removeTells", "quick", "tray"]
 let needsTextEdit = only.isEmpty || !only.isDisjoint(with: textEditGroups)
 func run(_ name: String, _ body: () -> Void) { if only.isEmpty || only.contains(name) { body() } }
 
@@ -515,6 +585,7 @@ if needsTextEdit {
     run("proofread", proofreadScenarios)
     run("fixAll", fixAllScenario)
     run("dictionary", dictionaryScenario)
+    run("history", historyScenario)
     run("stars", starScenarios)
     run("removeTells", removeTellsScenario)
     run("quick", quickTranslateScenario)

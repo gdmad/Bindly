@@ -262,9 +262,10 @@ func electronScenarios(_ target: ElectronTarget) {
         let item = E2E.find(in: AXUIElementCreateApplication(testPid), depth: 6) {
             (E2E.attr($0, kAXTitleAttribute) as? String) == "Fix spelling"
         }
-        record("clicking the star opens its menu", item != nil)
-        if let item {
-            E2E.press(item)
+        let menuUp = item != nil || E2E.windows().contains { $0.name.isEmpty && $0.bounds.height > 100 }
+        record("clicking the star opens its menu", menuUp)
+        if menuUp {
+            if let item { E2E.press(item) } else { pickMenuItem(downs: 2) }
             let preview = E2E.wait(15) { E2E.window("BindAll Preview") != nil }
             record("Fix spelling shows a preview", preview)
             if preview, let apply = E2E.testElement(window: "BindAll Preview", E2E.named("Apply")), let frame = E2E.frame(apply) {

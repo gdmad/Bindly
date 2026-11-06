@@ -308,8 +308,9 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   (debounced), hidden on key-down/scroll; follows the Proofread app filter; skips BindAll itself,
   password and tiny fields. Uses `ProofreadAX.focus(analyze: false)` (no hidden-break walk) and the
   offset map for the selection's end. A click opens an `NSMenu` built by the coordinator: Fix, Fix
-  spelling (LanguageTool `correct`), Translate (popup), action keys, Custom prompt..., and for the
-  field star "N issues: show the first". `StarContext` captures element, value, selection and map;
+  spelling (LanguageTool `correct`), Translate (popup), action keys, Custom prompt..., History (the
+  last 8 results, `HistoryMenuTitle`; picking one puts its output in place through the preview when
+  `previewFromMenu` is on; only with history on), and for the field star "N issues: show the first". `StarContext` captures element, value, selection and map;
   replacing re-activates the app, selects `appRange` and pastes.
 - **Preview** (`UI/Preview*`): every text-replacing star action shows a word diff (`TextDiff.words`,
   LCS over word+whitespace tokens; `DiffText` renders added on green + underline, removed red +
@@ -347,7 +348,8 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   "BindAll Suggestions", "BindAll Inline", "BindAll Star", "BindAll Preview", "BindAll Prompt",
   "BindAll Quick Translate"), their AX trees and its usage events. Report: `.build/e2e/report.md`.
   Once: grant "BindAll E2E" Accessibility; quit the real BindAll first. `E2E_ONLY=proofread,quick`
-  runs single groups; `slack` and `claude` drive those apps (no TextEdit then): Slack in an empty
+  runs single groups. The star menu is not always in the AX tree, so items are picked with the
+  arrows and Return when it is not (`pickMenuItem`); `slack` and `claude` drive those apps (no TextEdit then): Slack in an empty
   "New message" draft, Claude only in the composer of the window in front, left empty by hand, and
   never with Esc (Esc stops a Claude Code session in that app). Chromium word geometry comes from the
   field's AXStaticText children. Skips last for the whole run in every app, so each group types its

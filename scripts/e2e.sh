@@ -28,13 +28,13 @@ settings = {
     "enabled": True, "correctEnabled": True, "autocompleteEnabled": True, "autocompleteInline": True,
     "autocompleteLanguages": ["ru"], "languageToolMode": "free", "languageToolLanguage": "ru-RU",
     "proofreadMinLength": 5, "starFieldEnabled": True, "starSelectionEnabled": True,
-    "previewFromMenu": True, "defaultEngine": "apple", "historyEnabled": False,
+    "previewFromMenu": True, "defaultEngine": "apple", "historyEnabled": True,
     "sourceLanguage": "ru", "targetLanguage": "en",
 }
 data = json.dumps(settings).encode().hex()
 subprocess.run(["defaults", "write", "com.evgeny.bindall.e2e", "BindAll.settings.v1", "-data", data], check=True)
 PY
-rm -rf "$HOME/Library/Application Support/BindAll E2E/Usage"
+rm -rf "$HOME/Library/Application Support/BindAll E2E/Usage" "$HOME/Library/Application Support/BindAll E2E/history.json"
 
 echo "==> Launching"
 pkill -f "BindAll E2E.app" 2>/dev/null || true
