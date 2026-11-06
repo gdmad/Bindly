@@ -20,7 +20,7 @@ final class ProofreadPopover {
     func show(issue: TextIssue, selected: Int, softSelection: Bool, position: String, anchor: CGRect,
               layout: PopupLayout, fontSize: CGFloat, onHover: @escaping (Int) -> Void,
               onAccept: @escaping (Int) -> Void, onClose: @escaping () -> Void,
-              fixAllCount: Int = 0, onFixAll: @escaping () -> Void = {}) {
+              fixAllCount: Int = 0, onAddWord: (() -> Void)? = nil, onFixAll: @escaping () -> Void = {}) {
         let topCount = layout == .tile
             ? PopupTile.topRowCount(for: issue.replacements, fontSize: fontSize,
                                     near: NSPoint(x: anchor.minX, y: anchor.maxY))
@@ -39,7 +39,7 @@ final class ProofreadPopover {
                                   onHover: onHover,
                                   onAccept: onAccept,
                                   onClose: onClose, bottomUp: bottomUp,
-                                  fixAllCount: fixAllCount, onFixAll: onFixAll)
+                                  fixAllCount: fixAllCount, onAddWord: onAddWord, onFixAll: onFixAll)
         }
         let frame = presenter.present(view(bottomUp: placedAbove)) { PopupPlacement.origin(above: anchor, size: $0) }
         let above = frame.minY >= anchor.maxY

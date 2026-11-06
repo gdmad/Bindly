@@ -757,6 +757,7 @@ allChanged.proofreadLayout = .line
 allChanged.proofreadMinLength = 42
 allChanged.proofreadAppMode = "allow"
 allChanged.proofreadApps = ["com.example.two"]
+allChanged.personalDictionary = ["Swearl"]
 allChanged.historyEnabled = false
 allChanged.sourceLanguage = "de"
 allChanged.targetLanguage = "fr"
@@ -1167,6 +1168,20 @@ do {
                               issue(4, 8, original: "малако и", replacements: ["X"])], to: text)
     check(clash.fixed == 1, "overlapping issues are fixed once")
     check(FixAll.apply([typo], to: "совсем другой текст").fixed == 0, "a vanished issue is skipped")
+}
+
+print("PersonalDictionary")
+do {
+    let words = PersonalDictionary.set(["Ёжик", " BindAll "])
+    check(words == ["ежик", "bindall"], "words are trimmed, lowercased and ё folds into е")
+    let spelled = issue(0, 5, kind: .spelling, original: "ежик")
+    let grammar = issue(6, 7, kind: .grammar, original: "bindall")
+    let other = issue(14, 4, kind: .spelling, original: "тест")
+    let kept = PersonalDictionary.filter([spelled, grammar, other], words: words)
+    check(kept.map(\.original) == ["bindall", "тест"], "only spelling issues on dictionary words are dropped")
+    eqArr(PersonalDictionary.adding("ЁЖИК", to: ["Ёжик"]), ["Ёжик"], "a word already there is not added twice")
+    eqArr(PersonalDictionary.adding("Swearl,", to: ["Ёжик"]), ["Ёжик", "Swearl"], "punctuation is stripped on add")
+    eqArr(PersonalDictionary.adding("  ", to: []), [], "a blank word is ignored")
 }
 
 if failures == 0 {

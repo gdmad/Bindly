@@ -28,12 +28,16 @@ final class ProofreadController {
         var restoreClipboard = false
         var appMode = AppFilterMode.all
         var apps: Set<String> = []
+        /// `PersonalDictionary.set` of the user's words.
+        var dictionary: Set<String> = []
     }
 
     private var config = Config()
     /// "Fix all": the field (as a star context), the corrected text and how many fixes it holds.
     /// The coordinator shows the preview and writes the result, the way the star's actions do.
     var onFixAll: ((StarContext, String, Int) -> Void)?
+    /// "Add to dictionary": the coordinator stores the word; `configure` then brings the new set back.
+    var onAddWord: ((String) -> Void)?
     private var provider: LanguageToolProofreadProvider?
     /// Places the user skipped; see `ProofreadSkips`.
     private var skips = ProofreadSkips()
@@ -145,7 +149,12 @@ final class ProofreadController {
     // MARK: - Lifecycle
 
     func configure(_ config: Config, engine: LanguageToolEngine, language: String) {
+        let dictionaryChanged = config.dictionary != self.config.dictionary
         self.config = config
+        if dictionaryChanged, !issues.isEmpty {
+            issues = PersonalDictionary.filter(issues, words: config.dictionary)
+            redrawUnderlines()
+        }
         let provider = self.provider ?? LanguageToolProofreadProvider(engine: engine, language: language)
         self.provider = provider
         Task { await provider.configure(engine: engine, language: language) }
@@ -302,7 +311,8 @@ final class ProofreadController {
     private func applyResults(_ found: [TextIssue], selection: NSRange?, announceMiss: Bool = false,
                               resumeIndex: Int? = nil) {
         // Cap once at the door so the popup, arrow navigation and accept all see the same list.
-        issues = IssueMerger.capReplacements(skips.filter(found), limit: config.maxReplacements)
+        issues = IssueMerger.capReplacements(PersonalDictionary.filter(skips.filter(found), words: config.dictionary),
+                                             limit: config.maxReplacements)
         lastCheckedText = target?.text ?? ""
         redrawUnderlines()
 
@@ -389,6 +399,7 @@ final class ProofreadController {
                      onAccept: { [weak self] index in self?.acceptReplacement(index) },
                      onClose: { [weak self] in self?.endNavigation(reason: "closeButton") },
                      fixAllCount: FixAll.fixable(issues).count,
+                     onAddWord: issue.kind == .spelling ? { [weak self] in self?.addCurrentToDictionary() } : nil,
                      onFixAll: { [weak self] in self?.fixAll() })
         syncKeySnapshot() // where the popup landed decides which arrow goes into it
     }
@@ -522,6 +533,19 @@ final class ProofreadController {
                              selection: NSRange(location: 0, length: 0), offsetMap: target.offsetMap,
                              anchor: NSPoint(x: anchor.minX, y: anchor.minY)),
                  outcome.text, outcome.fixed)
+    }
+
+    /// The current word goes into the personal dictionary; every underline on it goes at once.
+    private func addCurrentToDictionary() {
+        guard let issue = issues[safe: currentIndex] else { return }
+        let word = issue.original
+        UsageLog.record(.proofread, .skipped, reason: "dictionary")
+        config.dictionary.insert(PersonalDictionary.normalize(word))
+        onAddWord?(word)
+        let index = currentIndex
+        issues = PersonalDictionary.filter(issues, words: config.dictionary)
+        redrawUnderlines()
+        if issues.isEmpty { endNavigation() } else { focusIssue(min(index, issues.count - 1)) }
     }
 
     /// "Not here": forgets this one place for the rest of the session and moves on to whatever

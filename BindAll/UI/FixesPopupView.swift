@@ -22,13 +22,15 @@ struct FixesPopupView: View {
     var bottomUp = false
     /// Issues "Fix all" would change; the button shows from two up.
     var fixAllCount = 0
+    /// Nil hides "Add to dictionary" (only spelling issues offer it).
+    var onAddWord: (() -> Void)?
     var onFixAll: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: PopupMetrics.cellSpacing) {
             FixesPopupHeader(title: title, kind: kind, position: position, fontSize: fontSize,
                              skipSelected: selected == skipIndex, onHoverSkip: hoverSkip, onSkip: skip,
-                             onClose: onClose)
+                             onAddWord: onAddWord, onClose: onClose)
             if replacements.isEmpty {
                 // Real information, not a hint: secondary rather than tertiary, which is hard to read
                 // on the material.

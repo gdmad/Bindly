@@ -271,6 +271,46 @@ func fixAllScenario() {
     }
 }
 
+func dictionaryScenario() {
+    group = "Dictionary"
+    clearField()
+    // A made-up word, so adding it cannot hide a typo another group relies on.
+    E2E.type("Сегодня бзыграмка пришла и снова бзыграмка ушла. ")
+    guard E2E.wait(20, { E2E.underlineCount() >= 2 }), let word = wordRect("бзыграмка") else {
+        record("the made-up word is underlined", false, "underlines \(E2E.underlineCount())"); return
+    }
+    record("the made-up word is underlined", true, "underlines \(E2E.underlineCount())")
+    E2E.click(CGPoint(x: word.midX, y: word.midY))
+    guard E2E.wait(4, { E2E.window("BindAll Fixes") != nil }),
+          let add = E2E.testElement(window: "BindAll Fixes", E2E.named("Add to dictionary")), let frame = E2E.frame(add) else {
+        record("the popup offers Add to dictionary", false); E2E.key(kVK_Escape); return
+    }
+    record("the popup offers Add to dictionary", true)
+    E2E.click(CGPoint(x: frame.midX, y: frame.midY))
+    record("adding removes every underline on the word", E2E.wait(3) { E2E.underlineCount() == 0 },
+           "left \(E2E.underlineCount())")
+    E2E.key(kVK_Escape)
+    focusTextEdit()
+    E2E.key(kVK_DownArrow, .maskCommand) // the click left the caret inside the word
+    // Unicode-only synthetic keys are dropped here until one with a real key code arrives (a
+    // person's keys always carry one); → at the end of the text changes nothing.
+    E2E.pause(0.5)
+    E2E.key(kVK_RightArrow)
+    E2E.type("Ещё раз Бзыграмка тут. ")
+    E2E.pause(3)
+    record("the word stays unflagged when typed again", fieldText().contains("Бзыграмка тут") && E2E.underlineCount() == 0,
+           "underlines \(E2E.underlineCount()); text: \(fieldText())")
+    if E2E.underlineCount() > 0 { snapshotField("dictionary-retyped") }
+    let stored = Process()
+    let pipe = Pipe()
+    stored.executableURL = URL(fileURLWithPath: "/bin/sh")
+    stored.arguments = ["-c", "defaults export com.evgeny.bindall.e2e - | python3 -c 'import plistlib,sys; sys.stdout.buffer.write(plistlib.loads(sys.stdin.buffer.read())[\"BindAll.settings.v1\"])'"]
+    stored.standardOutput = pipe
+    try? stored.run(); stored.waitUntilExit()
+    let saved = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    record("the word is saved in the settings", saved.contains("бзыграмка"))
+}
+
 func snapshotField(_ name: String) {
     if let el = textEditField(), let frame = E2E.frame(el) {
         E2E.snapshot(frame.intersection(CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: 160)),
@@ -457,7 +497,7 @@ func trayScenario() {
 
 guard E2E.testApp != nil else { print("BindAll E2E is not running"); exit(2) }
 let only = Set((ProcessInfo.processInfo.environment["E2E_ONLY"] ?? "").split(separator: ",").map(String.init))
-let textEditGroups = ["autocomplete", "proofread", "fixAll", "stars", "removeTells", "quick", "tray"]
+let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "stars", "removeTells", "quick", "tray"]
 let needsTextEdit = only.isEmpty || !only.isDisjoint(with: textEditGroups)
 func run(_ name: String, _ body: () -> Void) { if only.isEmpty || only.contains(name) { body() } }
 
@@ -474,6 +514,7 @@ if needsTextEdit {
     run("autocomplete", autocompleteScenarios)
     run("proofread", proofreadScenarios)
     run("fixAll", fixAllScenario)
+    run("dictionary", dictionaryScenario)
     run("stars", starScenarios)
     run("removeTells", removeTellsScenario)
     run("quick", quickTranslateScenario)

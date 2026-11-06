@@ -206,6 +206,7 @@ struct Settings: Codable, Equatable {
     var proofreadMinLength: Int = 12           // shortest text worth checking
     var proofreadAppMode: String = "all"       // "all" | "allow" | "deny"
     var proofreadApps: [String] = []           // bundle identifiers for allow/deny
+    var personalDictionary: [String] = []     // words never flagged as misspelled
 
     // History of recent results (menu-bar submenu)
     var historyEnabled: Bool = true
@@ -283,7 +284,7 @@ extension Settings {
              popupFontSize, autocompleteLanguages, autocompleteLearn, autocompleteNextWord,
              autocompleteAcceptReturn, autocompleteInline, autocompleteContextRanking, autocompleteAppMode, autocompleteApps,
              proofreadMaxReplacements, proofreadLayout,
-             proofreadMinLength, proofreadAppMode, proofreadApps,
+             proofreadMinLength, proofreadAppMode, proofreadApps, personalDictionary,
              historyEnabled, sourceLanguage, targetLanguage,
              correctEnabled, starFieldEnabled, starSelectionEnabled, previewFromMenu, previewFromHotkeys,
              recentPrompts, maskAISlopRules, removeTellsWithAI, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
@@ -335,6 +336,7 @@ extension Settings {
         if let v = try c.decodeIfPresent(Int.self, forKey: .proofreadMinLength) { proofreadMinLength = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .proofreadAppMode) { proofreadAppMode = v }
         if let v = try c.decodeIfPresent([String].self, forKey: .proofreadApps) { proofreadApps = v }
+        if let v = try c.decodeIfPresent([String].self, forKey: .personalDictionary) { personalDictionary = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .historyEnabled) { historyEnabled = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .sourceLanguage) { sourceLanguage = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .targetLanguage) { targetLanguage = v }

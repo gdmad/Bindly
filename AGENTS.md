@@ -56,6 +56,7 @@ BindAll/
 │   ├── HiddenBreaks.swift             # pure: block breaks Chromium leaves out of AXValue (align leaves, check text, map back, seam candidates)
 │   ├── ProofreadSkips.swift           # pure: places the user skipped (rule + text + context keys)
 │   ├── FixAll.swift                   # pure: every issue's first fix applied at once
+│   ├── PersonalDictionary.swift       # pure: words never flagged as misspellings
 │   ├── ListMarkers.swift              # pure: list numbers/bullets glued to their item ("1.Buy")
 │   ├── AppOffsetMap.swift             # pure: value offsets <-> the app's own (Slack drops some newlines)
 │   ├── ProofreadLanguage.swift        # language resolution; ru/uk disambiguation for "auto"
@@ -104,6 +105,8 @@ BindAll/
 │   ├── FixesPopupView.swift    # the fixes popup's content: header + PopupItemsLayout
 │   ├── FixesPopupHeader / FixesPopupSummary / FixesPopupSkipButton .swift # kind + wording + counter, then the Skip icon
 │   ├── FixesPopupFixAllButton.swift   # "Fix all (N)" cell under the fixes
+│   ├── FixesPopupAddWordButton.swift  # book icon: add the word to the personal dictionary
+│   ├── PersonalDictionarySection.swift # Settings -> Proofread: the dictionary's words
 │   ├── PopupMessageView.swift  # one-line notice in the same chrome
 │   ├── FirstMouseHostingView.swift # NSHostingView that accepts the first click on a never-key panel
 │   ├── HistoryPanelView.swift / HistoryRow.swift / HistoryDetail.swift # History popover from the menu bar
@@ -263,6 +266,11 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   (index = `replacements.count`) or clicked. It hides that one place for the rest of the session via
   `ProofreadSkips`, keyed by rule + text + 6 characters of context each side, so it survives
   re-checks and edits elsewhere while the same word in another place still shows.
+- **Personal dictionary:** `Settings.personalDictionary`; spelling issues on those words are dropped
+  in `applyResults` (`PersonalDictionary.filter`, pure: case-insensitive, ё = е; grammar and style
+  stay). The book icon beside Skip (`FixesPopupAddWordButton`, spelling issues only) adds the word
+  through `ProofreadController.onAddWord`; the list is edited in Settings -> Proofread
+  (`PersonalDictionarySection`).
 - **Fix all:** with two or more fixable issues the fixes popup ends with a "Fix all (N)" cell
   (`FixesPopupFixAllButton`); ⌘Return in the popup does the same (`ProofreadKeyPolicy.fixAll`).
   `FixAll.apply` (pure) re-reads the field, relocates each issue and applies its first fix from the

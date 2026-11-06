@@ -39,8 +39,10 @@ struct ProofreadSettingsView: View {
                     HelpHeader("Skip fields shorter than", "Short fields are usually search boxes, address bars and login forms: checking them would send their contents to the server for nothing. Anything shorter than this is left alone.")
                 }
             } header: {
-                HelpHeader("Checking", "Click an underlined word to see the fixes. Return applies the first fix; Down goes into the fixes to pick another (arrows, then Return); Tab and Shift+Tab move between problem words; the eye icon skips this place; Esc or the cross closes the popup. Until you press Down the popup takes no arrows, so moving the caret, selecting and switching the input language work as usual and close it. Skipped in password fields.\n\nThe whole field is sent one paragraph at a time, so LanguageTool sees enough context to catch grammar; unchanged paragraphs are cached and not sent again.")
+                HelpHeader("Checking", "Click an underlined word to see the fixes. Return applies the first fix; Down goes into the fixes to pick another (arrows, then Return); Tab and Shift+Tab move between problem words; the eye icon skips this place; the book icon adds the word to your personal dictionary; Fix all (or Cmd+Return) applies every first fix at once, with a preview; Esc or the cross closes the popup. Until you press Down the popup takes no arrows, so moving the caret, selecting and switching the input language work as usual and close it. Skipped in password fields.\n\nThe whole field is sent one paragraph at a time, so LanguageTool sees enough context to catch grammar; unchanged paragraphs are cached and not sent again.")
             }
+
+            PersonalDictionarySection()
 
             LanguageToolConnectionSection()
 

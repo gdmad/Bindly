@@ -25,6 +25,7 @@ swiftc -O \
     BindAll/Proofread/HiddenBreaks.swift \
     BindAll/Proofread/ProofreadSkips.swift \
     BindAll/Proofread/FixAll.swift \
+    BindAll/Proofread/PersonalDictionary.swift \
     BindAll/Proofread/ListMarkers.swift \
     BindAll/Proofread/AppOffsetMap.swift \
     BindAll/Engines/TranslationLayout.swift \
