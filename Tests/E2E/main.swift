@@ -595,6 +595,22 @@ func snapshotField(_ name: String) {
     }
 }
 
+/// The test build's status item, from its AX extras menu bar.
+func trayIconRect() -> CGRect? {
+    guard let pid = E2E.testApp?.processIdentifier,
+          let bar = E2E.attr(AXUIElementCreateApplication(pid), "AXExtrasMenuBar"),
+          let item = (E2E.attr(bar as! AXUIElement, kAXChildrenAttribute) as? [AXUIElement])?.first else { return nil }
+    return E2E.frame(item)
+}
+
+func captureExact(_ rect: CGRect, to file: URL) {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+    process.arguments = ["-x", "-R\(Int(rect.minX)),\(Int(rect.minY)),\(Int(rect.width)),\(Int(rect.height))", file.path]
+    try? process.run()
+    process.waitUntilExit()
+}
+
 func starScenarios() {
     group = "Stars"
     clearField()
@@ -627,6 +643,19 @@ func starScenarios() {
         let busyStar = E2E.window("BindAll Star")?.bounds
         if let busyStar, busyStar.width > 26 {
             E2E.snapshot(busyStar.insetBy(dx: -6, dy: -6), to: outDir.appending(path: "star-busy.png"))
+        }
+        // The tray icon flares while the action runs (and for at least one round after a quick one).
+        if let tray = trayIconRect() {
+            var frames: [Data] = []
+            for i in 0..<6 {
+                let file = outDir.appending(path: "tray-twinkle-\(i).png")
+                captureExact(tray, to: file)
+                frames.append((try? Data(contentsOf: file)) ?? Data())
+                E2E.pause(0.12)
+            }
+            record("the tray icon changes while the action runs", Set(frames).count >= 3, "\(Set(frames).count) distinct of 6 frames, icon \(tray)")
+        } else {
+            record("the tray icon changes while the action runs", false, "no status item window")
         }
         record("the working star grows around its center", grew && (busyStar?.width ?? 0) > 26
                && abs((busyStar?.midX ?? 0) - starNow.midX) < 1.5 && abs((busyStar?.midY ?? 0) - starNow.midY) < 1.5,

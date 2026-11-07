@@ -482,9 +482,11 @@ thread (and, with it, the active proofread popup tap the system would then disab
   policy to `.regular` so it can come to the front, then back to `.accessory` on close.
 - The status icon is always the same three sparkles, drawn by `StatusIconRenderer` (a template image
   laid out like the `sparkles` symbol, which has no per-layer variable rendering); the three states
-  differ only in alpha (`AppDelegate.updateStatusIcon`): full while idle, the sparkles flaring one
-  after another while an action runs (`StatusIconTwinkle`, frames of the button's own image at
-  20 fps, so the click highlight still works), and the button dimmed to `disabledAlpha` while the
+  differ only in alpha and size (`AppDelegate.updateStatusIcon`): full while idle, the sparkles
+  flaring one after another while an action runs (`StatusIconTwinkle`: a 1 s round, 0.2 s apart,
+  dim 0.15, each swelling at its peak; the first frame already has the big one lit, and a wave plays
+  at least two rounds and stops at the end of one, so a quick action is seen; frames of the button's
+  own image at 20 fps, so the click highlight still works), and the button dimmed to `disabledAlpha` while the
   master switch (`settings.enabled`) is off. The master switch gates the
   hotkey bursts, autocomplete and proofread alike, so "off" must stay visually distinguishable --
   otherwise a disabled app looks exactly like a working one whose shortcuts do nothing.

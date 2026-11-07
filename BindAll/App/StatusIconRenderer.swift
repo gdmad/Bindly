@@ -8,15 +8,18 @@ enum StatusIconRenderer {
 
     /// Center and radius of each sparkle in an 18 pt square (y up), biggest first, laid out like the
     /// `sparkles` symbol the icon used to be.
+    /// Placed so that each still fits at its `StatusIconTwinkle.peakScales` size.
     private static let sparkles: [(x: CGFloat, y: CGFloat, r: CGFloat)] = [
-        (10.5, 6.8, 6.2), (4.4, 12.6, 3.4), (9.4, 16.1, 2.1),
+        (10.5, 7.0, 6.2), (4.6, 12.6, 3.4), (9.3, 15.3, 2.1),
     ]
 
-    static func image(alphas: [Double] = [1, 1, 1], description: String) -> NSImage {
+    /// `frames` lights and sizes each sparkle (see `StatusIconTwinkle`); none means the idle icon.
+    static func image(frames: [StatusIconTwinkle.Frame] = [], description: String) -> NSImage {
         let image = NSImage(size: size, flipped: false) { _ in
             for (i, s) in sparkles.enumerated() {
-                NSColor.black.withAlphaComponent(i < alphas.count ? alphas[i] : 1).setFill()
-                sparkle(center: CGPoint(x: s.x, y: s.y), radius: s.r).fill()
+                let frame = i < frames.count ? frames[i] : StatusIconTwinkle.Frame(alpha: 1, scale: 1)
+                NSColor.black.withAlphaComponent(frame.alpha).setFill()
+                sparkle(center: CGPoint(x: s.x, y: s.y), radius: s.r * frame.scale).fill()
             }
             return true
         }

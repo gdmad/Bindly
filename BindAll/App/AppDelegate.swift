@@ -10,6 +10,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindow?
     private var twinkleTimer: Timer?
+    private var twinkleStart: Date?
+    /// Seconds into the wave at which it ends, once the action is over.
+    private var twinkleStopAt: Double?
     /// Alive only while the status menu is open -- see `menuWillOpen`.
     private var menuKeyMonitor: Any?
     private lazy var historyPopover: NSPopover = {
@@ -78,29 +81,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private static let disabledAlpha: CGFloat = 0.4
 
     /// The icon is always the three sparkles (`StatusIconRenderer`) -- idle, off and busy differ in
-    /// alpha, not shape. It is the button's own image, so the system click highlight and template
-    /// inversion work correctly. While busy the sparkles flare one after another
+    /// alpha and size, not shape. It is the button's own image, so the system click highlight and
+    /// template inversion work correctly. While busy the sparkles flare one after another
     /// (`StatusIconTwinkle`): fresh frames of the button's image, since symbol effects would need an
-    /// overlay view, which breaks the highlight.
+    /// overlay view, which breaks the highlight. A wave plays at least one round and ends at the end
+    /// of one, so a quick action is still seen; work that resumes meanwhile carries on the same wave.
     private func updateStatusIcon(busy: Bool) {
         guard let button = statusItem?.button else { return }
-        let enabled = appState.settings.enabled
-        let description = busy ? "BindAll — working" : (enabled ? "BindAll" : "BindAll — off")
+        if busy {
+            twinkleStopAt = nil
+            button.alphaValue = 1
+            if twinkleStart == nil { startTwinkle() }
+        } else if let start = twinkleStart {
+            twinkleStopAt = StatusIconTwinkle.stopTime(endedAt: Date.now.timeIntervalSince(start))
+        } else {
+            showIdleIcon()
+        }
+    }
+
+    private func startTwinkle() {
+        twinkleStart = .now
+        twinkleTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 20, repeats: true) { _ in
+            Task { @MainActor in self.twinkleTick() }
+        }
+        twinkleTick()
+    }
+
+    private func twinkleTick() {
+        guard let start = twinkleStart, let button = statusItem?.button else { return }
+        let elapsed = Date.now.timeIntervalSince(start)
+        if let stopAt = twinkleStopAt, elapsed >= stopAt {
+            showIdleIcon()
+            return
+        }
+        button.image = StatusIconRenderer.image(frames: StatusIconTwinkle.frames(at: elapsed),
+                                                description: "BindAll — working")
+    }
+
+    private func showIdleIcon() {
         twinkleTimer?.invalidate()
         twinkleTimer = nil
-        button.image = StatusIconRenderer.image(description: description)
-        if busy {
-            button.alphaValue = 1
-            let start = Date.now
-            twinkleTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 20, repeats: true) { _ in
-                Task { @MainActor in
-                    let alphas = StatusIconTwinkle.alphas(at: Date.now.timeIntervalSince(start))
-                    self.statusItem?.button?.image = StatusIconRenderer.image(alphas: alphas, description: description)
-                }
-            }
-        } else {
-            button.alphaValue = enabled ? 1.0 : Self.disabledAlpha
-        }
+        twinkleStart = nil
+        twinkleStopAt = nil
+        guard let button = statusItem?.button else { return }
+        let enabled = appState.settings.enabled
+        button.image = StatusIconRenderer.image(description: enabled ? "BindAll" : "BindAll — off")
+        button.alphaValue = enabled ? 1.0 : Self.disabledAlpha
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {

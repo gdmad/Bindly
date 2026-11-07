@@ -1228,14 +1228,20 @@ do {
 
 print("StatusIconTwinkle")
 do {
-    let start = StatusIconTwinkle.alphas(at: 0)
-    check(start.allSatisfy { $0 >= StatusIconTwinkle.dim - 1e-9 && $0 <= 1 }, "alphas stay between dim and full")
-    let peak = StatusIconTwinkle.alphas(at: 0.2 * StatusIconTwinkle.period)
-    check(abs(peak[0] - 1) < 1e-9 && peak[1] < 1 && peak[2] < peak[1] + 1e-9, "the big sparkle peaks first")
-    let second = StatusIconTwinkle.alphas(at: 0.2 * StatusIconTwinkle.period + StatusIconTwinkle.stagger)
-    check(abs(second[1] - 1) < 1e-9, "the next one peaks a stagger later")
-    check(abs(StatusIconTwinkle.alpha(phase: 0.7) - StatusIconTwinkle.dim) < 1e-9, "dim for the rest of the round")
-    check(abs(StatusIconTwinkle.alpha(phase: 1.2) - StatusIconTwinkle.alpha(phase: 0.2)) < 1e-9, "it repeats every period")
+    let all = stride(from: 0.0, to: 2.0, by: 0.01).flatMap { StatusIconTwinkle.frames(at: $0) }
+    check(all.allSatisfy { $0.alpha >= StatusIconTwinkle.dim - 1e-9 && $0.alpha <= 1 + 1e-9 }, "alphas stay between dim and full")
+    check(all.allSatisfy { $0.scale >= 1 - 1e-9 && $0.scale <= 1.35 + 1e-9 }, "scales stay between idle and peak")
+    let first = StatusIconTwinkle.frames(at: 0)
+    check(abs(first[0].alpha - 1) < 1e-9 && first[0].scale > 1.09, "the first frame already has the big sparkle lit")
+    check(first[1].alpha < 0.5 && first[2].alpha < 0.5, "and the small ones dim")
+    let second = StatusIconTwinkle.frames(at: StatusIconTwinkle.stagger)
+    check(abs(second[1].alpha - 1) < 1e-9 && second[0].alpha < 1, "the next one peaks a stagger later")
+    let third = StatusIconTwinkle.frames(at: 2 * StatusIconTwinkle.stagger)
+    check(abs(third[2].alpha - 1) < 1e-9, "then the last")
+    check(zip(StatusIconTwinkle.frames(at: 0.3), StatusIconTwinkle.frames(at: 0.3 + StatusIconTwinkle.period))
+        .allSatisfy { abs($0.alpha - $1.alpha) < 1e-6 && abs($0.scale - $1.scale) < 1e-6 }, "it repeats every period")
+    check(StatusIconTwinkle.stopTime(endedAt: 0.2) == 2 * StatusIconTwinkle.period, "a quick action still plays two rounds")
+    check(StatusIconTwinkle.stopTime(endedAt: 2.4) == 3 * StatusIconTwinkle.period, "a longer one ends at the end of its round")
 }
 
 print("AudioLevelMeter")
