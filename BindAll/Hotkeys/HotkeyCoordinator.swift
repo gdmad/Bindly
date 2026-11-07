@@ -25,6 +25,8 @@ final class HotkeyCoordinator {
     private var retryTimer: Timer?
     private var busyWatchdog: DispatchWorkItem?
     private var isBusy = false
+    /// The pasteboard's change count before the last hotkey burst (see `SelectionReader.currentSelection`).
+    private var burstChangeCount = 0
 
     // The in-flight engine task and the Esc monitors that can cancel it.
     private var currentTask: Task<Void, Never>?
@@ -40,8 +42,8 @@ final class HotkeyCoordinator {
         refreshStatus()
         setupTranslationWindow()
 
-        monitor.onBurst = { [weak self] keyCode, mods, count in
-            self?.handleBurst(keyCode: keyCode, modifiers: mods, count: count)
+        monitor.onBurst = { [weak self] keyCode, mods, count, changeCount in
+            self?.handleBurst(keyCode: keyCode, modifiers: mods, count: count, changeCount: changeCount)
         }
         reconfigureWatched()
         if !monitor.start() {
@@ -211,6 +213,7 @@ final class HotkeyCoordinator {
     /// What a star menu item does.
     enum StarAction {
         case fix, spelling, translate, translateInPlace, removeTells
+        case reading(Reading)
         case actionKey(ActionKey)
         case prompt(String, showOnly: Bool)
     }
@@ -221,6 +224,18 @@ final class HotkeyCoordinator {
             let item = ClosureMenuItem(title: title, action: action)
             item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
             menu.addItem(item)
+        }
+        if !context.isEditable {
+            // Text that cannot be changed (a terminal, a log): only what reads it.
+            add("Show translation", "globe") { [weak self] in self?.runStarAction(.translate, context) }
+            add("Explain", "questionmark.bubble") { [weak self] in self?.runStarAction(.reading(.explain), context) }
+            add("Summarize", "text.alignleft") { [weak self] in self?.runStarAction(.reading(.summarize), context) }
+            add("Copy", "doc.on.doc") {
+                UsageLog.record(.star, .accepted, detail: "copy")
+                TextInjector.copyToPasteboard(context.subject)
+            }
+            popUp(menu, under: view)
+            return
         }
         add("Fix", "wand.and.stars") { [weak self] in self?.runStarAction(.fix, context) }
         add("Fix spelling", "textformat.abc") { [weak self] in self?.runStarAction(.spelling, context) }
@@ -248,6 +263,10 @@ final class HotkeyCoordinator {
                 }
             }
         }
+        popUp(menu, under: view)
+    }
+
+    private func popUp(_ menu: NSMenu, under view: NSView) {
         // popUp blocks until the menu closes, so the flag spans exactly the tracking.
         proofread.setMenuOpen(true)
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.height + 2), in: view)
@@ -332,9 +351,10 @@ final class HotkeyCoordinator {
         case .actionKey(let key): (.actionKey, key.title, key.logToken)
         case .prompt: (.customPrompt, "Custom prompt", "source:star")
         case .translate, .translateInPlace: (.translate, "Translate", "source:star")
+        case .reading(let reading): (reading.feature, reading.title, "source:star")
         }
         let showOnly = switch action {
-        case .prompt(_, true): true
+        case .reading, .prompt(_, true): true
         case .actionKey(let key): key.showOnly
         default: false
         }
@@ -348,10 +368,11 @@ final class HotkeyCoordinator {
                     result = try await EngineFactory.makeLanguageTool(appState: self.appState).correct(text)
                 case .removeTells:
                     result = try await self.removeTells(from: text, settings: settings)
-                case .fix, .actionKey, .prompt, .translate, .translateInPlace:
+                case .fix, .actionKey, .prompt, .translate, .translateInPlace, .reading:
                     let instruction: String = switch action {
                     case .actionKey(let key): key.prompt
                     case .prompt(let prompt, _): prompt
+                    case .reading(let reading): reading.prompt
                     default: settings.defaultPrompt
                     }
                     let engine = EngineFactory.make(kind: settings.defaultEngine, appState: self.appState)
@@ -411,17 +432,56 @@ final class HotkeyCoordinator {
         """
 
     /// Puts `result` in place of the context's text: back in its app, select the range, paste.
+    /// Only where the text still is: a preview can wait while the user types on, and a paste over a
+    /// stale range (or over a selection the app did not make) loses or duplicates text. Then the
+    /// result is shown to copy instead.
     private func replace(_ context: StarContext, with result: String) {
+        let result = EdgeWhitespace.wrap(result, like: context.subject)
         let app = NSRunningApplication(processIdentifier: context.pid)
         app?.activate()
         Task { @MainActor [weak self] in
+            guard let self else { return }
             // Let the app take focus back before selecting in it.
             try? await Task.sleep(for: .milliseconds(200))
-            _ = ProofreadAX.select(context.appRange, in: context.element)
+            let current = ProofreadAX.currentText(of: context.element)
+            let unchanged = current == context.text
+            // The app's offsets map is only good for the text it was made from.
+            let range: NSRange? = if unchanged {
+                context.appRange
+            } else if context.offsetMap == nil, let current {
+                ReplaceTarget.range(context.subjectRange, in: context.text, now: current)
+            } else {
+                nil
+            }
+            guard let range, ProofreadAX.select(range, in: context.element) else {
+                return self.showUnplaced(result)
+            }
             try? await Task.sleep(for: .milliseconds(80))
-            TextInjector.replaceSelection(with: result, restorePrevious: self?.appState.settings.restoreClipboard ?? true,
+            if let selected = ProofreadAX.selectedText(of: context.element), !selected.isEmpty,
+               !Self.sameText(selected, context.subject) {
+                return self.showUnplaced(result)
+            }
+            TextInjector.replaceSelection(with: result, restorePrevious: self.appState.settings.restoreClipboard,
                                           target: TextInjector.FocusTarget(app: app))
         }
+    }
+
+    /// The focused field's selection, when it can be put back later (see `replace`).
+    private static func selectionContext() -> StarContext? {
+        guard case .axField(let t) = ProofreadAX.focus(analyze: false), t.selection.length > 0, t.isEditable else { return nil }
+        return StarContext(element: t.element, pid: t.pid, text: t.text, selection: t.selection,
+                           offsetMap: t.offsetMap, anchor: .zero)
+    }
+
+    /// Whitespace aside: web editors report list and paragraph breaks their own way.
+    private static func sameText(_ a: String, _ b: String) -> Bool {
+        func squeezed(_ s: String) -> String { s.filter { !$0.isWhitespace && !$0.isNewline } }
+        return squeezed(a) == squeezed(b)
+    }
+
+    private func showUnplaced(_ result: String) {
+        UsageLog.record(.star, .failed, reason: "textChanged")
+        popup.show(title: "Not replaced: the text has changed", text: result)
     }
 
     func stop() {
@@ -490,9 +550,10 @@ final class HotkeyCoordinator {
 
     // MARK: - Burst handling
 
-    private func handleBurst(keyCode: UInt16, modifiers: HotkeyModifiers, count: Int) {
+    private func handleBurst(keyCode: UInt16, modifiers: HotkeyModifiers, count: Int, changeCount: Int) {
         let s = appState.settings
         guard s.enabled, !appState.isRecordingShortcut else { return }
+        burstChangeCount = changeCount
 
         func matches(_ h: HotkeyConfig) -> Bool {
             h.keyCode == keyCode && h.modifiers == modifiers && h.repeatCount == count
@@ -620,6 +681,9 @@ final class HotkeyCoordinator {
         beginBusy()
         // Capture where the result must land before the (possibly slow) engine call.
         let target = TextInjector.FocusTarget.capture()
+        // And the selection itself, for a preview: by the time Apply is clicked the user may have
+        // moved on, and a plain paste would land over whatever is selected then.
+        let anchor = settings.previewFromHotkeys && !showOnly ? Self.selectionContext() : nil
 
         currentTask = Task { [weak self] in
             guard let self else { return }
@@ -630,7 +694,7 @@ final class HotkeyCoordinator {
             // copy, so we copy it ourselves.
             let selection = (fixedInstruction != nil || forceCopy)
                 ? SelectionReader.copyCurrentSelection()
-                : SelectionReader.currentSelection(previousChangeCount: Int.min)
+                : SelectionReader.currentSelection(previousChangeCount: self.burstChangeCount)
 
             guard let text = selection,
                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -656,8 +720,13 @@ final class HotkeyCoordinator {
                 self.recordHistory(kind: .action, input: content, output: result,
                                    engine: settings.defaultEngine.displayName)
                 let original = content
-                let replace = {
-                    TextInjector.replaceSelection(with: result, restorePrevious: settings.restoreClipboard, target: target)
+                let replace = { [weak self] in
+                    if let anchor, Self.sameText(anchor.subject, text) {
+                        self?.replace(anchor, with: result)
+                    } else {
+                        TextInjector.replaceSelection(with: EdgeWhitespace.wrap(result, like: text),
+                                                      restorePrevious: settings.restoreClipboard, target: target)
+                    }
                     UsageLog.record(feature, .applied, detail: actionKey ?? source,
                                     ms: UsageLog.elapsed(since: started))
                 }
@@ -687,7 +756,7 @@ final class HotkeyCoordinator {
 
             let selection = forceCopy
                 ? SelectionReader.copyCurrentSelection()
-                : SelectionReader.currentSelection(previousChangeCount: Int.min)
+                : SelectionReader.currentSelection(previousChangeCount: self.burstChangeCount)
             guard let text = selection,
                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 UsageLog.record(.translate, .failed, reason: "noSelection")

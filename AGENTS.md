@@ -244,6 +244,16 @@ a burst fires; the event tap is **listen-only** and does not consume the keystro
 shortcuts and Correct are not copy shortcuts, so they synthesize Cmd+C first
 (`SelectionReader.copyCurrentSelection`). A burst fires immediately once the highest configured press
 count for that key is reached (only counts with a larger sibling wait out the time window).
+`HotkeyMonitor` reads the pasteboard's change count before a burst's first press and passes it on:
+a burst that copied nothing (no selection, a field that refuses copying) never uses the older
+clipboard -- only the AX selected text, else "No text selected.". Key auto-repeat and BindAll's own
+marked keystrokes (`InjectedEvents`) are not presses. Read-only text (`ProofTarget.isEditable`: neither
+the value nor the selected text is settable, e.g. Terminal) gets no field star, no proofreading, and
+a selection star with only Show translation, Explain, Summarize and Copy. `replace()` puts a result
+back only where its text still is (`ReplaceTarget`: unchanged, or found again near its old place
+when there is no offset map), checks the select and the selected text, and otherwise shows the
+result to copy ("Not replaced"); the hotkey preview captures its selection (`selectionContext`) and
+goes through it. Results keep the subject's leading/trailing whitespace (`EdgeWhitespace`).
 
 ## Engines
 - **Engine for text actions** (`Settings → Providers`): Apple on-device, DeepSeek, OpenRouter, OpenAI,

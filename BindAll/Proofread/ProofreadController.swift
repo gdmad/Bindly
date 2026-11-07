@@ -207,7 +207,7 @@ final class ProofreadController {
     /// the popup opens instantly; otherwise the click doubles as a check request.
     private func clickedInText() {
         guard config.enabled, AccessibilityPermission.isGranted, appAllowed() else { return }
-        guard case .axField(let found) = ProofreadAX.focus() else { return }
+        guard case .axField(let found) = ProofreadAX.focus(), found.isEditable else { return }
         guard found.text.trimmingCharacters(in: .whitespacesAndNewlines).count >= config.minLength else { return }
 
         var probe: NSRange
@@ -255,7 +255,7 @@ final class ProofreadController {
     /// fresh result to reopen the popup on the issue now sitting at that position -- see `check`.
     private func typingPaused(resumeIndex: Int? = nil) {
         guard config.enabled, AccessibilityPermission.isGranted, appAllowed() else { return }
-        guard case .axField(let found) = ProofreadAX.focus() else { clearLive(); return }
+        guard case .axField(let found) = ProofreadAX.focus(), found.isEditable else { clearLive(); return }
         guard found.text.trimmingCharacters(in: .whitespacesAndNewlines).count >= config.minLength else {
             clearLive()
             return

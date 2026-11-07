@@ -16,6 +16,9 @@ struct ProofTarget {
     var breaks: HiddenBreaks = .none
     /// How `text` offsets translate into the app's own, when the two differ (see `AppOffsetMap`).
     var offsetMap: AppOffsetMap?
+    /// False for text that can be read but not changed (Terminal's scrollback, a log view): nothing
+    /// may be pasted into it, and checking it would underline what the user cannot fix.
+    var isEditable = true
 }
 
 enum ProofSource {
@@ -79,7 +82,7 @@ enum ProofreadAX {
             }
             return .axField(ProofTarget(element: candidate, pid: pid, text: text,
                                         caret: selection.location, selection: selection, breaks: breaks,
-                                        offsetMap: map))
+                                        offsetMap: map, isEditable: isEditable(candidate)))
         }
 
         // No readable field text, but the app may still expose the selection (many web views do).
@@ -179,6 +182,18 @@ enum ProofreadAX {
     }
 
     /// Never proofread a password field.
+    /// Either the value or the selected text can be set. Terminal's text area allows neither; every
+    /// editor tried allows at least one.
+    static func isEditable(_ element: AXUIElement) -> Bool {
+        for attribute in [kAXValueAttribute, kAXSelectedTextAttribute] {
+            var settable = DarwinBoolean(false)
+            if AXUIElementIsAttributeSettable(element, attribute as CFString, &settable) == .success, settable.boolValue {
+                return true
+            }
+        }
+        return false
+    }
+
     private static func isSecure(_ element: AXUIElement) -> Bool {
         subrole(of: element) == (kAXSecureTextFieldSubrole as String)
     }

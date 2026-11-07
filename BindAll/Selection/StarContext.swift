@@ -13,6 +13,8 @@ struct StarContext {
     let offsetMap: AppOffsetMap?
     /// Where the star is, AppKit screen coordinates: panels open next to it.
     let anchor: NSPoint
+    /// Read-only text (see `ProofTarget.isEditable`) gets the reading actions only.
+    var isEditable = true
 
     var isSelection: Bool { selection.length > 0 }
 
@@ -21,9 +23,13 @@ struct StarContext {
         isSelection ? (text as NSString).substring(with: selection) : text
     }
 
+    /// The subject's place in `text` (value offsets).
+    var subjectRange: NSRange {
+        isSelection ? selection : NSRange(location: 0, length: (text as NSString).length)
+    }
+
     /// The range to select before pasting the result, in the app's own offsets.
     var appRange: NSRange {
-        let range = isSelection ? selection : NSRange(location: 0, length: (text as NSString).length)
-        return offsetMap?.appRange(range) ?? range
+        offsetMap?.appRange(subjectRange) ?? subjectRange
     }
 }

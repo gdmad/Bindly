@@ -108,7 +108,7 @@ final class FieldStarController {
                 origin = NSPoint(x: field.maxX - size - 6, y: field.minY + 6)
             }
             show(target, kind: "selection", origin: origin, label: "Actions for the selection")
-        } else if config.fieldEnabled, target.selection.length == 0 {
+        } else if config.fieldEnabled, target.selection.length == 0, target.isEditable {
             let field = UnderlineGeometry.appKitRect(fromQuartz: fieldQuartz, primaryScreenHeight: screenHeight)
             let origin = NSPoint(x: field.maxX - size - 6, y: field.minY + 6)
             show(target, kind: "field", origin: origin, label: "Actions for this text")
@@ -129,7 +129,8 @@ final class FieldStarController {
         let context = StarContext(element: target.element, pid: target.pid, text: target.text,
                                   selection: kind == "selection" ? target.selection : NSRange(location: 0, length: 0),
                                   offsetMap: target.offsetMap,
-                                  anchor: NSPoint(x: origin.x + StarButton.size / 2, y: origin.y))
+                                  anchor: NSPoint(x: origin.x + StarButton.size / 2, y: origin.y),
+                                  isEditable: target.isEditable)
         // Counted once per field and kind, not on every re-show after typing or scrolling.
         let sameField = shownElement.map { CFEqual($0, target.element) } ?? false
         if !(sameField && shownKind == kind) { UsageLog.record(.star, .shown, detail: kind) }

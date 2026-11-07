@@ -78,6 +78,42 @@ func hotkeyScenarios() {
     let fixed = E2E.wait(20) { !fieldText().contains("звёздачки") && fieldText().contains("звёзд") }
     record("⌘C ⌘C fixes the selection in place", fixed, "now: \(fieldText())")
 
+    // Nothing selected: ⌘C copies nothing, and what was on the clipboard is not the selection.
+    clearField()
+    let untouched = "Тут ничего не выделено."
+    E2E.type(untouched)
+    E2E.pause(1.0)
+    E2E.key(kVK_RightArrow)
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString("старый буфер с ошибкой в слове малако", forType: .string)
+    E2E.key(kVK_ANSI_C, .maskCommand)
+    E2E.pause(0.08)
+    E2E.key(kVK_ANSI_C, .maskCommand)
+    let told = E2E.wait(5) { E2E.window("BindAll Translation") != nil && E2E.dumpTestWindows("BindAll Translation").contains("No text selected") }
+    record("⌘C ⌘C with nothing selected says so", told, "windows \(E2E.windows().map(\.name))")
+    record("…and pastes nothing", fieldText() == untouched, "now: \(fieldText())")
+    if E2E.window("BindAll Translation") != nil { clickButton("Close", in: "BindAll Translation") }
+    E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+
+    // A whole line selected with its line break: the fixed line keeps it.
+    clearField()
+    E2E.type("Перва строчка с ашибкой.")
+    E2E.allowBareReturn = true
+    E2E.key(kVK_Return)
+    E2E.allowBareReturn = false
+    E2E.type("Вторая строка.")
+    E2E.pause(1.0)
+    E2E.key(kVK_UpArrow, .maskCommand)
+    E2E.key(kVK_DownArrow, .maskShift)
+    E2E.pause(0.3)
+    E2E.key(kVK_ANSI_C, .maskCommand)
+    E2E.pause(0.08)
+    E2E.key(kVK_ANSI_C, .maskCommand)
+    let lineFixed = E2E.wait(20) { !fieldText().contains("ашибкой") }
+    let lines = fieldText().components(separatedBy: "\n")
+    record("a fixed line keeps its line break", lineFixed && lines.count == 2 && lines[1] == "Вторая строка.",
+           "now: \(fieldText().debugDescription)")
+
     // ⌘C ⌘C ⌘C: the translation in a window, the text left alone.
     clearField()
     let original = "Добрый вечер, друзья."

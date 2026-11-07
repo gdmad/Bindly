@@ -49,6 +49,8 @@ swiftc -O \
     BindAll/Autocomplete/AutocompleteKeyPolicy.swift \
     BindAll/Autocomplete/InlineCompletion.swift \
     BindAll/Selection/TextDiff.swift \
+    BindAll/Selection/EdgeWhitespace.swift \
+    BindAll/Selection/ReplaceTarget.swift \
     BindAll/Proofread/ProofreadKeyPolicy.swift \
     Tests/Unit/*.swift \
     -o "$OUT"

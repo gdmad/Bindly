@@ -3,6 +3,26 @@ import CoreGraphics
 import Foundation
 
 func runActionsTests() {
+    print("EdgeWhitespace")
+    check(EdgeWhitespace.wrap("Fixed line", like: "fixd line\n") == "Fixed line\n", "a line keeps its line break")
+    check(EdgeWhitespace.wrap(" Word ", like: " word") == " Word", "the original's edges, not the result's")
+    check(EdgeWhitespace.wrap("Text", like: "text") == "Text", "no edges, nothing added")
+    check(EdgeWhitespace.wrap("", like: "text\n") == "", "an empty result stays empty")
+    check(EdgeWhitespace.wrap("A", like: "  \n") == "A", "an all-blank original adds nothing")
+
+    print("ReplaceTarget")
+    let draft = "one two three two"
+    let two = NSRange(location: 14, length: 3)
+    check(ReplaceTarget.range(two, in: draft, now: draft) == two, "unchanged text: the same range")
+    check(ReplaceTarget.range(two, in: draft, now: draft + " and more") == two,
+          "typed after it: the occurrence where it was, not the first one")
+    let three = NSRange(location: 8, length: 5)
+    check(ReplaceTarget.range(three, in: draft, now: "zero " + draft) == NSRange(location: 13, length: 5),
+          "typed before it: found again further on")
+    check(ReplaceTarget.range(two, in: draft, now: "one three") == nil, "gone: nowhere to put it")
+    check(ReplaceTarget.range(NSRange(location: 0, length: 17), in: draft, now: draft + "!") == nil,
+          "the whole field changed: not guessed")
+
     print("ActionKey")
     check(ActionKey.defaults.allSatisfy { !$0.label.isEmpty }, "built-in keys are named")
     eq(ActionKey(label: "", prompt: "Line one\nline two").title, "Line one line two", "an unnamed key is titled by its prompt")
