@@ -362,4 +362,50 @@ func electronScenarios(_ target: ElectronTarget) {
         record("on the third line it is still inline gray text", false, note)
     }
     dismiss()
+
+    // MARK: A long list
+
+    // A message like a real one: numbered items, a nested list, several hundred characters. Editors
+    // turn "1. " into list markup, which puts the text runs deeper in the tree than a flat paragraph.
+    clearComposer()
+    let items = [
+        "1. Верни дизайн иконки звезды без толстых лучей",
+        "2. Анимацию звезды как можем улучшить, нужно больше анимации",
+        "3. Можем ли улучшить анимацию иконки в меню баре, какие варианты",
+        "4. Добавь иконку микрофона при аудио записи",
+        "5. Почему серый цвет предложений не появляется, пока я пишу",
+        "6. Подчёркивание ошибок не работает, вот пока я пишу тоже",
+        "7. Попап правок",
+        "   1. Значок глаза при наведении синий, а книга серая",
+        "   2. Кнопка сильно выделена, тут сабака \(joiner) ашибка рядом",
+        "8. Сегодня мы обсуждали прив",
+    ]
+    E2E.type(items.joined(separator: "\n"))
+    let long = text()
+    let flat = long.replacingOccurrences(of: "\n", with: " ")
+    print("    long message: \((long as NSString).length) UTF-16 units, \(long.components(separatedBy: "\n").count) lines in the value")
+    if let el = composer(of: pid) {
+        var leaves = 0, deepest = 0
+        func walk(_ node: AXUIElement, _ depth: Int) {
+            if (E2E.attr(node, kAXRoleAttribute) as? String) == "AXStaticText" { leaves += 1; deepest = max(deepest, depth) }
+            guard depth < 12 else { return }
+            for child in (E2E.attr(node, kAXChildrenAttribute) as? [AXUIElement]) ?? [] { walk(child, depth + 1) }
+        }
+        walk(el, 0)
+        print("    composer tree: \(leaves) text runs, deepest at level \(deepest)")
+    }
+    record("the long list reaches the composer", flat.contains("обсуждали прив"), "value: \(long.prefix(80))…")
+    let longInline = E2E.wait(4) { E2E.window("BindAll Inline") != nil }
+    record("at the end of a long list it is inline gray text", longInline, "windows \(E2E.windows().map(\.name))")
+    dismiss()
+    E2E.type(" ")
+    let nested = E2E.wait(15) { rect("сабака") != nil && E2E.underlineCount() >= 2 }
+    record("typos in a nested item are underlined", nested, "underlines \(E2E.underlineCount())")
+    if let frame = E2E.frame(field) { E2E.snapshot(frame, to: outDir.appending(path: "\(target.name.lowercased())-long-list.png")) }
+    if openFixes("ашибка") != nil {
+        record("a typo in a nested item opens its fixes", true)
+        dismiss()
+    } else {
+        record("a typo in a nested item opens its fixes", false, "underlines \(E2E.underlineCount())")
+    }
 }

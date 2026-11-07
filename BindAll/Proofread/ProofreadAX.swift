@@ -381,38 +381,61 @@ enum ProofreadAX {
     /// Walks the leaf text descendants, mapping the field-wide `range` onto the leaf that holds it.
     static func boundsFromLeaves(_ range: NSRange, in element: AXUIElement,
                                  expecting expected: String? = nil) -> CGRect? {
+        guard let hit = leafRange(range, in: element, expecting: expected) else { return nil }
+        return rawBounds(hit.range, in: hit.leaf)
+    }
+
+    /// The text leaf holding the field-wide `range`, and the range inside it. List items, quotes and
+    /// formatting put Chromium's leaves several levels down, and markers or newlines the value has
+    /// and the leaves lack (or the other way round) shift the offsets, so with `expected` the leaf's
+    /// own text has the final word: the occurrence nearest the estimated offset wins.
+    static func leafRange(_ range: NSRange, in element: AXUIElement,
+                          expecting expected: String? = nil) -> (leaf: AXUIElement, range: NSRange)? {
+        let leaves = textLeaves(of: element)
         var offset = 0
-        for leaf in textLeaves(of: element) {
+        for leaf in leaves {
             let ns = leaf.text as NSString
             let length = ns.length
             defer { offset += length }
             guard range.location >= offset, range.location < offset + length else { continue }
             let local = NSRange(location: range.location - offset,
                                 length: min(range.length, length - (range.location - offset)))
-            // The leaves need not be laid out the way the field's value is (Obsidian splits by
-            // formatting), so trust the offset only when the leaf's own text agrees.
-            if let expected, ns.substring(with: local) != expected {
-                let found = ns.range(of: expected, options: [.literal])
-                guard found.location != NSNotFound, let rect = rawBounds(found, in: leaf.element) else { continue }
-                return rect
-            }
-            if let rect = rawBounds(local, in: leaf.element) { return rect }
+            guard let expected, ns.substring(with: local) != expected else { return (leaf.element, local) }
+            if let found = nearest(expected, in: ns, to: local.location) { return (leaf.element, found) }
         }
-        // Offsets did not line up with any leaf: look for the text itself, nearest leaf first.
+        // Offsets did not line up with any leaf: look for the text itself, nearest the estimate.
         guard let expected else { return nil }
-        for leaf in textLeaves(of: element) {
-            let found = (leaf.text as NSString).range(of: expected, options: [.literal])
-            guard found.location != NSNotFound, let rect = rawBounds(found, in: leaf.element) else { continue }
-            return rect
+        offset = 0
+        var best: (leaf: AXUIElement, range: NSRange, distance: Int)?
+        for leaf in leaves {
+            let ns = leaf.text as NSString
+            if let found = nearest(expected, in: ns, to: range.location - offset) {
+                let distance = abs(found.location + offset - range.location)
+                if best == nil || distance < best!.distance { best = (leaf.element, found, distance) }
+            }
+            offset += ns.length
         }
-        return nil
+        return best.map { ($0.leaf, $0.range) }
+    }
+
+    private static func nearest(_ needle: String, in text: NSString, to estimate: Int) -> NSRange? {
+        var best: NSRange?
+        var search = NSRange(location: 0, length: text.length)
+        while search.length > 0 {
+            let found = text.range(of: needle, options: [.literal], range: search)
+            guard found.location != NSNotFound else { break }
+            if best == nil || abs(found.location - estimate) < abs(best!.location - estimate) { best = found }
+            let next = found.location + max(1, found.length)
+            search = NSRange(location: next, length: text.length - next)
+        }
+        return best
     }
 
     /// Finds the list items, quotes and code blocks that a Chromium field shows on separate lines but
     /// reports glued together in its value. The leaves are matched against the value one by one, so
     /// list markers and other text that is not in the value are skipped instead of spoiling the rest.
     static func hiddenBreaks(in element: AXUIElement, text: String) -> HiddenBreaks {
-        let leaves = textLeaves(of: element, depth: 6, budget: 200)
+        let leaves = textLeaves(of: element)
         guard leaves.count > 1 else { return .none }
         let pieces = leaves.map(\.text)
         let breaks = HiddenBreaks.find(pieces: pieces, in: text) { previous, next in
@@ -453,27 +476,56 @@ enum ProofreadAX {
         rect.minY >= other.maxY - 2
     }
 
-    /// Leaf elements carrying text, in reading order (depth-limited: these trees can be large).
-    static func textLeaves(of element: AXUIElement, depth: Int = 3, budget: Int = 40) -> [(element: AXUIElement, text: String)] {
-        guard depth > 0, budget > 0 else { return [] }
+    /// Leaf elements carrying text, in reading order. Bounded by depth and by the number of elements
+    /// visited (these trees can be large), deep enough for a nested list in a Chromium editor. Inside
+    /// `cachingLeaves` a field is walked once, however many characters are measured in it.
+    static func textLeaves(of element: AXUIElement, depth: Int = 8, budget: Int = 400) -> [(element: AXUIElement, text: String)] {
+        let cache = Thread.current.threadDictionary[leafCacheKey] as? LeafCache
+        if let cached = cache?.leaves(of: element) { return cached }
+        var left = budget
+        var out: [(element: AXUIElement, text: String)] = []
+        collectLeaves(of: element, depth: depth, left: &left, into: &out)
+        cache?.store(out, for: element)
+        return out
+    }
+
+    private static func collectLeaves(of element: AXUIElement, depth: Int, left: inout Int,
+                                      into out: inout [(element: AXUIElement, text: String)]) {
+        guard depth > 0, left > 0 else { return }
         var childrenRef: AnyObject?
         guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
-              let children = childrenRef as? [AXUIElement] else { return [] }
-
-        var out: [(element: AXUIElement, text: String)] = []
-        var left = budget
+              let children = childrenRef as? [AXUIElement] else { return }
         for child in children {
-            guard left > 0 else { break }
+            guard left > 0 else { return }
             left -= 1
             if let text = currentText(of: child), !text.isEmpty {
                 out.append((element: child, text: text))
             } else {
-                let nested = textLeaves(of: child, depth: depth - 1, budget: left)
-                left -= nested.count
-                out.append(contentsOf: nested)
+                collectLeaves(of: child, depth: depth - 1, left: &left, into: &out)
             }
         }
-        return out
+    }
+
+    /// Runs `body` with the text leaves of each field walked at most once on this thread; for a pass
+    /// that measures many ranges in a field that does not change meanwhile.
+    static func cachingLeaves<T>(_ body: () -> T) -> T {
+        let dictionary = Thread.current.threadDictionary
+        guard dictionary[leafCacheKey] == nil else { return body() }
+        dictionary[leafCacheKey] = LeafCache()
+        defer { dictionary[leafCacheKey] = nil }
+        return body()
+    }
+
+    private static let leafCacheKey = "com.evgeny.bindall.leafCache"
+
+    private final class LeafCache {
+        private var entries: [(element: AXUIElement, leaves: [(element: AXUIElement, text: String)])] = []
+        func leaves(of element: AXUIElement) -> [(element: AXUIElement, text: String)]? {
+            entries.first { CFEqual($0.element, element) }?.leaves
+        }
+        func store(_ leaves: [(element: AXUIElement, text: String)], for element: AXUIElement) {
+            entries.append((element, leaves))
+        }
     }
 
     /// The element's screen frame (Quartz, top-left origin).

@@ -361,7 +361,16 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   expected text keeps it on the right line, since the leaves leave out the newlines). In a
   multi-line field the caret is translated with `AppOffsetMap` (built uncached on the work queue,
   `workMapCache`). The gray text is drawn by `GhostTextView` from x = 0 (no label inset) in a
-  pixel-aligned panel.
+  pixel-aligned panel. Why a suggestion went to the list (caret not at a line end, no caret
+  geometry, a correction) is logged at `.notice`, category `autocomplete`, once per change.
+- **Text leaves** (`ProofreadAX.textLeaves`): depth 8, at most 400 elements visited (the budget
+  counts every element, not only the leaves found). A list in Claude's composer puts its text runs
+  four levels down, and the old depth of 3 lost them: no gray text and no underlines in any longer,
+  structured message. `leafRange` picks the leaf and the occurrence of the expected text nearest the
+  estimated offset; `UnderlineOverlay` measures the word and its one-character probe in that same
+  leaf. `ProofreadAX.cachingLeaves { }` walks each field once per pass (the underline pass and the
+  visual-break filter), and the overlay logs at `.notice` how many issues could not be found or
+  measured.
 - **Stars** (`Selection/FieldStarController.swift`): one violet four-point star (`StarShape`, a vector
   path with thin rays (`waist` 0.18), 12 pt in a 24 pt target, 13 px at 1x; `Color.brand`, the icon's violet; the panel frame is
   pixel-aligned with `backingAlignedRect` and has no window shadow, so it stays sharp). While an

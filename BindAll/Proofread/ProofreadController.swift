@@ -299,7 +299,9 @@ final class ProofreadController {
                 var found = breaks.mapBack(try await provider.check(breaks.checkText(text)), to: text)
                 guard !Task.isCancelled, gen == self.generation else { return }
                 if let element = chromiumElement {
-                    found.removeAll { ProofreadAX.crossesVisualBreak($0, text: text, in: element, map: offsetMap) }
+                    ProofreadAX.cachingLeaves {
+                        found.removeAll { ProofreadAX.crossesVisualBreak($0, text: text, in: element, map: offsetMap) }
+                    }
                 }
                 let rebased = offset == 0 ? found : ProofreadCache.rebase(found, to: offset)
                 self.lastError = nil

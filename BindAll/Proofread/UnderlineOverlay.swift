@@ -1,4 +1,5 @@
 import AppKit
+import os
 
 /// Draws squiggly underlines under every issue of the current proofread session, inside one
 /// click-through panel sized to the field's frame.
@@ -20,6 +21,7 @@ final class UnderlineOverlay {
     private var shownMap: AppOffsetMap?
     private var shownElement: AXUIElement?
     private var shownFieldFrame: CGRect = .zero
+    private static let log = Logger(subsystem: "com.evgeny.bindall", category: "proofread")
 
     /// Draws what it can and returns the ids of the issues it could not place in the field: those
     /// would not apply either, so the caller drops them rather than count what nobody can see.
@@ -34,29 +36,47 @@ final class UnderlineOverlay {
         // Word rects first: without them there is nothing to draw anyway, and their union stands in
         // for a field frame the app refuses to report (Chromium answers one but not always both).
         var wordRects: [(screen: CGRect, color: NSColor)] = []
-        for issue in issues {
-            // Our offsets come from the field's value; some apps (Chromium, Obsidian) index their
-            // geometry differently, so translate the range into the app's own before measuring --
-            // an underline in the wrong place is worse than no underline.
-            guard let range = ProofreadAX.alignedRange(issue.range, expecting: issue.original, in: element,
-                                                       contextBefore: issue.contextBefore,
-                                                       contextAfter: issue.contextAfter, map: map) else {
-                unplaced.insert(issue.id)
-                continue
+        var unmeasured = 0
+        ProofreadAX.cachingLeaves {
+            for issue in issues {
+                // Our offsets come from the field's value; some apps (Chromium, Obsidian) index their
+                // geometry differently, so translate the range into the app's own before measuring --
+                // an underline in the wrong place is worse than no underline.
+                guard let range = ProofreadAX.alignedRange(issue.range, expecting: issue.original, in: element,
+                                                           contextBefore: issue.contextBefore,
+                                                           contextAfter: issue.contextAfter, map: map) else {
+                    unplaced.insert(issue.id)
+                    continue
+                }
+                // The one-character probe tells a wrapped range from a single-line one. When the app
+                // does not answer it, fall back to a plausible single-line height. Where only the text
+                // leaves answer (Chromium), both are measured in the same leaf.
+                let quartz: CGRect
+                let probe: CGRect?
+                if let direct = ProofreadAX.rawBounds(range, in: element) {
+                    quartz = direct
+                    probe = ProofreadAX.rawBounds(NSRange(location: range.location, length: 1), in: element)
+                } else if let hit = ProofreadAX.leafRange(range, in: element, expecting: issue.original),
+                          let leafRect = ProofreadAX.rawBounds(hit.range, in: hit.leaf) {
+                    quartz = leafRect
+                    probe = ProofreadAX.rawBounds(NSRange(location: hit.range.location, length: 1), in: hit.leaf)
+                } else {
+                    unmeasured += 1
+                    continue
+                }
+                if let probe {
+                    guard UnderlineGeometry.isSingleLine(rangeRect: quartz, probeRect: probe) else { continue }
+                } else {
+                    guard quartz.height > 0, quartz.height <= 40 else { continue }
+                }
+                wordRects.append((screen: UnderlineGeometry.appKitRect(fromQuartz: quartz,
+                                                                       primaryScreenHeight: primaryHeight),
+                                  color: Self.color(for: issue.kind)))
             }
-            guard let quartz = ProofreadAX.boundsForRange(range, in: element,
-                                                          expecting: issue.original) else { continue }
-            // The one-character probe tells a wrapped range from a single-line one. When the app
-            // does not answer it, fall back to a plausible single-line height.
-            let probe = ProofreadAX.boundsForRange(NSRange(location: range.location, length: 1), in: element)
-            if let probe {
-                guard UnderlineGeometry.isSingleLine(rangeRect: quartz, probeRect: probe) else { continue }
-            } else {
-                guard quartz.height > 0, quartz.height <= 40 else { continue }
-            }
-            wordRects.append((screen: UnderlineGeometry.appKitRect(fromQuartz: quartz,
-                                                                   primaryScreenHeight: primaryHeight),
-                              color: Self.color(for: issue.kind)))
+        }
+        if !unplaced.isEmpty || unmeasured > 0 {
+            // Counts only, no text: why underlines are missing, readable later with `log show`.
+            Self.log.notice("underlines: \(issues.count, privacy: .public) issues, \(unplaced.count, privacy: .public) not found in the field, \(unmeasured, privacy: .public) without geometry")
         }
         guard !wordRects.isEmpty else { hide(); return unplaced }
 

@@ -656,11 +656,29 @@ final class AutocompleteController {
 
     /// Work-queue side: AX calls only.
     private func ghostPlace(for info: TextInfo, primaryHeight: CGFloat?) -> GhostPlace? {
-        guard info.caret > 0, InlineCompletion.caretAtLineEnd(in: info.text, caret: info.caret),
-              let rect = caretAnchor(for: info, primaryHeight: primaryHeight),
-              rect.height > 4 else { return nil }
+        guard info.caret > 0, InlineCompletion.caretAtLineEnd(in: info.text, caret: info.caret) else {
+            Self.noteGhostMiss("caret not at the end of a line")
+            return nil
+        }
+        guard let rect = caretAnchor(for: info, primaryHeight: primaryHeight), rect.height > 4 else {
+            Self.noteGhostMiss("no caret geometry")
+            return nil
+        }
         let font = fieldFont(info.element, at: info.caret - 1)
         return GhostPlace(caretCharacter: rect, fontSize: font?.size, fontName: font?.name)
+    }
+
+    private static let log = Logger(subsystem: "com.evgeny.bindall", category: "autocomplete")
+    private static let lastGhostMiss = OSAllocatedUnfairLock<String?>(initialState: nil)
+
+    /// Why a suggestion went to the list instead of gray text, logged once per change of reason so
+    /// a run of keystrokes leaves one line; nil when gray text was shown. Never any text.
+    nonisolated private static func noteGhostMiss(_ reason: String?) {
+        let changed = lastGhostMiss.withLock { last -> Bool in
+            defer { last = reason }
+            return last != reason
+        }
+        if changed, let reason { log.notice("gray text not shown: \(reason, privacy: .public)") }
     }
 
     /// The font the app draws the character at `offset` in, when it reports one (`AXFont` in the
@@ -679,7 +697,11 @@ final class AutocompleteController {
 
     /// Shows a fresh suggestion: inline after the caret when it fits there, the list otherwise.
     private func present(_ list: [String], partial: String, ghost place: GhostPlace?) {
+        if place != nil, let first = list.first, InlineCompletion.suffix(of: first, after: partial) == nil {
+            Self.noteGhostMiss("the first suggestion corrects the word")
+        }
         if let place, let first = list.first, let rest = InlineCompletion.suffix(of: first, after: partial) {
+            Self.noteGhostMiss(nil)
             overlay.hide()
             ghost.show(rest, after: place.caretCharacter, fontSize: place.fontSize, fontName: place.fontName)
             inlineShown = true
