@@ -12,6 +12,7 @@ struct SettingsView: View {
             Divider()
             SettingsTabContent(tab: selection)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .environment(\.showSettingsTab) { selection = $0 }
         }
         .frame(minWidth: 440, idealWidth: Self.defaultSize.width, minHeight: 478, idealHeight: Self.defaultSize.height)
     }

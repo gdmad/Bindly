@@ -10,20 +10,30 @@ struct GeneralSettingsView: View {
             Section {
                 HelpToggleRow("BindAll enabled", "The master switch, the same one the menu bar carries. Off: the global shortcuts, autocomplete and proofreading all stand down until it is back on.",
                               isOn: $appState.settings.enabled)
-                Toggle("Launch at login", isOn: $launchAtLogin)
+                HelpToggleRow("Launch at login", "Starts BindAll when you log in, in the menu bar. macOS may ask you to approve it in System Settings > General > Login Items.",
+                              isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in applyLaunchAtLogin(enabled) }
             } header: {
-                Text("Startup")
+                HelpHeader("Startup", "Whether BindAll runs, and whether it starts with your Mac.")
             }
 
-            Section("Output") {
+            Section {
                 HelpToggleRow("Restore clipboard after replacing", "When replacing the selection, BindAll puts the result on the clipboard and pastes it. With this on, your previous clipboard contents are restored a moment after pasting, so the tool does not overwrite what you had copied. Off: the result stays on the clipboard.",
                               isOn: $appState.settings.restoreClipboard)
-                HelpToggleRow("Mask AI Slop", "Cleans typical 'AI' leftovers out of action results: long dashes, curly quotes, emoji and more. Which clean-ups run is chosen on the Actions tab (Mask AI Slop).",
-                              isOn: $appState.settings.maskAISlop)
-                UsageDataRow()
-                HelpToggleRow("Keep history", "Stores the last 50 results locally (menu bar > History) so a closed popup or overwritten paste can be recovered. Stored on this Mac only; never includes API keys.",
+                HelpToggleRow("Preview from the star menu", "Before an action from a star replaces your text, show what will change (added words highlighted, removed ones struck through). Apply with Return, Esc to cancel. Fix all always shows the preview.",
+                              isOn: $appState.settings.previewFromMenu)
+                HelpToggleRow("Preview from the shortcuts", "The same preview for the global shortcuts. Off by default: the shortcuts are the quick path.",
+                              isOn: $appState.settings.previewFromHotkeys)
+            } header: {
+                HelpHeader("Replacing text", "How a result goes back into the app it came from.")
+            }
+
+            Section {
+                HelpToggleRow("Keep history", "Stores the last 50 results locally (menu bar > History, and History in the star menu) so a closed popup or overwritten paste can be recovered. Stored on this Mac only; never includes API keys.",
                               isOn: $appState.settings.historyEnabled)
+                UsageDataRow()
+            } header: {
+                HelpHeader("Data", "What BindAll keeps on this Mac. Nothing here leaves it.")
             }
 
             Section {
@@ -62,12 +72,14 @@ struct GeneralSettingsView: View {
                 HelpHeader("Status", "Live status. Accessibility is required for the global shortcuts and for pasting results back into the active app. \"Global shortcuts\" can show Not active even with Accessibility granted -- that means the permission is stale (common right after a macOS upgrade); remove BindAll from the Accessibility list in System Settings and grant it again. Apple on-device model shows whether Apple Intelligence is available for the on-device engine.")
             }
 
-            Section("About") {
+            Section {
                 LabeledContent("Version", value: UpdateChecker.currentVersion)
                 LabeledContent("Source code") {
                     Link("GitHub", destination: UpdateChecker.repositoryURL)
                 }
                 Button("Check for Updates…", action: UpdateChecker.checkForUpdates)
+            } header: {
+                HelpHeader("About", "Version and updates. Updates come from the GitHub releases.")
             }
         }
         .formStyle(.grouped)

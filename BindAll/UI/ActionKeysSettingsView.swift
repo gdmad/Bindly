@@ -11,7 +11,6 @@ struct ActionKeysSettingsView: View {
             // can't leave a stale index binding (which crashes with "Index out of range").
             ForEach(appState.settings.actionKeys) { key in
                 ActionKeyRow(key: binding(for: key.id),
-                             others: otherShortcuts(excluding: key.id),
                              startsExpanded: key.id == newKeyID,
                              delete: { delete(key.id) })
             }
@@ -30,15 +29,6 @@ struct ActionKeysSettingsView: View {
 
     private func delete(_ id: ActionKey.ID) {
         appState.settings.actionKeys.removeAll { $0.id == id }
-    }
-
-    /// All shortcuts an action-key recorder must not collide with: the four built-ins plus the
-    /// shortcuts of every other action key.
-    private func otherShortcuts(excluding id: ActionKey.ID) -> [HotkeyConfig] {
-        let s = appState.settings
-        let builtIn = [s.defaultActionHotkey, s.translateHotkey, s.screenTranslateHotkey, s.quickTranslateHotkey]
-        let keys = s.actionKeys.filter { $0.id != id }.compactMap(\.hotkey)
-        return builtIn + keys
     }
 
     /// A binding that resolves the action key by id on every access, so it stays valid even as the

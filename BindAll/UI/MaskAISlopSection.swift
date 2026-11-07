@@ -8,13 +8,17 @@ struct MaskAISlopSection: View {
     var body: some View {
         @Bindable var appState = appState
         Section {
-            ForEach(MaskAISlopRule.allCases) { rule in
-                MaskAISlopRuleRow(rule: rule, isOn: $appState.settings.maskAISlopRules.contains(rule.rawValue))
+            HelpToggleRow("Mask AI Slop", "Cleans typical 'AI' leftovers out of action results: long dashes, curly quotes, emoji and more, by the rules below.",
+                          isOn: $appState.settings.maskAISlop)
+            AdvancedDisclosure("Rules", id: "maskRules") {
+                ForEach(MaskAISlopRule.allCases) { rule in
+                    MaskAISlopRuleRow(rule: rule, isOn: $appState.settings.maskAISlopRules.contains(rule.rawValue))
+                }
             }
             HelpToggleRow("Remove AI tells: also rewrite with AI", "The star menu's Remove AI tells always applies the rules above plus Markdown leftovers, emoji at line ends and sign-off lines. With this on it then asks the AI engine to rewrite stock phrases and filler too (slower, uses the engine).",
                           isOn: $appState.settings.removeTellsWithAI)
         } header: {
-            HelpHeader("Mask AI Slop", "Applied to results of the actions when Mask AI Slop is on (General), and by Remove AI tells. Code in backticks and links are never changed.")
+            HelpHeader("Mask AI Slop", "Applied to results of the actions when it is on, and always by the star's Remove AI tells. Code in backticks and links are never changed.")
         }
     }
 }

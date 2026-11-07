@@ -21,18 +21,6 @@ struct ProvidersSettingsView: View {
     var body: some View {
         @Bindable var appState = appState
         Form {
-            // The engine that actually runs, and below it the credentials for each provider: the
-            // two used to live on different tabs, which read as if they were unrelated.
-            Section {
-                Picker("Engine for text actions", selection: $appState.settings.defaultEngine) {
-                    ForEach(ProviderKind.allCases) { kind in
-                        Text(kind.displayName).tag(kind)
-                    }
-                }
-            } header: {
-                HelpHeader("Engine", "Used for the default action and custom prompts. Translation always runs on-device via Apple's Translation framework, and proofreading always uses LanguageTool.")
-            }
-
             Section {
                 Picker("Provider", selection: $selectedKind) {
                     ForEach(cloudKinds) { kind in
@@ -44,10 +32,10 @@ struct ProvidersSettingsView: View {
                 // to reload -- saving here would write the old provider's key under the new one.
                 .onChange(of: selectedKind) { _, _ in loadForSelection() }
             } header: {
-                HelpHeader("Provider", "Credentials and model for each cloud provider. Configuring one does not select it -- that is the Engine picker above.")
+                HelpHeader("Provider", "Credentials and model for each cloud provider. Configuring one does not select it: the engine is chosen on the AI Actions tab.")
             }
 
-            Section("Connection") {
+            Section {
                 if selectedKind.requiresAPIKey {
                     LabeledContent("API key") {
                         // Saved as it is typed. Every other control here saves itself, and neither
@@ -79,7 +67,8 @@ struct ProvidersSettingsView: View {
                 }
                 .onChange(of: modelDraft) { _, model in storeModel(model) }
                 if selectedKind == .openrouter {
-                    Toggle("Free models only", isOn: $appState.settings.openRouterFreeOnly)
+                    HelpToggleRow("Free models only", "Fetch lists only OpenRouter's free models (those ending in :free).",
+                                  isOn: $appState.settings.openRouterFreeOnly)
                         .onChange(of: appState.settings.openRouterFreeOnly) { _, _ in
                             if !models.isEmpty { fetchModels() }
                         }
@@ -89,6 +78,8 @@ struct ProvidersSettingsView: View {
                         ForEach(models, id: \.self) { Text($0).tag($0) }
                     }
                 }
+            } header: {
+                HelpHeader("Connection", "The API key is kept in the Keychain. Base URL and model can be left as they are for the provider's defaults.")
             }
 
             Section {

@@ -6,6 +6,7 @@ struct SettingsTabContent: View {
     var body: some View {
         switch tab {
         case .general: GeneralSettingsView()
+        case .shortcuts: ShortcutsSettingsView()
         case .actions: ActionsSettingsView()
         case .translation: TranslationSettingsView()
         case .autocomplete: AutocompleteSettingsView()

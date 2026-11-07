@@ -25,6 +25,12 @@ struct TranslationSection: View {
             }
             TranslationStatusRow(autoSource: appState.settings.sourceLanguage == AppLanguages.autoTag,
                                  installed: pairInstalled)
+            LabeledContent {
+                LanguagePicker(title: "Voice translation", selection: $appState.settings.pushToTalkTargetLanguage, includeAuto: false,
+                               leadingOption: (tag: "same", title: "Same as Target"))
+            } label: {
+                HelpHeader("Dictation into", "What Dictate and translate (and Push to Talk with Translate before inserting) types: the target above, or a language of its own.")
+            }
         } header: {
             HelpHeader("Translation", "Source may be Auto Detect or a fixed language. With an explicit source, the pair is bidirectional (text is translated into whichever of source/target it is not). Runs on-device via Apple's Translation framework.")
         }

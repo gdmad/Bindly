@@ -1,12 +1,23 @@
 import SwiftUI
 
+/// AI Actions: the engine, the default prompt, the action keys and the clean-up of AI results.
 struct ActionsSettingsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.showSettingsTab) private var showSettingsTab
 
     var body: some View {
         @Bindable var appState = appState
         Form {
-            ShortcutsSection()
+            Section {
+                Picker("Engine for text actions", selection: $appState.settings.defaultEngine) {
+                    ForEach(ProviderKind.allCases) { kind in
+                        Text(kind.displayName).tag(kind)
+                    }
+                }
+                Button("Configure providers…") { showSettingsTab(.providers) }
+            } header: {
+                HelpHeader("Engine", "Runs Fix, the action keys, Explain, Summarize and custom prompts. Translation always runs on-device via Apple's Translation framework, and proofreading always uses LanguageTool.")
+            }
 
             Section {
                 // A TextEditor, not a vertical TextField: the prompt is multi-paragraph text where
@@ -21,21 +32,12 @@ struct ActionsSettingsView: View {
                 HelpHeader("Default action", "The Fix selection shortcut and the star's Fix run this prompt on the selected text (spelling, grammar and punctuation by default).")
             }
 
-            Section {
-                HelpToggleRow("From the star menu", "Before Fix, Fix spelling, an action key or a custom prompt from a star replaces your text, show what will change (added words highlighted, removed ones struck through). Apply with Return, Esc to cancel.",
-                              isOn: $appState.settings.previewFromMenu)
-                HelpToggleRow("From the shortcuts", "The same preview for the global shortcuts. Off by default: the shortcuts are the quick path.",
-                              isOn: $appState.settings.previewFromHotkeys)
-            } header: {
-                Text("Preview before replacing")
-            }
-
             MaskAISlopSection()
 
             Section {
                 ActionKeysSettingsView()
             } header: {
-                HelpHeader("Action keys", "Named instructions for the AI. Each one is in the star menu and can get its own global shortcut (Record Shortcut in the expanded row), which runs it on the current selection.")
+                HelpHeader("Action keys", "Named instructions for the AI. Each one is in the star menu; its global shortcut is set on the Shortcuts tab.")
             }
         }
         .formStyle(.grouped)

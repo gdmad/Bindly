@@ -81,13 +81,14 @@ BindAll/
 │   ├── ActionRouter.swift      # EngineFactory (builds an AIEngine from settings)
 │   └── MaskAISlop.swift        # typography normalizer (dashes/quotes/emoji)
 ├── UI/
-│   ├── SettingsView.swift      # tab bar + selected tab: General, Actions, Translation, Autocomplete, Proofread, Providers -- each feature owns its tab, including its on/off switch
+│   ├── SettingsView.swift      # tab bar + selected tab (see "Settings layout"); `showSettingsTab` in the environment switches tabs
 │   ├── SettingsTab / SettingsTabBar / SettingsTabRow / SettingsTabButton / SettingsTabContent .swift
 │   │                           # in-window tab bar, NOT TabView: on macOS 26+ a Tab-built TabView moves
 │   │                           # the tabs into the title bar as overflowing icons. ViewThatFits picks the
 │   │                           # widest layout that fits: icon+title, icon over title, icons only
-│   ├── GeneralSettingsView / ActionsSettingsView / TranslationSettingsView (+ TranslationSection,
-│   │   TranslationStatusRow, LanguagePicker) / ShortcutsSection .swift  # one type per file
+│   ├── GeneralSettingsView / ShortcutsSettingsView / ActionsSettingsView (AI Actions) /
+│   │   TranslationSettingsView (+ TranslationSection, TranslationStatusRow, LanguagePicker) .swift
+│   ├── HoldKeyPicker / AdvancedDisclosure / SettingsNavigation .swift # hold-key choice, folded "Advanced" blocks, `showSettingsTab`
 │   ├── HelpHint / HelpHeader / HelpToggleRow .swift # help icon, header with help, and the Form toggle
 │   │                           # with a help hint (keeps the hint's Button out of the Toggle's label)
 │   ├── AutocompleteSettingsView.swift  # autocomplete tab (on/off, count, layout, language, learning, per-app)
@@ -96,7 +97,7 @@ BindAll/
 │   ├── ProofreadSettingsView.swift     # proofread tab (on/off, fixes, layout, language, per-app)
 │   ├── AppFilterSection.swift          # shared per-app allow/deny section (autocomplete + proofread)
 │   ├── ActionKeysSettingsView.swift / ActionKeyRow.swift # action keys (name, instruction, shortcut, show-only); rows bound by id, never by index
-│   ├── ProvidersSettingsView.swift     # engine picker + AI providers (keys, models; drafts written back deferred)
+│   ├── ProvidersSettingsView.swift     # AI provider connections (keys, models; drafts written back deferred)
 │   ├── ShortcutRecorder.swift / HotkeyFormatter.swift # click-to-record shortcut field, glyph formatting
 │   ├── DarkFieldStyle / ClearFocusOnAppear / DeferredWrite .swift # input box style, no auto-focus on
 │   │                           # tab appear, deferred settings writes from text fields
@@ -149,7 +150,17 @@ Tests/
 Info.plist                      # LSUIElement, version (source of truth for version)
 ```
 
-## Triggers (defaults, all configurable in Settings → Actions → Shortcuts)
+## Settings layout
+General (startup, Replacing text: restore clipboard and both preview switches, Data, Stars, Popups,
+Status, About) · Shortcuts (every global shortcut and both voice hold keys, one collision check
+across all) · AI Actions (engine, default prompt, action keys, Mask AI Slop with its rules) ·
+Translation (pair, status, the dictation target) · Autocomplete · Proofread (Checking, Fixes popup,
+Personal dictionary, LanguageTool server folded while Free, Apps) · Voice (the two dictations, speech
+language, permissions) · Providers (connections only). Rarely changed options sit in
+`AdvancedDisclosure` blocks, which remember whether they are open. Every section header is a
+`HelpHeader`, and every toggle a `HelpToggleRow`.
+
+## Triggers (defaults, all configurable in Settings → Shortcuts)
 - **Cmd+C ×2** → default action: the default prompt (spelling/grammar) on the whole selection
 - **Cmd+C ×3** → translate the selection, shown in a popup near the cursor
 - **Cmd+E** → OCR: select a screen region, recognize text, translate

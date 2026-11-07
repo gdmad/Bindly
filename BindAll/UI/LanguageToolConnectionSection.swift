@@ -38,15 +38,6 @@ struct LanguageToolConnectionSection: View {
                 urlDraft = url
             }
 
-            LabeledContent("Server URL") {
-                TextField("Server URL", text: $urlDraft,
-                          prompt: Text("https://api.languagetool.org/v2"))
-                    .labelsHidden().textFieldStyle(.plain).darkField()
-                    .onChange(of: urlDraft) { _, url in
-                        // Deferred: onChange fires inside the view update.
-                        Task { @MainActor in appState.settings.languageToolBaseURL = url }
-                    }
-            }
             // Credentials belong to Premium only: the public server rejects them, and a self-hosted
             // server is reached by URL.
             if modeDraft == .premium {
@@ -69,17 +60,11 @@ struct LanguageToolConnectionSection: View {
                 }
             }
 
-            HStack {
-                Button(testing ? "Testing…" : "Test connection", action: test)
-                    .disabled(testing)
-                if let ok {
-                    Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundStyle(ok ? .green : .red)
-                        .accessibilityLabel(ok ? "Connected" : "Failed")
-                }
-            }
-            if !status.isEmpty {
-                Text(status).font(.caption).foregroundStyle(.secondary)
+            if modeDraft == .free {
+                // The public server needs nothing set up; its details are folded away.
+                AdvancedDisclosure("Server URL and test", id: "languageTool") { details }
+            } else {
+                details
             }
         } header: {
             HelpHeader("LanguageTool server", "How BindAll reaches LanguageTool.\n\nFree public: api.languagetool.org, no account, rate-limited, and your text is sent to languagetool.org. Credentials are never sent (the public server rejects them).\n\nPremium: api.languagetoolplus.com (a different host) with the username and token from your LanguageTool Premium account.\n\nSelf-hosted: your own server URL, no credentials.\n\nThe URL is pre-filled per mode but stays editable.")
@@ -92,6 +77,30 @@ struct LanguageToolConnectionSection: View {
             testTask = nil
             testing = false
             resetTest()
+        }
+    }
+
+    @ViewBuilder private var details: some View {
+            LabeledContent("Server URL") {
+            TextField("Server URL", text: $urlDraft,
+                      prompt: Text("https://api.languagetool.org/v2"))
+                .labelsHidden().textFieldStyle(.plain).darkField()
+                .onChange(of: urlDraft) { _, url in
+                    // Deferred: onChange fires inside the view update.
+                    Task { @MainActor in appState.settings.languageToolBaseURL = url }
+                }
+        }
+            HStack {
+            Button(testing ? "Testing…" : "Test connection", action: test)
+                .disabled(testing)
+            if let ok {
+                Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .foregroundStyle(ok ? .green : .red)
+                    .accessibilityLabel(ok ? "Connected" : "Failed")
+            }
+        }
+        if !status.isEmpty {
+            Text(status).font(.caption).foregroundStyle(.secondary)
         }
     }
 
