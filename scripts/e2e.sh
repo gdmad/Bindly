@@ -26,7 +26,7 @@ python3 - <<'PY'
 import json, subprocess
 settings = {
     "enabled": True, "correctEnabled": True, "autocompleteEnabled": True, "autocompleteInline": True,
-    "autocompleteLanguages": ["ru"], "languageToolMode": "free", "languageToolLanguage": "ru-RU",
+    "autocompleteLanguages": ["ru"], "languageToolMode": "free", "languageToolLanguage": "ru",
     "proofreadMinLength": 5, "starFieldEnabled": True, "starSelectionEnabled": True,
     "previewFromMenu": True, "defaultEngine": "apple", "historyEnabled": True, "preSendCheck": True,
     "pushToTalkEnabled": True, "pushToTalkLanguage": "ru", "pushToTalkTargetLanguage": "en",
