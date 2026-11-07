@@ -280,6 +280,36 @@ func electronScenarios(_ target: ElectronTarget) {
         record("clicking the star opens its menu", false, "no star on the selection")
     }
 
+    // MARK: Summarize, closed with its own button
+
+    clearComposer()
+    E2E.type("Совещание переносится на четверг, потому что заказчик не успел прислать техническое задание. ")
+    E2E.pause(1.0)
+    E2E.key(kVK_ANSI_A, .maskCommand)
+    E2E.pause(1.2)
+    if let starNow = E2E.window("BindAll Star")?.bounds, let testPid = E2E.testApp?.processIdentifier {
+        E2E.click(CGPoint(x: starNow.midX, y: starNow.midY))
+        E2E.pause(0.6)
+        if let item = E2E.find(in: AXUIElementCreateApplication(testPid), depth: 6, { (E2E.attr($0, kAXTitleAttribute) as? String) == "Summarize" }) {
+            E2E.press(item)
+        } else {
+            pickMenuItem(downs: 7)
+        }
+        let shown = E2E.wait(40) { E2E.window("BindAll Translation") != nil }
+        record("Summarize shows its result", shown)
+        if shown, let close = E2E.testElement(window: "BindAll Translation", E2E.named("Close")).flatMap(E2E.frame) {
+            E2E.hoverThenClick(CGPoint(x: close.midX, y: close.midY))
+            let closed = E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+            E2E.pause(1.0)
+            let alive = !(E2E.testApp?.isTerminated ?? true)
+            record("Close closes the summary and BindAll keeps running", closed && alive, "closed \(closed), running \(alive)")
+            if !alive { return }
+        }
+    } else {
+        record("Summarize shows its result", false, "no star on the selection")
+    }
+    focusComposer(pid)
+
     // MARK: Fix all
 
     clearComposer()

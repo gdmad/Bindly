@@ -42,8 +42,13 @@ final class FloatingPanelHost {
     func close() {
         if let resizeObserver { NotificationCenter.default.removeObserver(resizeObserver) }
         resizeObserver = nil
-        panel?.orderOut(nil)
+        guard let closing = panel else { return }
         panel = nil
+        closing.onEscape = nil
+        closing.orderOut(nil)
+        // Close is usually clicked in this very window: freeing it (and its SwiftUI hierarchy) while
+        // AppKit is still delivering that click left the app stuck. It goes once the event is over.
+        DispatchQueue.main.async { withExtendedLifetime(closing) {} }
     }
 
     private func keepOnScreen() {

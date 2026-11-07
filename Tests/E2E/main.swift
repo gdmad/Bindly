@@ -306,12 +306,15 @@ func fixAllScenario() {
         if E2E.wait(4, { E2E.window("BindAll Fixes") != nil }) {
             E2E.key(kVK_Return, .maskCommand)
             record("⌘Return in the popup opens the Fix all preview", E2E.wait(4) { E2E.window("BindAll Preview") != nil })
-            if let close = E2E.testElement(window: "BindAll Preview", E2E.named("Cancel")) ?? E2E.testElement(window: "BindAll Preview", E2E.named("Close")) {
-                E2E.press(close)
+            if let close = (E2E.testElement(window: "BindAll Preview", E2E.named("Cancel")) ?? E2E.testElement(window: "BindAll Preview", E2E.named("Close"))).flatMap(E2E.frame) {
+                // A real click on the window's own button, the path that used to free the window mid-click.
+                E2E.hoverThenClick(CGPoint(x: close.midX, y: close.midY))
             } else {
                 E2E.key(kVK_Escape)
             }
-            E2E.wait(2) { E2E.window("BindAll Preview") == nil }
+            let closed = E2E.wait(2) { E2E.window("BindAll Preview") == nil }
+            E2E.pause(0.8)
+            record("the preview's Close button closes it and BindAll keeps running", closed && !(E2E.testApp?.isTerminated ?? true))
         }
     }
 }
@@ -459,10 +462,34 @@ func explainScenario() {
                    near && E2E.isOnScreen(popup) && popup.width >= 380, "popup \(popup), field \(fieldFrame)")
         }
         record("\(name) leaves the text alone", fieldText() == text, "now: \(fieldText())")
-        E2E.key(kVK_Escape)
-        let closed = E2E.wait(2) { E2E.window("BindAll Translation") == nil }
-        record("\(name): Esc closes the window", closed, "front \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
-        if !closed { E2E.key(kVK_Escape) }
+        if name == "Explain" {
+            E2E.key(kVK_Escape)
+            let closed = E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+            record("\(name): Esc closes the window", closed, "front \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
+            if !closed { E2E.key(kVK_Escape) }
+        } else {
+            // Copy, then the window's own Close button: the click that used to free the window
+            // while it was still handling it.
+            if let copy = E2E.testElement(window: "BindAll Translation", E2E.named("Copy")).flatMap(E2E.frame) {
+                E2E.hoverThenClick(CGPoint(x: copy.midX, y: copy.midY))
+                E2E.pause(0.4)
+            }
+            guard let close = E2E.testElement(window: "BindAll Translation", E2E.named("Close")).flatMap(E2E.frame) else {
+                record("\(name): Close closes the window", false, "no Close button"); E2E.key(kVK_Escape); continue
+            }
+            E2E.hoverThenClick(CGPoint(x: close.midX, y: close.midY))
+            let closed = E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+            E2E.pause(1.0)
+            let alive = !(E2E.testApp?.isTerminated ?? true)
+            record("\(name): Close closes the window and BindAll keeps running", closed && alive,
+                   "closed \(closed), running \(alive)")
+            guard alive else { return }
+            focusTextEdit()
+            E2E.key(kVK_ANSI_A, .maskCommand)
+            E2E.pause(1.2)
+            record("\(name): the star still works after Close", E2E.wait(3) { E2E.window("BindAll Star") != nil })
+            E2E.key(kVK_RightArrow)
+        }
     }
 }
 

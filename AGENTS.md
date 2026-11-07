@@ -398,7 +398,11 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   keeping its top edge. Placed by `PanelPlacement`: under the field (`FocusedField.rect()`, the
   focused element), above it when there is no room, else centered on the app's window. Look:
   `.panelChrome()` (material, radius 14, hairline border) and `PanelActionBar` (secondary left,
-  Close and the main action right); Quick Translate uses the same bar.
+  Close and the main action right); Quick Translate uses the same bar. `FloatingPanelHost.close()`
+  and `QuickTranslateController.close()` order the window out at once but free it on the next main
+  run-loop turn: Close is clicked in that very window, and freeing it (with its SwiftUI hierarchy)
+  while AppKit is still delivering the click stopped the app after Summarize. The E2E clicks the real
+  Close buttons (Summarize, the Fix all preview) and checks the app keeps running.
 - **Preview** (`UI/Preview*`): every text-replacing star action shows a word diff (`TextDiff.words`,
   LCS over word+whitespace tokens; `DiffText` renders added on green + underline, removed red +
   strikethrough) with Changes/Result, Close / Copy / Apply (Return). `previewFromMenu` (default on)
@@ -484,7 +488,8 @@ thread (and, with it, the active proofread popup tap the system would then disab
   with high-contrast variants), named by `NSAccentColorName` in Info.plist, so default buttons,
   toggles, segmented controls, focus rings and the popups' `selectedContentBackgroundColor`
   selection are violet. macOS uses it only while System Settings > Appearance > Accent color is
-  Multicolor (the default); a color the user picked there wins, as it should.
+  Multicolor (the default); a color the user picked there wins, as it should. Menus (the status
+  menu, the star's menu) are drawn by macOS in the system accent and stay that way on purpose.
 - The status icon is always the same three sparkles, drawn by `StatusIconRenderer` (a template image
   laid out like the `sparkles` symbol, which has no per-layer variable rendering); the three states
   differ only in alpha and size (`AppDelegate.updateStatusIcon`): full while idle, the sparkles

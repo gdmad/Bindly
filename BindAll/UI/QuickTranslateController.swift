@@ -59,9 +59,12 @@ final class QuickTranslateController: NSObject, NSWindowDelegate {
 
     func close() {
         copyShortcut.remove()
-        window?.orderOut(nil)
+        guard let closing = window else { return }
         window = nil
+        closing.orderOut(nil)
         NSApp.setActivationPolicy(.accessory)
+        // Its own Close button calls this: the window outlives the click that is closing it.
+        DispatchQueue.main.async { withExtendedLifetime(closing) {} }
     }
 
     func windowWillClose(_ notification: Notification) {
