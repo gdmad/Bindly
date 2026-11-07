@@ -29,6 +29,9 @@ final class PushToTalkController {
     private var policy = HoldKeyPolicy()
     private let recorder = SpeechRecorder()
     private let presenter = PopupPresenter(ignoresMouseEvents: true, name: "BindAll Voice")
+    private let level = VoiceLevel()
+    /// Set when the first moments of a recording were silent, so "nothing heard" can say why.
+    private var silent = false
     private var tickTimer: Timer?
     private var target: TextInjector.FocusTarget?
     private var anchor = CGRect.zero
@@ -122,6 +125,8 @@ final class PushToTalkController {
         anchor = caretAnchor()
         monitor.recording = true
         UsageLog.record(.voice, .shown, detail: slot == .translate ? "translateKey" : nil)
+        level.value = 0
+        silent = false
         show("Listening…", listening: true)
         let locale = Self.locale(for: config.language)
         Task { [weak self] in
@@ -135,7 +140,12 @@ final class PushToTalkController {
                                               onText: { [weak self] text in
                                                   guard let self, self.session == id, self.monitor.recording else { return }
                                                   self.show(text.isEmpty ? "Listening…" : text, listening: true)
+                                              },
+                                              onLevel: { [weak self] value in
+                                                  guard let self, self.session == id else { return }
+                                                  self.level.value = value
                                               })
+                self.checkForSilence(session: id)
             } catch {
                 guard self.session == id else { return }
                 UsageLog.record(.voice, .failed, reason: "start")
@@ -158,8 +168,8 @@ final class PushToTalkController {
             var text = await self.recorder.finish()
             guard self.session == id else { return }
             guard !text.isEmpty else {
-                UsageLog.record(.voice, .dismissed, reason: "nothingHeard")
-                self.flash("Nothing was heard.")
+                UsageLog.record(.voice, .dismissed, reason: self.silent ? "silentInput" : "nothingHeard")
+                self.flash(self.silent ? Self.silentMessage : "Nothing was heard.")
                 return
             }
             if translate, let translator = self.translate {
@@ -191,11 +201,27 @@ final class PushToTalkController {
         presenter.hide()
     }
 
+    static let silentMessage = "The microphone is silent. Check the input device in System Settings > Sound."
+
+    /// A moment into the recording: no audio at all, or none above the noise floor, means the wrong
+    /// or a muted input device -- said now, while the key is still held, not after the release.
+    private func checkForSilence(session id: Int) {
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard let self, self.session == id, self.monitor.recording else { return }
+            let stats = self.recorder.meter.stats
+            guard stats.buffers == 0 || stats.peakDecibels < AudioLevelMeter.silentDecibels else { return }
+            Self.log.notice("silent input: \(stats.buffers, privacy: .public) buffers, peak \(Int(stats.peakDecibels), privacy: .public) dB")
+            self.silent = true
+            self.show(Self.silentMessage, listening: true)
+        }
+    }
+
     // MARK: - Note by the caret
 
     private func show(_ text: String, listening: Bool) {
         let anchor = self.anchor
-        presenter.present(VoiceIndicatorView(text: text, listening: listening, fontSize: config.fontSize)) {
+        presenter.present(VoiceIndicatorView(text: text, listening: listening, level: level, fontSize: config.fontSize)) {
             PopupPlacement.origin(above: anchor, size: $0)
         }
     }

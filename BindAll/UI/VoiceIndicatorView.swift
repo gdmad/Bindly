@@ -1,18 +1,16 @@
 import SwiftUI
 
-/// Push to Talk's note by the caret: a recording dot and what has been heard so far.
+/// Push to Talk's note by the caret: the microphone while recording and what has been heard so far.
 struct VoiceIndicatorView: View {
     let text: String
     let listening: Bool
+    let level: VoiceLevel
     let fontSize: CGFloat
 
     var body: some View {
         HStack(spacing: PopupMetrics.inlineSpacing) {
             if listening {
-                Circle()
-                    .fill(.red)
-                    .frame(width: 7, height: 7)
-                    .accessibilityHidden(true)
+                VoiceMicIcon(level: level, fontSize: PopupMetrics.secondaryFontSize(fontSize))
             } else {
                 ProgressView()
                     .controlSize(.mini)

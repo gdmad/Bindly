@@ -30,6 +30,7 @@ swiftc -O \
     BindAll/Proofread/PreSendPolicy.swift \
     BindAll/Voice/HoldKeyPolicy.swift \
     BindAll/App/StatusIconTwinkle.swift \
+    BindAll/Voice/AudioLevelMeter.swift \
     BindAll/Proofread/ListMarkers.swift \
     BindAll/Proofread/AppOffsetMap.swift \
     BindAll/Engines/TranslationLayout.swift \

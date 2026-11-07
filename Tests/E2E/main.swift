@@ -552,7 +552,10 @@ func voiceScenario() {
     let listening = E2E.wait(3) { E2E.window("BindAll Voice") != nil }
     record("holding the key shows the note", listening)
     E2E.pause(2.5)
-    if let note = E2E.window("BindAll Voice") { E2E.snapshot(note.bounds, to: outDir.appending(path: "voice.png")) }
+    if let note = E2E.window("BindAll Voice") { E2E.snapshot(note.bounds.insetBy(dx: -4, dy: -4), to: outDir.appending(path: "voice.png")) }
+    let tree = E2E.dumpTestWindows("BindAll Voice")
+    record("the note shows the microphone, not the silent warning", tree.contains("Recording") && !tree.contains("silent"),
+           tree.split(separator: "\n").prefix(8).joined(separator: " / "))
     E2E.rightOption(down: false)
     let typed = E2E.wait(15) { fieldText().lowercased().contains("проверка голосового ввода") }
     record("releasing types what was said", typed, "now: \(fieldText())")

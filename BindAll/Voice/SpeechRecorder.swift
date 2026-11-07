@@ -26,12 +26,17 @@ final class SpeechRecorder {
     private var analyzer: SpeechAnalyzer?
     private var builder: AsyncStream<AnalyzerInput>.Continuation?
     private var collector: Task<String, Never>?
+    /// Buffers and loudness of the current recording, for the indicator and the silent-microphone hint.
+    let meter = AudioLevelMeter()
+    private var inputName = "none"
     private static let log = Logger(subsystem: "com.evgeny.bindall", category: "voice")
 
     /// Starts listening. `onText` gets the running transcript (volatile results included).
     /// `onStatus` reports a slow first step, such as downloading the language model.
+    /// `onLevel` gets the input level (0...1) about twelve times a second.
     func start(locale: Locale, testAudio: URL?, onStatus: @escaping (String) -> Void,
-               onText: @escaping (String) -> Void) async throws {
+               onText: @escaping (String) -> Void, onLevel: @escaping @MainActor @Sendable (Double) -> Void) async throws {
+        meter.reset()
         if testAudio == nil { try await Self.ensureMicrophone() }
         let (stream, builder) = AsyncStream<AnalyzerInput>.makeStream()
         self.builder = builder
@@ -77,9 +82,11 @@ final class SpeechRecorder {
         let analyzer = SpeechAnalyzer(modules: [module])
         self.analyzer = analyzer
         if let testAudio {
-            try Self.feed(file: testAudio, as: format, into: builder)
+            inputName = "test audio"
+            try Self.feed(file: testAudio, as: format, into: builder, meter: meter)
         } else {
-            try startMicrophone(format: format, into: builder)
+            inputName = AVCaptureDevice.default(for: .audio)?.localizedName ?? "unknown"
+            try startMicrophone(format: format, into: builder, onLevel: onLevel)
         }
         try await analyzer.start(inputSequence: stream)
     }
@@ -93,6 +100,8 @@ final class SpeechRecorder {
         analyzer = nil
         let text = await collector?.value ?? ""
         collector = nil
+        let stats = meter.stats
+        Self.log.notice("recording: input \(self.inputName, privacy: .public), \(stats.buffers, privacy: .public) buffers, peak \(Int(stats.peakDecibels), privacy: .public) dB, \(text.count, privacy: .public) characters")
         return text
     }
 
@@ -109,15 +118,20 @@ final class SpeechRecorder {
 
     // MARK: - Audio
 
-    private func startMicrophone(format: AVAudioFormat, into builder: AsyncStream<AnalyzerInput>.Continuation) throws {
+    private func startMicrophone(format: AVAudioFormat, into builder: AsyncStream<AnalyzerInput>.Continuation,
+                                 onLevel: @escaping @MainActor @Sendable (Double) -> Void) throws {
         let engine = AVAudioEngine()
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
         guard inputFormat.channelCount > 0, let converter = AVAudioConverter(from: inputFormat, to: format) else {
             throw RecorderError.noMicrophone
         }
-        nonisolated(unsafe) let unsafeConverter = converter
+        let unsafeConverter = converter
+        let meter = self.meter
         input.installTap(onBus: 0, bufferSize: 2048, format: inputFormat) { buffer, _ in
+            if let level = meter.record(buffer) {
+                Task { @MainActor in onLevel(level) }
+            }
             if let converted = Self.convert(buffer, with: unsafeConverter, to: format) {
                 builder.yield(AnalyzerInput(buffer: converted))
             }
@@ -134,11 +148,12 @@ final class SpeechRecorder {
     }
 
     private static func feed(file url: URL, as format: AVAudioFormat,
-                             into builder: AsyncStream<AnalyzerInput>.Continuation) throws {
+                             into builder: AsyncStream<AnalyzerInput>.Continuation, meter: AudioLevelMeter) throws {
         let file = try AVAudioFile(forReading: url)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)),
               let converter = AVAudioConverter(from: file.processingFormat, to: format) else { return }
         try file.read(into: buffer)
+        _ = meter.record(buffer)
         if let converted = convert(buffer, with: converter, to: format) {
             builder.yield(AnalyzerInput(buffer: converted))
         }

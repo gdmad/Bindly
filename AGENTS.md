@@ -44,6 +44,7 @@ BindAll/
 │   ├── HoldKeyPolicy.swift            # pure: hold / quick tap / used as a modifier / Esc
 │   ├── HoldKeyMonitor.swift           # key tap on its own thread (right Option or a custom key)
 │   ├── SpeechRecorder.swift           # AVAudioEngine (or a test file) -> SpeechAnalyzer
+│   ├── AudioLevelMeter.swift          # input loudness: the mic's level and the silent-input hint
 │   └── PushToTalkController.swift     # session: note by the caret, optional translation, paste
 ├── Autocomplete/               # word completion while typing (off by default)
 │   ├── AutocompleteEngine.swift       # NSSpellChecker completions/guesses + recasing + partial-word; Mode (baseline/context/semantic) + scorer re-ranking
@@ -324,7 +325,13 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   Command): its own hold key that always translates, also with plain Push to Talk off.
   `HoldKeyMonitor` watches both keys as slots (one hold at a time). The voice target language is
   "same" by default, meaning the Translation tab's target.
-  The note by the caret is the "BindAll Voice" panel (`VoiceIndicatorView`). `PushToTalkTestAudio`
+  The note by the caret is the "BindAll Voice" panel (`VoiceIndicatorView`): a red `mic.fill`
+  (`VoiceMicIcon`) that swells with the input level (`AudioLevelMeter`, RMS measured in the audio tap,
+  reported through `VoiceLevel` about 12 times a second; still with Reduce Motion). 1.5 s in, no
+  buffers or a peak below `AudioLevelMeter.silentDecibels` (-60 dB) shows "The microphone is silent",
+  and an empty result is then logged as `silentInput` rather than `nothingHeard`. Each recording logs
+  input device, buffers, peak dB and text length (never the text) at `.notice`, category `voice`.
+  `PushToTalkTestAudio`
   (UserDefaults, set only by scripts/e2e.sh) feeds a `say` recording instead of the microphone.
 - **Translation layout:** Apple's model (macOS 27) translates each line as its own segment and
   joins the output with blank lines. The whole text still goes in one request (context matters);

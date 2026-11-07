@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import CoreGraphics
 
@@ -1235,6 +1236,23 @@ do {
     check(abs(second[1] - 1) < 1e-9, "the next one peaks a stagger later")
     check(abs(StatusIconTwinkle.alpha(phase: 0.7) - StatusIconTwinkle.dim) < 1e-9, "dim for the rest of the round")
     check(abs(StatusIconTwinkle.alpha(phase: 1.2) - StatusIconTwinkle.alpha(phase: 0.2)) < 1e-9, "it repeats every period")
+}
+
+print("AudioLevelMeter")
+do {
+    check(AudioLevelMeter.level(decibels: -80) == 0 && AudioLevelMeter.level(decibels: 0) == 1, "level clamps to 0...1")
+    check(abs(AudioLevelMeter.level(decibels: -30) - 0.5) < 1e-6, "-30 dB is half way")
+    let format = AVAudioFormat(standardFormatWithSampleRate: 16000, channels: 1)!
+    let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 160)!
+    buffer.frameLength = 160
+    for i in 0..<160 { buffer.floatChannelData![0][i] = 0.1 }
+    let meter = AudioLevelMeter()
+    check(meter.record(buffer, now: 1) != nil, "the first buffer reports a level")
+    check(meter.record(buffer, now: 1.02) == nil, "reports are throttled")
+    let stats = meter.stats
+    check(stats.buffers == 2 && abs(stats.peakDecibels + 20) < 0.01, "counts buffers and keeps the peak (0.1 RMS = -20 dB)")
+    meter.reset()
+    check(meter.stats.buffers == 0 && meter.stats.peakDecibels < AudioLevelMeter.silentDecibels, "reset starts silent")
 }
 
 if failures == 0 {
