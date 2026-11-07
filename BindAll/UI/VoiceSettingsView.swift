@@ -8,6 +8,8 @@ struct VoiceSettingsView: View {
     @State private var customShortcut = HotkeyConfig(keyCode: 49, modifiers: HotkeyModifiers(command: false, control: true), repeatCount: 1)
 
     @State private var usesRightOption = true
+    @State private var translateUsesRightCommand = true
+    @State private var translateShortcut = HotkeyConfig(keyCode: 49, modifiers: HotkeyModifiers(command: false, option: true, control: true), repeatCount: 1)
 
     var body: some View {
         @Bindable var appState = appState
@@ -40,10 +42,28 @@ struct VoiceSettingsView: View {
             }
 
             Section {
-                HelpToggleRow("Translate before inserting", "Speak in one language and get the text in another, translated by Apple Translation on this Mac. Holding Shift when you release the key flips this for one dictation.",
+                HelpToggleRow("Dictate and translate", "Hold this key to speak in one language and get the text in another, translated by Apple Translation on this Mac. It works on its own key whether or not Push to Talk above is on, and whatever \"Translate before inserting\" is set to.",
+                              isOn: $appState.settings.voiceTranslateEnabled)
+                Picker("Hold", selection: $translateUsesRightCommand) {
+                    Text("Right Command").tag(true)
+                    Text("Custom shortcut").tag(false)
+                }
+                .onChange(of: translateUsesRightCommand) { _, rightCommand in
+                    Task { @MainActor in appState.settings.voiceTranslateKey = rightCommand ? .rightCommand : .shortcut(translateShortcut) }
+                }
+                if !translateUsesRightCommand {
+                    LabeledContent("Shortcut") {
+                        ShortcutRecorder(config: $translateShortcut, others: [])
+                            .onChange(of: translateShortcut) { _, config in
+                                Task { @MainActor in appState.settings.voiceTranslateKey = .shortcut(config) }
+                            }
+                    }
+                }
+                HelpToggleRow("Translate before inserting", "Speak in one language and get the text in another, translated by Apple Translation on this Mac. Applies to Push to Talk; holding Shift when you release the key flips it for one dictation.",
                               isOn: $appState.settings.pushToTalkTranslate)
                 LabeledContent("Into") {
-                    LanguagePicker(title: "Into", selection: $appState.settings.pushToTalkTargetLanguage, includeAuto: false)
+                    LanguagePicker(title: "Into", selection: $appState.settings.pushToTalkTargetLanguage, includeAuto: false,
+                                   leadingOption: (tag: "same", title: "Same as Translation"))
                 }
             } header: {
                 Text("Translation")
@@ -71,6 +91,8 @@ struct VoiceSettingsView: View {
             microphone = AVCaptureDevice.authorizationStatus(for: .audio)
             usesRightOption = appState.settings.pushToTalkKey == .rightOption
             if case .shortcut(let config) = appState.settings.pushToTalkKey { customShortcut = config }
+            translateUsesRightCommand = appState.settings.voiceTranslateKey == .rightCommand
+            if case .shortcut(let config) = appState.settings.voiceTranslateKey { translateShortcut = config }
         }
     }
 

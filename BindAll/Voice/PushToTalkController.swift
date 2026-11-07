@@ -7,8 +7,12 @@ import os
 @MainActor
 final class PushToTalkController {
     struct Config: Equatable {
+        /// Plain dictation on `key`.
         var enabled = false
         var key = PushToTalkKey.rightOption
+        /// Dictate and translate on its own key, whether or not plain dictation is on.
+        var translateKeyEnabled = false
+        var translateKey = PushToTalkKey.rightCommand
         /// `AppLanguages.autoTag` follows the keyboard layout.
         var language = AppLanguages.autoTag
         var translate = false
@@ -30,6 +34,8 @@ final class PushToTalkController {
     private var anchor = CGRect.zero
     private var session = 0
     private var started = ContinuousClock.now
+    /// The key that started the hold: the translate key always translates.
+    private var slot = HoldKeyMonitor.Slot.dictate
     private static let log = Logger(subsystem: "com.evgeny.bindall", category: "voice")
 
     /// Only the E2E build sets this (scripts/e2e.sh): a recording to play instead of the microphone.
@@ -40,10 +46,13 @@ final class PushToTalkController {
     }
 
     func configure(_ config: Config) {
-        let wasEnabled = self.config.enabled
+        let wasEnabled = self.config.enabled || self.config.translateKeyEnabled
         self.config = config
-        monitor.key = config.key
-        if config.enabled, AccessibilityPermission.isGranted {
+        var keys: [HoldKeyMonitor.Slot: PushToTalkKey] = [:]
+        if config.enabled { keys[.dictate] = config.key }
+        if config.translateKeyEnabled, config.translateKey != config.key || !config.enabled { keys[.translate] = config.translateKey }
+        monitor.keys = keys
+        if !keys.isEmpty, AccessibilityPermission.isGranted {
             if !monitor.isRunning { monitor.start() }
         } else if wasEnabled || monitor.isRunning {
             monitor.stop()
@@ -62,10 +71,11 @@ final class PushToTalkController {
         let now = ProcessInfo.processInfo.systemUptime
         let output: HoldKeyPolicy.Output
         switch raw {
-        case .down:
+        case .down(let slot):
+            self.slot = slot
             output = policy.handle(.keyDown(at: now))
             startTicking()
-        case .up(let shift):
+        case .up(_, let shift):
             stopTicking()
             output = policy.handle(.keyUp(at: now, shift: shift))
         case .other: output = policy.handle(.otherKey)
@@ -111,7 +121,7 @@ final class PushToTalkController {
         target = .capture()
         anchor = caretAnchor()
         monitor.recording = true
-        UsageLog.record(.voice, .shown)
+        UsageLog.record(.voice, .shown, detail: slot == .translate ? "translateKey" : nil)
         show("Listening…", listening: true)
         let locale = Self.locale(for: config.language)
         Task { [weak self] in
@@ -140,7 +150,7 @@ final class PushToTalkController {
     private func finish(translateFlip: Bool) {
         monitor.recording = false
         let id = session
-        let translate = config.translate != translateFlip
+        let translate = (slot == .translate || config.translate) != translateFlip
         let targetLanguage = config.targetLanguage
         show("…", listening: false)
         Task { [weak self] in

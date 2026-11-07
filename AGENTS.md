@@ -307,6 +307,10 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   otherwise (Russian is only there), both on-device, models via `AssetInventory`. The language is the
   setting or the keyboard layout's. "Translate before inserting" (or Shift held at release, which
   flips it once) runs Apple Translation first; if that fails the dictation goes to the clipboard.
+  **Dictate and translate** (`voiceTranslateEnabled`, on by default; `voiceTranslateKey`, right
+  Command): its own hold key that always translates, also with plain Push to Talk off.
+  `HoldKeyMonitor` watches both keys as slots (one hold at a time). The voice target language is
+  "same" by default, meaning the Translation tab's target.
   The note by the caret is the "BindAll Voice" panel (`VoiceIndicatorView`). `PushToTalkTestAudio`
   (UserDefaults, set only by scripts/e2e.sh) feeds a `say` recording instead of the microphone.
 - **Translation layout:** Apple's model (macOS 27) translates each line as its own segment and

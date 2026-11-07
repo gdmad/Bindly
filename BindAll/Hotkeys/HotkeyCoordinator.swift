@@ -170,9 +170,11 @@ final class HotkeyCoordinator {
         var cfg = PushToTalkController.Config()
         cfg.enabled = s.enabled && s.pushToTalkEnabled
         cfg.key = s.pushToTalkKey
+        cfg.translateKeyEnabled = s.enabled && s.voiceTranslateEnabled
+        cfg.translateKey = s.voiceTranslateKey
         cfg.language = s.pushToTalkLanguage
         cfg.translate = s.pushToTalkTranslate
-        cfg.targetLanguage = s.pushToTalkTargetLanguage
+        cfg.targetLanguage = s.pushToTalkTargetLanguage == "same" ? s.targetLanguage : s.pushToTalkTargetLanguage
         cfg.restoreClipboard = s.restoreClipboard
         cfg.fontSize = CGFloat(max(10, min(20, s.popupFontSize)))
         voice.configure(cfg)

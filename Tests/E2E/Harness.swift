@@ -95,6 +95,15 @@ enum E2E {
     }
 
     /// The right Option key alone, as a modifier change (`kVK_RightOption`, device bit for "right").
+    /// The right Command key alone (`kVK_RightCommand`, device bit 0x10).
+    static func rightCommand(down: Bool) {
+        let event = CGEvent(keyboardEventSource: nil, virtualKey: 54, keyDown: down)!
+        event.type = .flagsChanged
+        event.flags = down ? [.maskCommand, CGEventFlags(rawValue: 0x10)] : []
+        event.post(tap: .cghidEventTap)
+        usleep(20_000)
+    }
+
     static func rightOption(down: Bool, shift: Bool = false) {
         let event = CGEvent(keyboardEventSource: nil, virtualKey: 61, keyDown: down)!
         event.type = .flagsChanged

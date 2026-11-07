@@ -7,23 +7,27 @@ import os
 /// The tap is active only so it can keep a custom trigger key (and Esc while recording) out of the
 /// app; everything else passes untouched, and the callback only reads a lock-protected snapshot.
 final class HoldKeyMonitor: @unchecked Sendable {
-    enum Raw { case down, up(shift: Bool), other, escape }
+    /// Which key a press belongs to.
+    enum Slot: Int { case dictate, translate }
+    enum Raw { case down(Slot), up(Slot, shift: Bool), other, escape }
 
     /// Called on main.
     var onEvent: ((Raw) -> Void)?
 
     private var lock = os_unfair_lock()
-    private var keyValue = PushToTalkKey.rightOption
+    private var keysValue: [Slot: PushToTalkKey] = [.dictate: .rightOption]
     private var recordingValue = false
-    private var triggerDown = false
+    /// The key being held, if any: only one hold at a time.
+    private var heldSlot: Slot?
     private var tap: CFMachPort?
     private var runLoop: CFRunLoop?
     private var source: CFRunLoopSource?
     private static let log = Logger(subsystem: "com.evgeny.bindall", category: "voice")
 
-    var key: PushToTalkKey {
-        get { locked { keyValue } }
-        set { locked { keyValue = newValue } }
+    /// The keys to watch; a slot left out is off.
+    var keys: [Slot: PushToTalkKey] {
+        get { locked { keysValue } }
+        set { locked { keysValue = newValue } }
     }
 
     /// While recording, Esc is taken out of the app (it cancels instead).
@@ -92,37 +96,41 @@ final class HoldKeyMonitor: @unchecked Sendable {
         let pass = Unmanaged.passUnretained(event)
         let code = Int(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
-        let (key, recording, wasDown) = locked { (keyValue, recordingValue, triggerDown) }
+        let (keys, recording, held) = locked { (keysValue, recordingValue, heldSlot) }
 
-        switch key {
-        case .rightOption:
-            if type == .flagsChanged {
-                guard code == kVK_RightOption else { return pass } // Shift and the rest are not "another key"
-                let down = flags.contains(.maskAlternate)
-                guard down != wasDown else { return pass }
-                locked { triggerDown = down }
-                send(down ? .down : .up(shift: flags.contains(.maskShift)))
+        for (slot, key) in keys {
+            if let held, held != slot { continue }
+            switch key {
+            case .rightOption, .rightCommand:
+                guard type == .flagsChanged else { continue }
+                let (keyCode, flag): (Int, CGEventFlags) = key == .rightOption
+                    ? (kVK_RightOption, .maskAlternate) : (kVK_RightCommand, .maskCommand)
+                guard code == keyCode else { continue } // Shift and the rest are not "another key"
+                let down = flags.contains(flag)
+                guard down != (held == slot) else { return pass }
+                locked { heldSlot = down ? slot : nil }
+                send(down ? .down(slot) : .up(slot, shift: flags.contains(.maskShift)))
                 return pass
-            }
-        case .shortcut(let config):
-            if code == Int(config.keyCode), type == .keyDown || type == .keyUp {
+            case .shortcut(let config):
+                guard code == Int(config.keyCode), type == .keyDown || type == .keyUp else { continue }
                 if type == .keyDown {
                     let m = config.modifiers
                     let matches = flags.contains(.maskCommand) == m.command && flags.contains(.maskAlternate) == m.option
                         && flags.contains(.maskControl) == m.control
-                    guard matches || wasDown else { return pass }
-                    if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 || wasDown { return nil }
-                    locked { triggerDown = true }
-                    send(.down)
+                    guard matches || held == slot else { continue }
+                    if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 || held == slot { return nil }
+                    locked { heldSlot = slot }
+                    send(.down(slot))
                 } else {
-                    guard wasDown else { return pass }
-                    locked { triggerDown = false }
-                    send(.up(shift: flags.contains(.maskShift)))
+                    guard held == slot else { continue }
+                    locked { heldSlot = nil }
+                    send(.up(slot, shift: flags.contains(.maskShift)))
                 }
                 return nil
             }
-            if type == .flagsChanged { return pass }
         }
+        if type == .flagsChanged { return pass }
+        let wasDown = held != nil
 
         guard type == .keyDown else { return pass }
         if code == kVK_Escape, recording {

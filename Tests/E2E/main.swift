@@ -566,6 +566,19 @@ func voiceScenario() {
             && text.lowercased().contains("voice")
     }
     record("with Shift it types the translation", english, "now: \(fieldText())")
+
+    clearField()
+    E2E.key(kVK_RightArrow)
+    E2E.rightCommand(down: true)
+    _ = E2E.wait(3) { E2E.window("BindAll Voice") != nil }
+    E2E.pause(2.5)
+    E2E.rightCommand(down: false)
+    let translated = E2E.wait(20) {
+        let text = fieldText()
+        return !text.isEmpty && text.range(of: "[А-Яа-яЁё]", options: .regularExpression) == nil
+            && text.lowercased().contains("voice")
+    }
+    record("right Command dictates and translates", translated, "now: \(fieldText())")
 }
 
 func snapshotField(_ name: String) {
