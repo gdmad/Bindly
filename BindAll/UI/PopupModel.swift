@@ -1,10 +1,13 @@
-import Foundation
+import AppKit
 import Observation
 
 @MainActor @Observable
 final class PopupModel {
     let title: String
     let text: String
+    /// The text as shown: a model's Markdown styled rather than spelled out.
+    let display: AttributedString
+    let width: CGFloat
     let original: String?
     let sourceLanguage: String?
     let targetLanguage: String?
@@ -18,6 +21,8 @@ final class PopupModel {
          onClose: @escaping () -> Void) {
         self.title = title
         self.text = text
+        self.display = ResultMarkdown.render(text)
+        self.width = PanelWidth.fitting([String(display.characters), original ?? ""])
         self.original = original
         self.sourceLanguage = sourceLanguage
         self.targetLanguage = targetLanguage
@@ -32,7 +37,7 @@ final class PopupModel {
 
     func copyText() {
         UsageLog.record(.translationPopup, .accepted, detail: "copy")
-        TextInjector.copyToPasteboard(text)
+        TextInjector.copyToPasteboard(String(display.characters))
         copiedText = true
         copiedReset?.cancel()
         copiedReset = Task {

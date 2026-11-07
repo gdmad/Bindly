@@ -42,6 +42,14 @@ final class FloatingPanelHost {
         }
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
+        // Once, after the first layout: a window shorter than its content hides its own header and
+        // buttons (it can then be neither moved nor closed by mouse).
+        DispatchQueue.main.async { [weak self, weak panel] in
+            guard let panel, panel === self?.panel, let view = panel.contentView else { return }
+            let fit = view.fittingSize
+            let size = panel.contentLayoutRect.size
+            if abs(fit.height - size.height) > 1 || abs(fit.width - size.width) > 1 { panel.setContentSize(fit) }
+        }
     }
 
     func close() {

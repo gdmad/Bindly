@@ -592,11 +592,11 @@ final class HotkeyCoordinator {
             switch self {
             case .explain: """
                 Explain what this text says and means in plain words, briefly, in the same language as the \
-                text. Spell out jargon, abbreviations and anything implied. Reply with the explanation only.
+                text. Spell out jargon, abbreviations and anything implied. Reply with the explanation only, as plain text without Markdown.
                 """
             case .summarize: """
                 Summarize this text in one to three sentences, in the same language as the text. Keep names, \
-                numbers and decisions. Reply with the summary only.
+                numbers and decisions. Reply with the summary only, as plain text without Markdown.
                 """
             }
         }

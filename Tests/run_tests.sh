@@ -33,6 +33,8 @@ swiftc -O \
     BindAll/Store/ShortcutConflicts.swift \
     BindAll/Proofread/TextOccurrence.swift \
     BindAll/UI/PanelPlacement.swift \
+    BindAll/UI/PanelWidth.swift \
+    BindAll/UI/ResultMarkdown.swift \
     BindAll/Voice/AudioLevelMeter.swift \
     BindAll/Proofread/ListMarkers.swift \
     BindAll/Proofread/AppOffsetMap.swift \

@@ -120,6 +120,7 @@ BindAll/
 │   ├── StarBusyView.swift / BrandPalette.swift # the working star (orbits) and the icon's colors
 │   ├── FloatingPanelHost.swift        # the borderless, content-sized window behind result/preview/prompt
 │   ├── PanelPlacement.swift / FocusedField.swift # next to the field: below, above, or centered
+│   ├── PanelWidth.swift / ResultMarkdown.swift # pure: window width from the text, Markdown in results
 │   ├── PanelChrome.swift / PanelActionBar.swift  # shared window look and button row
 │   ├── FixesPopupAddWordButton.swift  # book icon: add the word to the personal dictionary
 │   ├── PersonalDictionarySection.swift # Settings -> Proofread: the dictionary's words
@@ -402,7 +403,12 @@ count for that key is reached (only counts with a larger sibling wait out the ti
 - **Windows** (placement is the pure, unit-tested `PanelPlacement.origin(size:near:window:visible:)`; result `PopupController`, `PreviewController`, `CustomPromptController`): one
   `FloatingPanelHost` -- a borderless `KeyablePanel` (Esc via `onEscape`, since borderless panels do
   not reach `onExitCommand`), `sizingOptions = .preferredContentSize`, so it is as big as its content
-  (380-560 pt wide, the body scrolls past 60% of the screen height) and follows it as it grows,
+  (the width is given up front by the pure `PanelWidth.fitting` -- the longest line, 380-560 pt -- so
+  the height is measured at the width the text is drawn at; left to SwiftUI's ideal size the text was
+  measured as one line and the window came out shorter than its content, hiding its header and
+  buttons; the body scrolls past 60% of the screen height; one `setContentSize` after the first
+  layout corrects a window that still differs from its content). Result text goes through
+  `ResultMarkdown` (inline Markdown styled, headings as bold, Copy without the marks) and follows it as it grows,
   keeping its top edge. Placed by `PanelPlacement`: under the field (`FocusedField.rect()`, the
   focused element), above it when there is no room, else centered on the app's window. Look:
   `.panelChrome()` (material, radius 14, hairline border) and `PanelActionBar` (secondary left,

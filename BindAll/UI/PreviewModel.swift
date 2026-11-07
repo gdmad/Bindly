@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Observation
 
 /// The text before and after an action, waiting for Apply.
@@ -14,6 +14,7 @@ final class PreviewModel {
     let original: String
     let result: String
     let parts: [TextDiff.Part]
+    let width: CGFloat
     /// Something worth knowing that the diff does not show (e.g. stock phrases left in the text).
     let note: String?
     var mode: Mode = .changes
@@ -28,6 +29,7 @@ final class PreviewModel {
         self.original = original
         self.result = result
         self.parts = TextDiff.words(old: original, new: result)
+        self.width = PanelWidth.fitting([original, result])
         self.onApply = onApply
         self.onClose = onClose
     }

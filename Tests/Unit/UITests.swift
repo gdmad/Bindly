@@ -3,6 +3,23 @@ import CoreGraphics
 import Foundation
 
 func runUITests() {
+    print("PanelWidth")
+    check(PanelWidth.fitting(["Ok"]) == 380, "a short text gets the narrowest window")
+    check(PanelWidth.fitting([String(repeating: "word ", count: 80)]) == 560, "a long line gets the widest")
+    let middle = PanelWidth.fitting([String(repeating: "x", count: 64)])
+    check(middle > 380 && middle < 560, "in between follows the text (\(middle))")
+    check(PanelWidth.fitting(["short\n" + String(repeating: "x", count: 64)]) == middle,
+          "several lines: the longest one counts")
+    check(PanelWidth.fitting(["Ok"], font: .systemFont(ofSize: 13)) == PanelWidth.fitting([""]), "empty is the narrowest too")
+
+    print("ResultMarkdown")
+    check(ResultMarkdown.plain("**Что это говорит**") == "Что это говорит", "bold loses its asterisks")
+    check(ResultMarkdown.plain("## Итог\nтекст") == "Итог\nтекст", "a heading becomes its title")
+    check(ResultMarkdown.plain("- один\n- два") == "- один\n- два", "list lines and line breaks stay")
+    check(ResultMarkdown.plain("2 * 3 = 6") == "2 * 3 = 6", "a lone asterisk is text")
+    check(ResultMarkdown.render("**a** b").runs.contains { $0.inlinePresentationIntent?.contains(.stronglyEmphasized) == true },
+          "bold is styled")
+
     print("PopupTilePacker")
     check(PopupTilePacker.topRowCount(widths: [], spacing: 4, maxContent: 100) == 0, "no items: no first row")
     check(PopupTilePacker.topRowCount(widths: [50], spacing: 4, maxContent: 10) == 1,

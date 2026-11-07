@@ -8,6 +8,7 @@ struct PreviewView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             PreviewHeader(title: model.title, mode: $model.mode)
+                .layoutPriority(1)
             ScrollView {
                 PreviewBody(model: model)
                     .fixedSize(horizontal: false, vertical: true)
@@ -37,9 +38,10 @@ struct PreviewView: View {
                 .keyboardShortcut(.defaultAction)
                 .disabled(!model.hasChanges)
             }
+            .layoutPriority(1)
         }
-        .frame(minWidth: 380, maxWidth: 560, alignment: .topLeading)
-        .fixedSize()
+        .frame(width: model.width, alignment: .topLeading)
+        .fixedSize(horizontal: false, vertical: true)
         .panelChrome()
         .onExitCommand(perform: model.onClose)
     }

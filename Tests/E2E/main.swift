@@ -291,6 +291,14 @@ func fixAllScenario() {
     let preview = E2E.wait(4) { E2E.window("BindAll Preview") != nil }
     record("Fix all shows a preview", preview)
     guard preview else { return }
+    E2E.pause(0.5)
+    if let window = E2E.window("BindAll Preview")?.bounds {
+        let inside = ["Apply", "Copy"].allSatisfy { button in
+            E2E.testElement(window: "BindAll Preview", E2E.named(button)).flatMap(E2E.frame)
+                .map { window.insetBy(dx: -1, dy: -1).contains($0) } ?? false
+        }
+        record("the preview's buttons are inside its window", inside, "window \(window)")
+    }
     E2E.allowBareReturn = true
     E2E.key(kVK_Return)
     E2E.allowBareReturn = false
@@ -461,6 +469,14 @@ func explainScenario() {
             E2E.snapshot(E2E.window("BindAll Translation")!.bounds, to: outDir.appending(path: "\(name.lowercased()).png"))
         }
         record("\(name) shows its result in a popup", shown && !body.contains("Error"), shown ? "" : "no popup")
+        if shown, let window = E2E.window("BindAll Translation")?.bounds {
+            let inside = ["Close", "Copy"].allSatisfy { button in
+                E2E.testElement(window: "BindAll Translation", E2E.named(button)).flatMap(E2E.frame)
+                    .map { window.insetBy(dx: -1, dy: -1).contains($0) } ?? false
+            }
+            record("\(name): Close and Copy are inside the window", inside, "window \(window)")
+            record("\(name): no Markdown asterisks in the window", !body.contains("**"))
+        }
         if let popup = E2E.window("BindAll Translation")?.bounds, let fieldFrame = textEditField().flatMap(E2E.frame) {
             let near = popup.minY >= fieldFrame.minY - 40 && popup.minY <= fieldFrame.maxY + 40
                 || popup.maxY >= fieldFrame.minY - 40 && popup.maxY <= fieldFrame.minY + 40

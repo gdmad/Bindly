@@ -8,9 +8,10 @@ struct PopupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             PopupHeader(title: model.title, languagePair: model.languagePair)
+                .layoutPriority(1)
 
             ScrollView {
-                Text(model.text)
+                Text(model.display)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -34,9 +35,10 @@ struct PopupView: View {
                 CloseButton(action: model.onClose)
                 CopyButton(copied: model.copiedText, action: model.copyText)
             }
+            .layoutPriority(1)
         }
-        .frame(minWidth: 380, maxWidth: 560, alignment: .topLeading)
-        .fixedSize()
+        .frame(width: model.width, alignment: .topLeading)
+        .fixedSize(horizontal: false, vertical: true)
         .panelChrome()
         .onExitCommand(perform: model.onClose)
     }
