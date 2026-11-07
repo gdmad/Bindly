@@ -12,6 +12,8 @@ final class PopupModel {
     let sourceLanguage: String?
     let targetLanguage: String?
     @ObservationIgnored let onClose: () -> Void
+    /// Puts the result in place of the text it came from; nil when there is no such place.
+    @ObservationIgnored var onReplace: (() -> Void)?
     @ObservationIgnored private var copiedReset: Task<Void, Never>?
     var showOriginal = false
     private(set) var copiedText = false

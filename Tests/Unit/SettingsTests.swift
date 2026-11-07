@@ -85,6 +85,10 @@ func runSettingsTests() {
     allChanged.voiceTranslateEnabled = true
     allChanged.voiceTranslateKey = .rightOption
     allChanged.historyEnabled = false
+    allChanged.starAppMode = "deny"
+    allChanged.spellingNoticeShown = true
+    allChanged.commandHotkeys = ["spelling": HotkeyConfig(keyCode: 1, modifiers: HotkeyModifiers(command: true, control: true), repeatCount: 1)]
+    allChanged.starApps = ["com.example.stars"]
     allChanged.sourceLanguage = "de"
     allChanged.targetLanguage = "fr"
     allChanged.correctEnabled = true
@@ -131,6 +135,14 @@ func runSettingsTests() {
     check(decode("{\"autocompleteLayout\":\"tile\"}").autocompleteLayout == .tile,
           "the new autocompleteLayout wins over the legacy key")
     check(decode("{}").proofreadLayout == .column, "proofread layout defaults to column")
+
+    print("Star apps")
+    do {
+        let old = decode(#"{"proofreadAppMode":"deny","proofreadApps":["com.apple.Terminal"]}"#)
+        check(old.starAppMode == "deny" && old.starApps == ["com.apple.Terminal"], "settings from before start from the Proofread list")
+        let own = decode(#"{"proofreadAppMode":"deny","proofreadApps":["a"],"starAppMode":"all","starApps":[]}"#)
+        check(own.starAppMode == "all" && own.starApps.isEmpty, "then the stars' own list is kept")
+    }
 
     print("ShortcutConflicts")
     do {

@@ -30,6 +30,9 @@ final class PreviewModel {
         self.result = result
         self.parts = TextDiff.words(old: original, new: result)
         self.width = PanelWidth.fitting([original, result])
+        // A translation, an inserted entry or a rewrite strikes out nearly every word: the result
+        // reads better than that diff.
+        if TextDiff.changedShare(parts) > 0.5 { mode = .result }
         self.onApply = onApply
         self.onClose = onClose
     }

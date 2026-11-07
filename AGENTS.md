@@ -85,6 +85,7 @@ BindAll/
 ├── Actions/
 │   ├── ActionRouter.swift      # EngineFactory (builds an AIEngine from settings)
 │   └── MaskAISlop.swift        # typography normalizer (dashes/quotes/emoji)
+│   ├── LocalTransform.swift / KeyboardLayoutMap.swift # pure: built-in keys done without a model
 ├── UI/
 │   ├── SettingsView.swift      # tab bar + selected tab (see "Settings layout"); `showSettingsTab` in the environment switches tabs
 │   ├── SettingsTab / SettingsTabBar / SettingsTabRow / SettingsTabButton / SettingsTabContent .swift
@@ -147,6 +148,7 @@ BindAll/
     ├── ActionKey.swift         # {key, label, prompt, hotkey?}; built-in w / u / l / о / гг
     ├── KeychainStore.swift     # API keys (generic password)
     ├── ShortcutConflicts.swift # pure: every shortcut in the settings and the duplicate check
+    ├── SelectionCommand.swift  # star actions also offered in the menu bar and as optional shortcuts
     └── LoginItemManager.swift  # SMAppService launch-at-login
 Tests/
 ├── Unit/                       # pure-logic assertions (no XCTest host needed): Harness.swift (check/eq and
@@ -271,6 +273,18 @@ works both ways; unknown language -> target. Used by the shortcut, the star, OCR
 follows the Translation tab; Quick Translate keeps its own one-way pair but says "already in X"
 instead of asking to download X -> X, and checks the pack both ways. OCR shows the recognized text
 whenever it cannot be translated (already in the target, no pack, failure).
+Stars have their own app filter (`starAppMode`/`starApps`, General tab; stored settings from before
+start from the Proofread list). A shown-only result from an editable star's text has Replace in its
+window. The preview opens on Result when most of the text changed (`TextDiff.changedShare` > 0.5:
+translations, history insertions, rewrites). `SelectionCommand` (Custom prompt, Fix spelling,
+Remove AI tells, Replace with translation) also runs on the selection from the menu bar and from
+optional shortcuts (`commandHotkeys`), through `selectionContext` and the star's own paths. The
+built-in UPPERCASE, lowercase and Fix keyboard layout keys run locally (`LocalTransform`,
+`KeyboardLayoutMap`), recognized by their built-in instruction. Mask AI Slop keeps every non-ASCII
+character the user typed in the input (`apply(to:rules:keeping:)`); Remove AI tells never takes the
+user's "All emoji" rule. Fix spelling is labelled "(LanguageTool)" and, in Free mode, says once in its
+preview that the text goes to languagetool.org (`spellingNoticeShown`). "Check before sending" is
+dimmed while Proofread is off.
 
 ## Engines
 - **Engine for text actions** (`Settings → Providers`): Apple on-device, DeepSeek, OpenRouter, OpenAI,
@@ -556,7 +570,7 @@ thread (and, with it, the active proofread popup tap the system would then disab
   master switch (`settings.enabled`) is off. It does not gate the menu-bar items: a click is a clear request. The master switch gates the
   hotkey bursts, autocomplete and proofread alike, so "off" must stay visually distinguishable --
   otherwise a disabled app looks exactly like a working one whose shortcuts do nothing.
-- The status menu draws every shortcut hint itself (eight of them, one right-aligned column; Explain and Summarize show none until one is set) and has
+- The status menu draws every shortcut hint itself (one right-aligned column; Explain, Summarize and the selection commands show none until one is set) and has
   **no real key equivalents**. Give an item a real one and the system reserves its own column right of
   the widest title -- our drawn line counts as a title -- so it lands to the right of ours and moving
   ours only pushes it further; that is why Settings and Quit are drawn too. Their keys still work

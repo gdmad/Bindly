@@ -28,6 +28,17 @@ struct ShortcutsSettingsView: View {
             }
 
             Section {
+                ForEach(SelectionCommand.allCases) { command in
+                    LabeledContent(command.title) {
+                        ShortcutRecorder(optionalConfig: commandBinding(command),
+                                         others: others(excluding: "command:" + command.settingsKey))
+                    }
+                }
+            } header: {
+                HelpHeader("Editing the selection", "The star's actions on the selected text, also in the menu bar. No shortcut by default.")
+            }
+
+            Section {
                 HoldKeyPicker(title: "Push to Talk", modifierKey: .rightOption,
                               key: $appState.settings.pushToTalkKey, others: others(excluding: "ptt"))
                 HoldKeyPicker(title: "Dictate and translate", modifierKey: .rightCommand,
@@ -63,6 +74,13 @@ struct ShortcutsSettingsView: View {
     /// Every other shortcut, so no two actions share keys -- the hold keys included.
     private func others(excluding id: String) -> [HotkeyConfig] {
         ShortcutConflicts.others(excluding: id, in: appState.settings)
+    }
+
+    private func commandBinding(_ command: SelectionCommand) -> Binding<HotkeyConfig?> {
+        Binding(
+            get: { appState.settings.commandHotkeys[command.settingsKey] },
+            set: { appState.settings.commandHotkeys[command.settingsKey] = $0 }
+        )
     }
 
     /// Resolves the key by id on every access: the array changes under the list (see ActionKeysSettingsView).

@@ -12,6 +12,7 @@ enum ShortcutConflicts {
         ]
         if let c = settings.explainHotkey { all.append(("explain", c)) }
         if let c = settings.summarizeHotkey { all.append(("summarize", c)) }
+        all += settings.commandHotkeys.sorted { $0.key < $1.key }.map { ("command:" + $0.key, $0.value) }
         if case .shortcut(let c) = settings.pushToTalkKey { all.append(("ptt", c)) }
         if case .shortcut(let c) = settings.voiceTranslateKey { all.append(("voiceTranslate", c)) }
         all += settings.actionKeys.compactMap { key in key.hotkey.map { (key.id.uuidString, $0) } }

@@ -404,7 +404,7 @@ func historyScenario() {
     E2E.type("Этот текст для звёздачки. ")
     E2E.pause(1.0)
     guard openStarMenu() else { record("setup: the star menu opens", false); return }
-    if let fix = item({ $0 == "Fix spelling" }) { E2E.press(fix) } else { pickMenuItem(downs: 2) }
+    if let fix = item({ $0 == "Fix spelling (LanguageTool)" }) { E2E.press(fix) } else { pickMenuItem(downs: 2) }
     guard applyPreview(), E2E.wait(5, { !fieldText().contains("звёздачки") }) else { record("setup: Fix spelling applies", false); return }
     let remembered = fieldText().trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -705,7 +705,7 @@ func starScenarios() {
     E2E.click(CGPoint(x: starNow.midX, y: starNow.midY))
     E2E.pause(0.6)
     let pid = E2E.testApp!.processIdentifier
-    let item = E2E.find(in: AXUIElementCreateApplication(pid), depth: 6) { (E2E.attr($0, kAXTitleAttribute) as? String) == "Fix spelling" }
+    let item = E2E.find(in: AXUIElementCreateApplication(pid), depth: 6) { (E2E.attr($0, kAXTitleAttribute) as? String) == "Fix spelling (LanguageTool)" }
     let menuUp = item != nil || E2E.windows().contains { $0.name.isEmpty && $0.bounds.height > 100 }
     record("clicking the star opens its menu", menuUp)
     if menuUp {

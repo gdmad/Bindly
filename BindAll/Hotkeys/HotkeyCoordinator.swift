@@ -166,7 +166,7 @@ final class HotkeyCoordinator {
     // MARK: - Stars
 
     private func setupStars() {
-        stars.appAllowed = { [weak self] in self?.proofreadAppAllowed() ?? false }
+        stars.appAllowed = { [weak self] in self?.starAppAllowed() ?? false }
         stars.onOpen = { [weak self] context, view in self?.openStarMenu(context, at: view) }
         updateStars()
     }
@@ -210,13 +210,13 @@ final class HotkeyCoordinator {
                                                selectionEnabled: on && s.starSelectionEnabled))
     }
 
-    /// Stars follow the Proofread app filter: an app where checking is unwanted wants no star either.
-    private func proofreadAppAllowed() -> Bool {
+    /// Stars have their own app list (Settings > General > Stars).
+    private func starAppAllowed() -> Bool {
         let s = appState.settings
         let bundle = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
-        switch s.proofreadAppMode {
-        case "allow": return s.proofreadApps.contains(bundle)
-        case "deny": return !s.proofreadApps.contains(bundle)
+        switch s.starAppMode {
+        case "allow": return s.starApps.contains(bundle)
+        case "deny": return !s.starApps.contains(bundle)
         default: return true
         }
     }
@@ -249,7 +249,7 @@ final class HotkeyCoordinator {
             return
         }
         add("Fix", "wand.and.stars") { [weak self] in self?.runStarAction(.fix, context) }
-        add("Fix spelling", "textformat.abc") { [weak self] in self?.runStarAction(.spelling, context) }
+        add(SelectionCommand.spelling.title, "textformat.abc") { [weak self] in self?.runStarAction(.spelling, context) }
         add("Show translation", "globe") { [weak self] in self?.runStarAction(.translate, context) }
         add("Replace with translation", "character.bubble") { [weak self] in self?.runStarAction(.translateInPlace, context) }
         add("Remove AI tells", "eraser") { [weak self] in self?.runStarAction(.removeTells, context) }
@@ -384,6 +384,8 @@ final class HotkeyCoordinator {
                         .correct(text, dictionary: PersonalDictionary.set(settings.personalDictionary))
                 case .removeTells:
                     result = try await self.removeTells(from: text, settings: settings)
+                case .actionKey(let key) where key.localTransform != nil:
+                    result = key.localTransform!.apply(to: text)
                 case .fix, .actionKey, .prompt, .translate, .translateInPlace, .reading:
                     let instruction: String = switch action {
                     case .actionKey(let key): key.prompt
@@ -393,7 +395,7 @@ final class HotkeyCoordinator {
                     }
                     let engine = EngineFactory.make(kind: settings.defaultEngine, appState: self.appState)
                     result = try await engine.process(text: text, instruction: instruction)
-                    if settings.maskAISlop { result = MaskAISlop.apply(to: result, rules: settings.maskRules) }
+                    if settings.maskAISlop { result = MaskAISlop.apply(to: result, rules: settings.maskRules, keeping: text) }
                 }
                 if Task.isCancelled { return }
                 let ms = UsageLog.elapsed(since: started)
@@ -406,7 +408,13 @@ final class HotkeyCoordinator {
                 let entry = self.recordHistory(kind: .action, input: text, output: result, engine: engineName)
                 if showOnly {
                     UsageLog.record(feature, .shown, detail: detail, ms: ms)
-                    self.popup.show(title: title, text: result, original: text)
+                    // A shown result of the user's own editable text can still be put in its place.
+                    let replace: (() -> Void)? = context.isEditable ? { [weak self] in
+                        UsageLog.record(feature, .applied, detail: detail, ms: ms)
+                        self?.markApplied(entry)
+                        self?.replace(context, with: result)
+                    } : nil
+                    self.popup.show(title: title, text: result, original: text, onReplace: replace)
                     return
                 }
                 let apply = { [weak self] in
@@ -423,6 +431,11 @@ final class HotkeyCoordinator {
                 if listsPhrases {
                     let left = MaskAISlop.stockPhrases(in: result)
                     if !left.isEmpty { note = "Stock phrases left: " + left.joined(separator: ", ") }
+                }
+                // Said once: with the Apple engine chosen, nothing else here leaves the Mac.
+                if case .spelling = action, settings.previewFromMenu, settings.languageToolMode == .free, !settings.spellingNoticeShown {
+                    note = "Fix spelling checks the text on languagetool.org (the free public server). Another server: Proofread > LanguageTool."
+                    self.appState.settings.spellingNoticeShown = true
                 }
                 if settings.previewFromMenu {
                     self.preview.show(title: title, original: text, result: result, note: note,
@@ -441,13 +454,19 @@ final class HotkeyCoordinator {
     /// Mechanical clean-up first (always including Markdown leftovers, trailing emoji and sign-offs),
     /// then, when asked for, an AI pass over what no rule can fix: stock phrases and filler.
     private func removeTells(from text: String, settings: Settings) async throws -> String {
-        var result = MaskAISlop.apply(to: text, rules: settings.maskRules.union(MaskAISlopRule.removeTells))
+        var result = MaskAISlop.apply(to: text, rules: Self.removeTellsRules(settings))
         if settings.removeTellsWithAI {
             let engine = EngineFactory.make(kind: settings.defaultEngine, appState: appState)
             result = try await engine.process(text: result, instruction: Self.removeTellsPrompt)
-            result = MaskAISlop.apply(to: result, rules: settings.maskRules.union(MaskAISlopRule.removeTells))
+            result = MaskAISlop.apply(to: result, rules: Self.removeTellsRules(settings))
         }
         return result
+    }
+
+    /// The user's own rules plus every text-changing one -- but not "All emoji": Remove AI tells
+    /// leaves emoji in a sentence on purpose (it takes the decorative ones at line ends).
+    private static func removeTellsRules(_ settings: Settings) -> Set<MaskAISlopRule> {
+        settings.maskRules.subtracting([.emoji]).union(MaskAISlopRule.removeTells)
     }
 
     static let removeTellsPrompt = """
@@ -555,7 +574,7 @@ final class HotkeyCoordinator {
     private func reconfigureWatched() {
         let s = appState.settings
         let configs = [s.defaultActionHotkey, s.translateHotkey, s.screenTranslateHotkey, s.quickTranslateHotkey]
-            + [s.explainHotkey, s.summarizeHotkey].compactMap { $0 }
+            + [s.explainHotkey, s.summarizeHotkey].compactMap { $0 } + Array(s.commandHotkeys.values)
             + s.actionKeys.compactMap(\.hotkey)
 
         // Group configs that share key+modifiers so the monitor knows the highest press count to
@@ -607,6 +626,8 @@ final class HotkeyCoordinator {
             runReading(.explain)
         } else if s.summarizeHotkey.map(matches) == true {
             runReading(.summarize)
+        } else if let command = SelectionCommand.allCases.first(where: { s.commandHotkeys[$0.settingsKey].map(matches) == true }) {
+            runCommand(command)
         } else if let key = s.actionKeys.first(where: { $0.hotkey.map(matches) == true }) {
             // A custom action key bound to its own shortcut: run its prompt on the selection.
             runDefaultAction(fixedInstruction: key.prompt, actionKey: key, showOnly: key.showOnly)
@@ -741,10 +762,14 @@ final class HotkeyCoordinator {
             let instruction = fixedInstruction ?? settings.defaultPrompt
 
             do {
-                var result = try await engine.process(text: content, instruction: instruction)
+                let local = key?.localTransform
+                var result: String
+                if let local { result = local.apply(to: content) } else {
+                    result = try await engine.process(text: content, instruction: instruction)
+                }
                 if Task.isCancelled { return }
-                if settings.maskAISlop {
-                    result = MaskAISlop.apply(to: result, rules: settings.maskRules)
+                if settings.maskAISlop, local == nil {
+                    result = MaskAISlop.apply(to: result, rules: settings.maskRules, keeping: content)
                 }
                 let entry = self.recordHistory(kind: .action, input: content, output: result,
                                                engine: settings.defaultEngine.displayName)
@@ -813,6 +838,27 @@ final class HotkeyCoordinator {
     func menuExplain() { runFromMenu(.explain) }
     func menuSummarize() { runFromMenu(.summarize) }
     func menuScreenTranslate() { translateFromScreen() }
+
+    func menuCommand(_ command: SelectionCommand) {
+        guard !isBusy else { return }
+        // As `runFromMenu`: the menu closes and the app gets its focus back first.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in self?.runCommand(command) }
+    }
+
+    /// A star action on the focused field's selection, without the star.
+    private func runCommand(_ command: SelectionCommand) {
+        UsageLog.record(.star, .accepted, detail: "command:\(command.rawValue)")
+        guard let context = Self.selectionContext() else {
+            popup.show(title: "BindAll", text: "Select the text to change first, in a field you can type in.")
+            return
+        }
+        switch command {
+        case .customPrompt: askForPrompt(context)
+        case .spelling: runStarAction(.spelling, context)
+        case .removeTells: runStarAction(.removeTells, context)
+        case .translateInPlace: runStarAction(.translateInPlace, context)
+        }
+    }
 
     func menuQuickTranslate() {
         UsageLog.record(.quickTranslate, .shown, detail: "source:menu")

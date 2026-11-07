@@ -138,7 +138,7 @@ func hotkeyScenarios() {
     let marker = "e2e clipboard marker \(Int(Date().timeIntervalSince1970))"
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(marker, forType: .string)
-    guard runStarItem("Fix spelling", downs: 2), E2E.wait(15, { E2E.window("BindAll Preview") != nil }) else {
+    guard runStarItem("Fix spelling (LanguageTool)", downs: 2), E2E.wait(15, { E2E.window("BindAll Preview") != nil }) else {
         record("Restore clipboard: Fix spelling opens its preview", false); return
     }
     E2E.allowBareReturn = true
@@ -291,6 +291,24 @@ func masterSwitchScenario() {
         E2E.wait(2) { E2E.window("BindAll Translation") == nil }
     }
     focusTextEdit()
+    // The star's editing actions on the selection from the menu bar, without a star.
+    clearField()
+    E2E.type("Тут малако в тексте. ")
+    E2E.pause(0.5)
+    E2E.key(kVK_ANSI_A, .maskCommand)
+    E2E.pause(0.5)
+    if pressTrayItem("Fix spelling") {
+        let preview = E2E.wait(15) { E2E.window("BindAll Preview") != nil }
+        record("off: Fix spelling from the menu bar previews the selection", preview)
+        if preview {
+            E2E.allowBareReturn = true
+            E2E.key(kVK_Return)
+            E2E.allowBareReturn = false
+            record("…and Apply fixes it", E2E.wait(5) { fieldText().contains("молоко") }, "now: \(fieldText())")
+        }
+    } else {
+        record("off: Fix spelling is in the menu bar", false)
+    }
     guard pressTrayItem("Enabled") else { record("on again: the Enabled item is found", false); return }
     isEnabledNow = true
     clearField()

@@ -180,8 +180,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // Column = widest "title + gap + shortcut" across every shortcut-bearing item.
         let font = NSFont.menuFont(ofSize: 0)
         let gap: CGFloat = 18
-        let widths = (leading + trailing)
-            .map { (title: $0.title, shortcut: $0.shortcut) }
+        // The star's editing actions, on the selection, for when there is no star to click.
+        let commands = SelectionCommand.allCases.map { command in
+            (command: command, title: command.title, shortcut: s.commandHotkeys[command.settingsKey].map(HotkeyFormatter.string) ?? "")
+        }
+        let widths = ((leading + trailing).map { (title: $0.title, shortcut: $0.shortcut) }
+                      + commands.map { (title: $0.title, shortcut: $0.shortcut) })
             .map { (title, shortcut) in
                 (title as NSString).size(withAttributes: [.font: font]).width + gap
                     + (shortcut as NSString).size(withAttributes: [.font: font]).width
@@ -190,6 +194,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
         for a in leading {
             menu.addItem(actionMenuItem(a.title, shortcut: a.shortcut, action: a.action, tab: column))
+        }
+
+        menu.addItem(.separator())
+        for c in commands {
+            let item = ClosureMenuItem(title: c.title) { [weak self] in self?.coordinator.menuCommand(c.command) }
+            item.attributedTitle = Self.menuTitle(c.title, shortcut: c.shortcut, tab: column)
+            menu.addItem(item)
         }
 
         menu.addItem(.separator())

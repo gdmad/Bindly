@@ -10,6 +10,8 @@ swiftc -O \
     BindAll/Store/Settings.swift \
     BindAll/Actions/MaskAISlopRule.swift \
     BindAll/Actions/MaskAISlop.swift \
+    BindAll/Actions/KeyboardLayoutMap.swift \
+    BindAll/Actions/LocalTransform.swift \
     BindAll/Store/AppPaths.swift \
     BindAll/Store/HistoryStore.swift \
     BindAll/Store/HistoryMenuTitle.swift \
@@ -31,6 +33,7 @@ swiftc -O \
     BindAll/Voice/HoldKeyPolicy.swift \
     BindAll/App/StatusIconTwinkle.swift \
     BindAll/Store/ShortcutConflicts.swift \
+    BindAll/Store/SelectionCommand.swift \
     BindAll/Proofread/TextOccurrence.swift \
     BindAll/UI/PanelPlacement.swift \
     BindAll/UI/PanelWidth.swift \

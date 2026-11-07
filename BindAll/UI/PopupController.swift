@@ -12,12 +12,18 @@ final class PopupController {
 
     /// `field`: the text this is about (AppKit screen rect); the focused field when nil.
     func show(title: String, text: String, original: String? = nil, sourceLanguage: String? = nil,
-              targetLanguage: String? = nil, near field: CGRect? = nil) {
+              targetLanguage: String? = nil, near field: CGRect? = nil, onReplace: (() -> Void)? = nil) {
         close()
         let field = field ?? FocusedField.rect()
         let model = PopupModel(title: title, text: text, original: original,
                                sourceLanguage: sourceLanguage, targetLanguage: targetLanguage,
                                onClose: { [weak self] in self?.close() })
+        if let onReplace {
+            model.onReplace = { [weak self] in
+                self?.close()
+                onReplace()
+            }
+        }
         host.show(PopupView(model: model, maxBodyHeight: PanelPlacement.maxHeight(near: field) - 120),
                   title: "BindAll Translation", near: field, onEscape: model.onClose)
         if let panel = host.panel { copyShortcut.install(on: panel, copyAll: model.copyText) }

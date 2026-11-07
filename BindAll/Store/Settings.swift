@@ -233,6 +233,10 @@ struct Settings: Codable, Equatable {
     // Stars: the violet star in a text field's corner (whole text) and at a selection's end.
     var starFieldEnabled: Bool = true
     var starSelectionEnabled: Bool = true
+    /// Where stars show, on their own: they used to follow Proofread's list, so hiding stars in one
+    /// app stopped checking there too. Stored settings from then start from that list.
+    var starAppMode: String = "all"
+    var starApps: [String] = []
     // Preview before replacing text: for star actions, and for the global shortcuts.
     var previewFromMenu: Bool = true
     var previewFromHotkeys: Bool = false
@@ -280,6 +284,10 @@ struct Settings: Codable, Equatable {
     /// have no shortcut until the user sets one.
     var explainHotkey: HotkeyConfig?
     var summarizeHotkey: HotkeyConfig?
+    /// Optional shortcuts of the `SelectionCommand`s, by `settingsKey`.
+    var commandHotkeys: [String: HotkeyConfig] = [:]
+    /// Fix spelling has said once that the free LanguageTool server is on the internet.
+    var spellingNoticeShown = false
 
     func provider(_ kind: ProviderKind) -> ProviderConfig {
         providers.first(where: { $0.kind == kind }) ?? .makeDefault(kind)
@@ -301,10 +309,10 @@ extension Settings {
              proofreadMinLength, proofreadAppMode, proofreadApps, personalDictionary, preSendCheck,
              historyEnabled, pushToTalkEnabled, pushToTalkKey, pushToTalkLanguage, pushToTalkTranslate,
              pushToTalkTargetLanguage, voiceTranslateEnabled, voiceTranslateKey, sourceLanguage, targetLanguage,
-             correctEnabled, starFieldEnabled, starSelectionEnabled, previewFromMenu, previewFromHotkeys,
+             correctEnabled, starFieldEnabled, starSelectionEnabled, starAppMode, starApps, previewFromMenu, previewFromHotkeys,
              recentPrompts, maskAISlopRules, removeTellsWithAI, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
              openRouterFreeOnly, providers, defaultActionHotkey, translateHotkey,
-             screenTranslateHotkey, quickTranslateHotkey, explainHotkey, summarizeHotkey
+             screenTranslateHotkey, quickTranslateHotkey, explainHotkey, summarizeHotkey, commandHotkeys, spellingNoticeShown
     }
 
     /// Old key names still honoured on decode (never written back).
@@ -365,6 +373,8 @@ extension Settings {
         if let v = try c.decodeIfPresent(Bool.self, forKey: .correctEnabled) { correctEnabled = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .starFieldEnabled) { starFieldEnabled = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .starSelectionEnabled) { starSelectionEnabled = v }
+        starAppMode = try c.decodeIfPresent(String.self, forKey: .starAppMode) ?? proofreadAppMode
+        starApps = try c.decodeIfPresent([String].self, forKey: .starApps) ?? proofreadApps
         if let v = try c.decodeIfPresent(Bool.self, forKey: .previewFromMenu) { previewFromMenu = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .previewFromHotkeys) { previewFromHotkeys = v }
         if let v = try c.decodeIfPresent([String].self, forKey: .recentPrompts) { recentPrompts = v }
@@ -382,6 +392,8 @@ extension Settings {
         if let v = try c.decodeIfPresent(HotkeyConfig.self, forKey: .quickTranslateHotkey) { quickTranslateHotkey = v }
         explainHotkey = try c.decodeIfPresent(HotkeyConfig.self, forKey: .explainHotkey)
         summarizeHotkey = try c.decodeIfPresent(HotkeyConfig.self, forKey: .summarizeHotkey)
+        if let v = try c.decodeIfPresent([String: HotkeyConfig].self, forKey: .commandHotkeys) { commandHotkeys = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .spellingNoticeShown) { spellingNoticeShown = v }
     }
 }
 

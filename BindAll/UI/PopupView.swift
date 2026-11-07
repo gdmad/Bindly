@@ -34,6 +34,12 @@ struct PopupView: View {
             } trailing: {
                 CloseButton(action: model.onClose)
                 CopyButton(copied: model.copiedText, action: model.copyText)
+                if let onReplace = model.onReplace {
+                    Button(action: onReplace) {
+                        Text("Replace").frame(minWidth: 56)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             }
             .layoutPriority(1)
         }

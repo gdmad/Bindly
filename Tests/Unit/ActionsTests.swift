@@ -14,6 +14,28 @@ func runActionsTests() {
         check(back?.first?.applied == false, "a shown-only entry stays shown-only")
     }
 
+    print("MaskAISlop keeps what the user typed")
+    check(MaskAISlop.apply(to: "«Да» — сказал он", keeping: "«да» — сказал он") == "«Да» — сказал он", "their quotes and dash stay")
+    check(MaskAISlop.apply(to: "«Да» — сказал он", keeping: "да, сказал он") == "\"Да\" - сказал он", "the model's own are cleaned")
+    check(MaskAISlop.apply(to: "ok 🚀 go", keeping: "ok 🚀 go") == "ok 🚀 go", "their emoji stays")
+
+    print("KeyboardLayoutMap and local transforms")
+    check(KeyboardLayoutMap.convert("Ghbdtn? rfr ltkf") == "Привет, как дела", "US keys meant as Russian")
+    check(KeyboardLayoutMap.convert("руддщ цщкдв") == "hello world", "Russian keys meant as US")
+    check(KeyboardLayoutMap.convert("Ghbdtn 2026") == "Привет 2026", "digits and spaces stay")
+    check(ActionKey.defaults.first { $0.label == "UPPERCASE" }?.localTransform == .uppercase, "the built-in UPPERCASE runs locally")
+    check(LocalTransform.lowercase.apply(to: "ПрИвЕт") == "привет", "lowercase")
+    var renamed = ActionKey.defaults[0]
+    renamed.label = "Раскладка"
+    check(renamed.localTransform == .keyboardLayout, "a renamed built-in key still counts")
+    check(ActionKey(label: "UPPERCASE", prompt: "Shout it").localTransform == nil, "an edited instruction goes to the model")
+
+    print("TextDiff changedShare")
+    check(TextDiff.changedShare(TextDiff.words(old: "один два три четыре", new: "один два три пять")) < 0.5, "one word of four: the diff")
+    check(TextDiff.changedShare(TextDiff.words(old: "Привет, как дела", new: "Hi, how are you")) > 0.5, "a translation: the result")
+    check(TextDiff.changedShare(TextDiff.words(old: "", new: "inserted")) == 1, "an insertion: the result")
+    check(TextDiff.changedShare([]) == 0, "nothing: no change")
+
     print("EdgeWhitespace")
     check(EdgeWhitespace.wrap("Fixed line", like: "fixd line\n") == "Fixed line\n", "a line keeps its line break")
     check(EdgeWhitespace.wrap(" Word ", like: " word") == " Word", "the original's edges, not the result's")

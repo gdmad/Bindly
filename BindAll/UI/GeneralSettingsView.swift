@@ -47,8 +47,14 @@ struct GeneralSettingsView: View {
                 HelpToggleRow("Star at a selection", "A violet star at the end of selected text, with the same actions for just the selection. While something is selected, the field's star steps aside, so there is only ever one.",
                               isOn: $appState.settings.starSelectionEnabled)
             } header: {
-                HelpHeader("Stars", "Stars follow the app list on the Proofread tab, and never show in password fields or very small fields.")
+                HelpHeader("Stars", "Stars never show in password fields or very small fields. On text that cannot be edited (a terminal, a log) only the selection star shows, with the reading actions.")
             }
+
+            AppFilterSection(title: "Star apps",
+                             help: "Limit where stars show, separately from proofreading.",
+                             modeLabel: "Show in",
+                             mode: $appState.settings.starAppMode,
+                             apps: $appState.settings.starApps)
 
             Section {
                 Stepper("Text size: \(appState.settings.popupFontSize) pt",

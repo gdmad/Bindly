@@ -11,26 +11,21 @@ struct ActionKey: Identifiable, Codable, Hashable {
     /// Shows the result in a popup instead of replacing the text (an explanation, a summary).
     var showOnly = false
 
+    static let keyboardLayoutPrompt = "Convert this wrong-keyboard-layout text to the intended layout (e.g. Ghbdtn -> Привет). Output only the result."
+    static let uppercasePrompt = "Convert the text to UPPERCASE. Output only the result."
+    static let lowercasePrompt = "Convert the text to lowercase. Output only the result."
+
     static let defaults: [ActionKey] = [
-        ActionKey(
-            label: "Fix keyboard layout",
-            prompt: "Convert this wrong-keyboard-layout text to the intended layout (e.g. Ghbdtn -> Привет). Output only the result."
-        ),
-        ActionKey(
-            label: "UPPERCASE",
-            prompt: "Convert the text to UPPERCASE. Output only the result."
-        ),
-        ActionKey(
-            label: "lowercase",
-            prompt: "Convert the text to lowercase. Output only the result."
-        ),
+        ActionKey(label: "Fix keyboard layout", prompt: keyboardLayoutPrompt),
+        ActionKey(label: "UPPERCASE", prompt: uppercasePrompt),
+        ActionKey(label: "lowercase", prompt: lowercasePrompt),
         ActionKey(
             label: "Formal tone",
             prompt: "Rewrite in a formal, professional tone. Same language. Output only the result."
         ),
         ActionKey(
             label: "Polite request",
-            prompt: "Rewrite the text as a short, polite, constructive request. Start with \"Привет!\" and form a complete question or request (e.g. \"когда\" -> \"Привет! Когда будет готово?\", \"пришли отчет\" -> \"Привет! Можешь прислать отчёт?\"). Same language. Output only the result."
+            prompt: "Rewrite the text as a short, polite, constructive request in the same language as the text: a greeting, then a complete question or request (e.g. \"когда\" -> \"Привет! Когда будет готово?\", \"send the report\" -> \"Hi! Could you send the report?\"). Output only the result."
         ),
     ]
 }

@@ -59,6 +59,18 @@ enum TextDiff {
         return out
     }
 
+    /// How much of the text the change touches, 0...1, by characters: kept text counts on both sides.
+    static func changedShare(_ parts: [Part]) -> Double {
+        var kept = 0, changed = 0
+        for part in parts {
+            switch part {
+            case .same(let s): kept += s.count * 2
+            case .added(let s), .removed(let s): changed += s.count
+            }
+        }
+        return kept + changed == 0 ? 0 : Double(changed) / Double(kept + changed)
+    }
+
     static func hasChanges(_ parts: [Part]) -> Bool {
         parts.contains { if case .same = $0 { false } else { true } }
     }

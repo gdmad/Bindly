@@ -260,7 +260,7 @@ func electronScenarios(_ target: ElectronTarget) {
         E2E.click(CGPoint(x: starNow.midX, y: starNow.midY))
         E2E.pause(0.6)
         let item = E2E.find(in: AXUIElementCreateApplication(testPid), depth: 6) {
-            (E2E.attr($0, kAXTitleAttribute) as? String) == "Fix spelling"
+            (E2E.attr($0, kAXTitleAttribute) as? String) == "Fix spelling (LanguageTool)"
         }
         let menuUp = item != nil || E2E.windows().contains { $0.name.isEmpty && $0.bounds.height > 100 }
         record("clicking the star opens its menu", menuUp)

@@ -19,6 +19,7 @@ struct ProofreadSettingsView: View {
             Section {
                 HelpToggleRow("Check before sending", "In chat apps (Slack, Claude, Telegram, Discord, Messages, WhatsApp), pressing Return while issues are still underlined does not send at once: a note says how many are left. Return again sends anyway, Tab shows the first issue, Cmd+Return fixes them all with a preview, Esc goes back to the text. Shift+Return and Return in an open popup or suggestion are never held.",
                               isOn: $appState.settings.preSendCheck)
+                    .disabled(!appState.settings.correctEnabled)
                 LabeledContent("Language") {
                     LanguagePicker(title: "Language", selection: $appState.settings.languageToolLanguage, includeAuto: true)
                 }

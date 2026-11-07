@@ -3,10 +3,13 @@ import Foundation
 /// Normalizes "AI slop" so generated text looks like a human typed it. Which clean-ups run is a set
 /// of `MaskAISlopRule`s. Code in backticks and URLs are never touched.
 enum MaskAISlop {
-    static func apply(to input: String, rules: Set<MaskAISlopRule> = MaskAISlopRule.defaults) -> String {
+    /// `keeping`: the text the result was made from. A character the user typed there themselves
+    /// (their «», —, an emoji) is theirs, not slop, and stays.
+    static func apply(to input: String, rules: Set<MaskAISlopRule> = MaskAISlopRule.defaults, keeping original: String? = nil) -> String {
+        let kept = Set((original ?? "").unicodeScalars.filter { !$0.isASCII })
         var out = ""
         for segment in segments(of: input) {
-            out += segment.isProtected ? segment.text : clean(segment.text, rules: rules)
+            out += segment.isProtected ? segment.text : clean(segment.text, rules: rules, keeping: kept)
         }
         if rules.contains(.closers) { out = removeClosers(out) }
         return out
@@ -60,7 +63,7 @@ enum MaskAISlop {
 
     // MARK: - Rules
 
-    private static func clean(_ input: String, rules: Set<MaskAISlopRule>) -> String {
+    private static func clean(_ input: String, rules: Set<MaskAISlopRule>, keeping kept: Set<Unicode.Scalar>) -> String {
         var text = input
         if rules.contains(.markdown) { text = removeMarkdown(text) }
         if rules.contains(.decorativeEmoji), !rules.contains(.emoji) { text = removeTrailingEmoji(text) }
@@ -73,6 +76,11 @@ enum MaskAISlop {
         var strippedAfterSpace = false
 
         for scalar in text.unicodeScalars {
+            if kept.contains(scalar) {
+                scalars.append(scalar)
+                strippedAfterSpace = false
+                continue
+            }
             if rules.contains(.emoji), shouldStrip(scalar) {
                 if scalars.last == " " { strippedAfterSpace = true }
                 continue
