@@ -619,6 +619,15 @@ func starScenarios() {
     record("clicking the star opens its menu", menuUp)
     if menuUp {
         if let item { E2E.press(item) } else { pickMenuItem(downs: 2) }
+        // While the action runs the star works in a larger panel, so its orbiting stars fit.
+        let grew = E2E.wait(4, step: 0.02) { (E2E.window("BindAll Star")?.bounds.width ?? 0) > 26 || E2E.window("BindAll Preview") != nil }
+        let busyStar = E2E.window("BindAll Star")?.bounds
+        if let busyStar, busyStar.width > 26 {
+            E2E.snapshot(busyStar.insetBy(dx: -6, dy: -6), to: outDir.appending(path: "star-busy.png"))
+        }
+        record("the working star grows around its center", grew && (busyStar?.width ?? 0) > 26
+               && abs((busyStar?.midX ?? 0) - starNow.midX) < 1.5 && abs((busyStar?.midY ?? 0) - starNow.midY) < 1.5,
+               "idle \(starNow), busy \(busyStar.map { "\($0)" } ?? "none")")
         let preview = E2E.wait(15) { E2E.window("BindAll Preview") != nil }
         if !preview {
             E2E.snapshot(CGRect(x: 100, y: 60, width: 900, height: 600), to: outDir.appending(path: "star-no-preview.png"))
@@ -634,6 +643,9 @@ func starScenarios() {
             E2E.key(kVK_Return)
             E2E.allowBareReturn = false
             record("Apply replaces the text", E2E.wait(5) { !fieldText().contains("звёздачки") }, "now: \(fieldText())")
+            E2E.pause(1.2)
+            let after = E2E.window("BindAll Star")?.bounds.width ?? 0
+            record("the star is back to its idle size after the action", after == 0 || after < 26, "width \(after)")
         }
     }
 

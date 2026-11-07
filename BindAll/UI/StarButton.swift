@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The single violet star BindAll puts at the end of a selection or in the corner of a text field:
-/// just the star, no badge around it. It turns and pulses while an action runs.
+/// just the star, no badge around it. While an action runs it becomes `StarBusyView`.
 struct StarButton: View {
     /// "Actions for the selection" / "Actions for this text", for VoiceOver and the tooltip.
     let label: String
@@ -9,7 +9,6 @@ struct StarButton: View {
     let action: () -> Void
 
     @Environment(\.displayScale) private var displayScale
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: action) {
@@ -18,31 +17,31 @@ struct StarButton: View {
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityLabel(label)
         .accessibilityValue(activity.busy ? "Working" : "")
         .help(label)
     }
 
     @ViewBuilder private var star: some View {
-        let shape = StarShape()
-            .fill(Color.brand)
-            .frame(width: starSize, height: starSize)
         if activity.busy {
-            TimelineView(.animation) { context in
-                let t = context.date.timeIntervalSinceReferenceDate
-                shape
-                    .rotationEffect(.degrees(reduceMotion ? 0 : (t * 180).truncatingRemainder(dividingBy: 360)))
-                    .opacity(0.55 + 0.45 * (0.5 + 0.5 * sin(t * 2 * .pi / 1.2)))
-            }
+            StarBusyView(starSize: starSize)
         } else {
-            shape
+            StarShape()
+                .fill(Color.brand)
+                .frame(width: starSize, height: starSize)
+                // At 1x the 24 pt target's center is a pixel corner; half a point puts the odd-sized
+                // star's center, and with it each thin ray, on a pixel's middle.
+                .offset(x: pixelNudge, y: pixelNudge)
         }
     }
 
-    /// At 1x an odd pixel count centers the thin rays on whole pixels; at 2x 12 pt already does.
     private var starSize: CGFloat { displayScale < 2 ? 13 : StarButton.starSize }
+    private var pixelNudge: CGFloat { displayScale < 2 ? 0.5 : 0 }
 
     /// The click target; the star itself is smaller.
     static let size: CGFloat = 24
     static let starSize: CGFloat = 12
+    /// The panel while the star works, so the orbiting stars are not clipped.
+    static let busySize: CGFloat = 30
 }

@@ -114,6 +114,7 @@ BindAll/
 │   ├── FixesPopupFixAllButton.swift   # "Fix all (N)" cell under the fixes
 │   ├── StarShape.swift                # the star as a vector path
 │   ├── StarActivity.swift             # busy flag the star animates on
+│   ├── StarBusyView.swift / BrandPalette.swift # the working star (orbits) and the icon's colors
 │   ├── FloatingPanelHost.swift        # the borderless, content-sized window behind result/preview/prompt
 │   ├── PanelPlacement.swift / FocusedField.swift # next to the field: below, above, or centered
 │   ├── PanelChrome.swift / PanelActionBar.swift  # shared window look and button row
@@ -356,8 +357,10 @@ count for that key is reached (only counts with a larger sibling wait out the ti
 - **Stars** (`Selection/FieldStarController.swift`): one violet four-point star (`StarShape`, a vector
   path with thin rays (`waist` 0.18), 12 pt in a 24 pt target, 13 px at 1x; `Color.brand`, the icon's violet; the panel frame is
   pixel-aligned with `backingAlignedRect` and has no window shadow, so it stays sharp). While an
-  action runs (`beginBusy`/`endBusy`, including both translate items) `StarActivity.busy` makes it
-  turn and pulse (pulse only with Reduce Motion) and keeps it shown through typing in a click-through-free non-activating panel (`StarPanel`) -- at the end of the selection
+  action runs (`beginBusy`/`endBusy`, including both translate items) `StarPanel.setBusy` grows the
+  panel to `StarButton.busySize` around the same center and `StarBusyView` draws it turning,
+  breathing and shifting through the icon's colors (`BrandPalette`) with three small stars on tilted
+  orbits (only the color shift with Reduce Motion); it stays shown through typing in a click-through-free non-activating panel (`StarPanel`) -- at the end of the selection
   (below it, away from editors' own selection toolbars) when something is selected, otherwise in the
   focused field's bottom-right corner; never both. Re-evaluated on mouse-up, key-up and app switch
   (debounced), hidden on key-down/scroll; follows the Proofread app filter; skips BindAll itself,
