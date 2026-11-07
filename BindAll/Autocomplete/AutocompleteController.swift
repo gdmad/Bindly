@@ -872,6 +872,9 @@ final class AutocompleteController {
         var quartz: CGRect?
         if let text {
             let ns = text as NSString
+            // The caret and the text are read separately and can disagree while the app updates;
+            // past the end, the walk back read outside the string and took the app down.
+            guard caret <= ns.length else { return nil }
             var start = caret
             while start > 0, caret - start < 8, ns.character(at: start - 1) != 0x0A { start -= 1 }
             guard start < caret else { return nil }
