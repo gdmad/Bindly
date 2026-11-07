@@ -10,7 +10,8 @@ struct FixesPopupFixAllButton: View {
     var body: some View {
         PopupCell(text: "Fix all (\(count))", isSelected: false,
                   fontSize: PopupMetrics.secondaryFontSize(fontSize),
-                  systemImage: "wand.and.stars", isSecondary: true, onActivate: onActivate)
+                  fillsWidth: true, systemImage: "wand.and.stars", onActivate: onActivate,
+                  highlightsOnHover: true, isProminent: true)
             .help("Fix all \(count) issues, with a preview (⌘Return)")
     }
 }

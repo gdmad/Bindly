@@ -19,6 +19,13 @@ struct PopupCell: View {
     /// What a click on the cell does. Nil for a cell that is not clickable (the autocomplete list is
     /// purely keyboard-driven), which is also what keeps it from being announced as a button.
     var onActivate: (() -> Void)?
+    /// Lights up under the pointer on its own, for actions that are not part of the arrow selection
+    /// (Add to dictionary, Close, Fix all).
+    var highlightsOnHover = false
+    /// Drawn as a button: an accent outline, for Fix all.
+    var isProminent = false
+
+    @State private var hovered = false
 
     var body: some View {
         Label {
@@ -35,7 +42,14 @@ struct PopupCell: View {
         .padding(.vertical, PopupMetrics.cellPaddingV)
         .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
         .background(background, in: RoundedRectangle(cornerRadius: PopupMetrics.cellRadius))
+        .overlay {
+            if isProminent {
+                RoundedRectangle(cornerRadius: PopupMetrics.cellRadius)
+                    .strokeBorder(Color.accentColor.opacity(0.6), lineWidth: 1)
+            }
+        }
         .contentShape(Rectangle())
+        .onHover { inside in if highlightsOnHover { hovered = inside } }
         // A tap gesture rather than a Button: the panel is non-activating and never key, and
         // applying the fix on a click is the popup's main job -- not worth risking on a control
         // whose behaviour in such a panel cannot be checked here. The traits and the action
@@ -52,7 +66,7 @@ struct PopupCell: View {
     }
 
     private var background: AnyShapeStyle {
-        guard isSelected else { return AnyShapeStyle(.clear) }
+        guard isSelected else { return hovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear) }
         return softSelection ? AnyShapeStyle(.quaternary) : AnyShapeStyle(Color(nsColor: .selectedContentBackgroundColor))
     }
 

@@ -9,7 +9,7 @@ struct FixesPopupAddWordButton: View {
     var body: some View {
         PopupCell(text: "Add to dictionary", isSelected: false,
                   fontSize: PopupMetrics.counterFontSize(fontSize),
-                  systemImage: "text.book.closed", isSecondary: true, showsTitle: false, onActivate: onActivate)
+                  systemImage: "text.book.closed", isSecondary: true, showsTitle: false, onActivate: onActivate, highlightsOnHover: true)
             .help("Add to dictionary")
     }
 }

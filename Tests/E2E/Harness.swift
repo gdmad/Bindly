@@ -75,6 +75,14 @@ enum E2E {
         }
     }
 
+    /// Moves the pointer there first, the way a person reaches a button before clicking it.
+    static func hoverThenClick(_ point: CGPoint) {
+        CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left)?
+            .post(tap: .cghidEventTap)
+        pause(0.3)
+        click(point)
+    }
+
     static func doubleClick(_ point: CGPoint) {
         for state in [1, 2] {
             for type in [CGEventType.leftMouseDown, .leftMouseUp] {

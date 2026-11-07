@@ -232,7 +232,7 @@ func proofreadScenarios() {
            let close = E2E.testElement(window: "BindAll Fixes", E2E.named("Close")),
            let frame = E2E.frame(close) {
             let panel = E2E.window("BindAll Fixes")?.bounds ?? .zero
-            E2E.click(CGPoint(x: frame.midX, y: frame.midY))
+            E2E.hoverThenClick(CGPoint(x: frame.midX, y: frame.midY))
             let first = E2E.wait(2) { E2E.window("BindAll Fixes") == nil }
             if !first {
                 E2E.click(CGPoint(x: frame.midX, y: frame.midY))
