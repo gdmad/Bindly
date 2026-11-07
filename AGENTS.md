@@ -325,7 +325,7 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   Command): its own hold key that always translates, also with plain Push to Talk off.
   `HoldKeyMonitor` watches both keys as slots (one hold at a time). The voice target language is
   "same" by default, meaning the Translation tab's target.
-  The note by the caret is the "BindAll Voice" panel (`VoiceIndicatorView`): a red `mic.fill`
+  The note by the caret is the "BindAll Voice" panel (`VoiceIndicatorView`): a violet `mic.fill` (`Color.brand`)
   (`VoiceMicIcon`) that swells with the input level (`AudioLevelMeter`, RMS measured in the audio tap,
   reported through `VoiceLevel` about 12 times a second; still with Reduce Motion). 1.5 s in, no
   buffers or a peak below `AudioLevelMeter.silentDecibels` (-60 dB) shows "The microphone is silent",
