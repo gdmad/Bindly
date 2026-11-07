@@ -200,7 +200,7 @@ func proofreadScenarios() {
     record("three typos are underlined", underlined, "count \(E2E.underlineCount())")
     snapshotField("proofread-underlines")
 
-    guard let milk = wordRect("малако") else { record("word geometry", false, "TextEdit gave no rect"); return }
+    guard let milk = wordRect("малако") else { record("setup: TextEdit gives the word's geometry", false); return }
     E2E.click(CGPoint(x: milk.midX, y: milk.midY))
     var popup = E2E.wait(4) { E2E.window("BindAll Fixes") != nil }
     record("clicking an underlined word opens the fixes", popup)
@@ -237,7 +237,7 @@ func proofreadScenarios() {
                    E2E.wait(3) { E2E.underlineCount() < count } && E2E.hasEvent("proofread", "skipped", since: since),
                    "popup \(above ? "above" : "below"); underlines \(count) → \(E2E.underlineCount())")
         } else {
-            record("Skip", false, "fixes popup did not open")
+            record("Skip: the fixes popup opens", false)
         }
     }
 
@@ -270,10 +270,10 @@ func fixAllScenario() {
     clearField()
     E2E.type("Вчера малако было свежее, а ощибка в слове и граматика тоже. ")
     guard E2E.wait(12, { E2E.underlineCount() >= 3 }), let word = wordRect("ощибка") else {
-        record("Fix all", false, "underlines \(E2E.underlineCount())"); return
+        record("setup: the typos are underlined", false, "underlines \(E2E.underlineCount())"); return
     }
     E2E.click(CGPoint(x: word.midX, y: word.midY))
-    guard E2E.wait(4, { E2E.window("BindAll Fixes") != nil }) else { record("Fix all", false, "popup did not open"); return }
+    guard E2E.wait(4, { E2E.window("BindAll Fixes") != nil }) else { record("setup: the fixes popup opens", false); return }
     let button = E2E.testElement(window: "BindAll Fixes") {
         ((E2E.attr($0, kAXDescriptionAttribute) as? String) ?? (E2E.attr($0, kAXTitleAttribute) as? String) ?? "").hasPrefix("Fix all")
     }
@@ -395,9 +395,9 @@ func historyScenario() {
     clearField()
     E2E.type("Этот текст для звёздачки. ")
     E2E.pause(1.0)
-    guard openStarMenu() else { record("History", false, "no star"); return }
+    guard openStarMenu() else { record("setup: the star menu opens", false); return }
     if let fix = item({ $0 == "Fix spelling" }) { E2E.press(fix) } else { pickMenuItem(downs: 2) }
-    guard applyPreview(), E2E.wait(5, { !fieldText().contains("звёздачки") }) else { record("History", false, "Fix spelling did not apply"); return }
+    guard applyPreview(), E2E.wait(5, { !fieldText().contains("звёздачки") }) else { record("setup: Fix spelling applies", false); return }
     let remembered = fieldText().trimmingCharacters(in: .whitespacesAndNewlines)
 
     clearField()
@@ -505,7 +505,13 @@ func preSendScenario() {
     }
     clearField()
     E2E.type("Здесь малако осталось")
-    guard E2E.wait(12, { E2E.underlineCount() >= 1 }) else { record("Before sending", false, "no underline"); return }
+    if !E2E.wait(12, { E2E.underlineCount() >= 1 }) {
+        // The free LanguageTool server limits requests per minute; one more pause gets a fresh check.
+        E2E.pause(3)
+        E2E.type(" ")
+        E2E.key(kVK_Delete)
+    }
+    guard E2E.wait(12, { E2E.underlineCount() >= 1 }) else { record("setup: the typo is underlined", false); return }
     let text = fieldText()
 
     press(kVK_Return)
@@ -534,20 +540,10 @@ func preSendScenario() {
 
 func translateInPlaceScenario() {
     group = "Translate in place"
-    guard let pid = E2E.testApp?.processIdentifier else { return }
     clearField()
     E2E.type("Добрый день, коллеги")
     E2E.pause(1.0)
-    E2E.key(kVK_ANSI_A, .maskCommand)
-    E2E.pause(1.2)
-    guard let star = E2E.window("BindAll Star")?.bounds else { record("Translate in place", false, "no star"); return }
-    E2E.click(CGPoint(x: star.midX, y: star.midY))
-    E2E.pause(0.6)
-    if let item = E2E.find(in: AXUIElementCreateApplication(pid), depth: 6, { (E2E.attr($0, kAXTitleAttribute) as? String) == "Replace with translation" }) {
-        E2E.press(item)
-    } else {
-        pickMenuItem(downs: 4)
-    }
+    guard runStarItem("Replace with translation", downs: 4) else { record("setup: the selection star shows", false); return }
     let preview = E2E.wait(20) { E2E.window("BindAll Preview") != nil }
     record("it shows the translation in the preview", preview, preview ? "" : "windows \(E2E.windows().map(\.name))")
     record("nothing changes before Apply", fieldText() == "Добрый день, коллеги")
@@ -648,7 +644,7 @@ func starScenarios() {
     clearField()
     E2E.type("Этот текст для звёздачки. ")
     E2E.pause(1.2)
-    guard let field = textEditField().flatMap(E2E.frame) else { record("field frame", false); return }
+    guard let field = textEditField().flatMap(E2E.frame) else { record("setup: the field's frame is known", false); return }
     let star = E2E.wait(3) { E2E.window("BindAll Star") != nil }
     let starRect = E2E.window("BindAll Star")?.bounds ?? .zero
     record("the field star sits in the field's corner", star && field.insetBy(dx: -4, dy: -4).contains(starRect)
@@ -755,12 +751,12 @@ func removeTellsScenario() {
     E2E.type("Это — **важно** “очень”.\nLet me know if you have any questions!")
     E2E.key(kVK_ANSI_A, .maskCommand)
     E2E.pause(1.2)
-    guard let star = E2E.window("BindAll Star")?.bounds else { record("star", false, "no selection star"); return }
+    guard let star = E2E.window("BindAll Star")?.bounds else { record("setup: the selection star shows", false); return }
     E2E.click(CGPoint(x: star.midX, y: star.midY))
     E2E.pause(0.6)
     let pid = E2E.testApp!.processIdentifier
     guard let item = E2E.find(in: AXUIElementCreateApplication(pid), depth: 6, { (E2E.attr($0, kAXTitleAttribute) as? String) == "Remove AI tells" }) else {
-        record("menu item", false); E2E.key(kVK_Escape); return
+        record("setup: the menu has Remove AI tells", false); E2E.key(kVK_Escape); return
     }
     E2E.press(item)
     let preview = E2E.wait(5) { E2E.window("BindAll Preview") != nil }
@@ -855,7 +851,7 @@ func trayScenario() {
         E2E.pause(1.5)
         return true
     }
-    guard pressStars() else { record("Stars item", false, "status item or its Stars entry not found"); return }
+    guard pressStars() else { record("setup: the status menu's Stars item is found", false); return }
     record("Stars off hides the star", E2E.wait(2) { E2E.window("BindAll Star") == nil })
     _ = pressStars()
     focusTextEdit()
@@ -867,7 +863,7 @@ func trayScenario() {
 
 guard E2E.testApp != nil else { print("BindAll E2E is not running"); exit(2) }
 let only = Set((ProcessInfo.processInfo.environment["E2E_ONLY"] ?? "").split(separator: ",").map(String.init))
-let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "explain", "preSend", "translateInPlace", "voice", "stars", "removeTells", "quick", "tray"]
+let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "explain", "preSend", "translateInPlace", "voice", "stars", "removeTells", "quick", "tray", "hotkeys", "starActions", "cancel", "master"]
 let needsTextEdit = only.isEmpty || !only.isDisjoint(with: textEditGroups)
 func run(_ name: String, _ body: () -> Void) { if only.isEmpty || only.contains(name) { body() } }
 
@@ -894,6 +890,10 @@ if needsTextEdit {
     run("removeTells", removeTellsScenario)
     run("quick", quickTranslateScenario)
     run("tray", trayScenario)
+    run("hotkeys", hotkeyScenarios)
+    run("starActions", starActionScenarios)
+    run("cancel", cancelScenario)
+    run("master", masterSwitchScenario)
     clearField()
     let close = Process()
     close.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
@@ -901,6 +901,7 @@ if needsTextEdit {
     try? close.run(); close.waitUntilExit()
     try? FileManager.default.removeItem(at: docURL)
 }
+run("settings", settingsScenario)
 run("slack") { electronScenarios(slackTarget) }
 run("claude") { electronScenarios(claudeTarget) }
 

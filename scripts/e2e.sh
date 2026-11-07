@@ -30,13 +30,15 @@ settings = {
     "proofreadMinLength": 5, "starFieldEnabled": True, "starSelectionEnabled": True,
     "previewFromMenu": True, "defaultEngine": "apple", "historyEnabled": True, "preSendCheck": True,
     "pushToTalkEnabled": True, "pushToTalkLanguage": "ru", "pushToTalkTargetLanguage": "en",
-    "sourceLanguage": "ru", "targetLanguage": "en",
+    "sourceLanguage": "ru", "targetLanguage": "en", "restoreClipboard": True,
 }
 data = json.dumps(settings).encode().hex()
 subprocess.run(["defaults", "write", "com.evgeny.bindall.e2e", "BindAll.settings.v1", "-data", data], check=True)
 PY
 # Push to Talk listens to a recording instead of the microphone.
-say -v Milena "Привет, это проверка голосового ввода" -o "$PWD/$OUT/voice-ru.aiff"
+# Made once and reused while it is a readable audio file: speech synthesis has hung a run before.
+VOICE_SECONDS=$(afinfo "$OUT/voice-ru.aiff" 2>/dev/null | awk '/estimated duration/ {print int($3)}')
+[ "${VOICE_SECONDS:-0}" -ge 1 ] || say -v Milena "Привет, это проверка голосового ввода" -o "$PWD/$OUT/voice-ru.aiff"
 defaults write com.evgeny.bindall.e2e PushToTalkTestAudio "$PWD/$OUT/voice-ru.aiff"
 # TextEdit stands in for a chat app for the pre-send check: a Return that gets through is a newline.
 defaults write com.evgeny.bindall.e2e PreSendExtraApps -array com.apple.TextEdit
