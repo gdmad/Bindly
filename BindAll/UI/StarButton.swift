@@ -39,10 +39,10 @@ struct StarButton: View {
         }
     }
 
-    /// At 1x an odd pixel count puts the center and the tips on whole pixels; at 2x 10 pt already does.
-    private var starSize: CGFloat { displayScale < 2 ? 11 : StarButton.starSize }
+    /// At 1x an odd pixel count centers the thin rays on whole pixels; at 2x 12 pt already does.
+    private var starSize: CGFloat { displayScale < 2 ? 13 : StarButton.starSize }
 
     /// The click target; the star itself is smaller.
-    static let size: CGFloat = 20
-    static let starSize: CGFloat = 10
+    static let size: CGFloat = 24
+    static let starSize: CGFloat = 12
 }

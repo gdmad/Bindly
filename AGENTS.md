@@ -354,7 +354,7 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   `workMapCache`). The gray text is drawn by `GhostTextView` from x = 0 (no label inset) in a
   pixel-aligned panel.
 - **Stars** (`Selection/FieldStarController.swift`): one violet four-point star (`StarShape`, a vector
-  path, 10 pt in a 20 pt target, 11 px at 1x; `Color.brand`, the icon's violet; the panel frame is
+  path with thin rays (`waist` 0.18), 12 pt in a 24 pt target, 13 px at 1x; `Color.brand`, the icon's violet; the panel frame is
   pixel-aligned with `backingAlignedRect` and has no window shadow, so it stays sharp). While an
   action runs (`beginBusy`/`endBusy`, including both translate items) `StarActivity.busy` makes it
   turn and pulse (pulse only with Reduce Motion) and keeps it shown through typing in a click-through-free non-activating panel (`StarPanel`) -- at the end of the selection

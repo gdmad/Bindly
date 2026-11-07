@@ -4,7 +4,7 @@ import SwiftUI
 /// for text, so with a pixel-aligned panel its edges stay sharp at 1x and 2x.
 struct StarShape: Shape {
     /// How far the waist between two points is pulled toward the center (0 = a plus, 1 = a square).
-    var waist: CGFloat = 0.3
+    var waist: CGFloat = 0.18
 
     func path(in rect: CGRect) -> Path {
         let c = CGPoint(x: rect.midX, y: rect.midY)
