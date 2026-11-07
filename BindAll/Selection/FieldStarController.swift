@@ -143,7 +143,14 @@ final class FieldStarController {
 
     /// Leaves `shownKind` / `shownElement` alone: hiding while typing must not make the next show
     /// count as a new one.
+    /// Animates the star while an action runs; it also stays put through typing until the work ends.
+    func setBusy(_ busy: Bool) {
+        panel.activity.busy = busy
+        if !busy { schedule() }
+    }
+
     private func hide() {
+        guard !panel.activity.busy else { return }
         panel.hide()
     }
 }

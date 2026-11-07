@@ -310,12 +310,16 @@ final class HotkeyCoordinator {
         let settings = appState.settings
         if case .translate = action {
             UsageLog.record(.star, .accepted, detail: "translate")
-            Task { await translateAndShow(text, historyKind: .translate) }
+            guard !isBusy else { return }
+            beginBusy()
+            Task { await translateAndShow(text, historyKind: .translate); endBusy() }
             return
         }
         if case .translateInPlace = action {
             UsageLog.record(.star, .accepted, detail: "translateInPlace")
-            Task { await translateAndShow(text, historyKind: .translate, replacing: context) }
+            guard !isBusy else { return }
+            beginBusy()
+            Task { await translateAndShow(text, historyKind: .translate, replacing: context); endBusy() }
             return
         }
         guard !isBusy else { return }
@@ -534,11 +538,13 @@ final class HotkeyCoordinator {
     private func beginBusy() {
         isBusy = true
         appState.isProcessing = true
+        stars.setBusy(true)
         installEscMonitor()
         busyWatchdog?.cancel()
         let work = DispatchWorkItem { [weak self] in
             self?.isBusy = false
             self?.appState.isProcessing = false
+            self?.stars.setBusy(false)
             self?.removeEscMonitor()
         }
         busyWatchdog = work
@@ -550,6 +556,7 @@ final class HotkeyCoordinator {
         busyWatchdog = nil
         isBusy = false
         appState.isProcessing = false
+        stars.setBusy(false)
         currentTask = nil
         removeEscMonitor()
     }
