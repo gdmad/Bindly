@@ -9,7 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindow?
-    private var pulseTimer: Timer?
+    private var twinkleTimer: Timer?
     /// Alive only while the status menu is open -- see `menuWillOpen`.
     private var menuKeyMonitor: Any?
     private lazy var historyPopover: NSPopover = {
@@ -77,32 +77,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     /// for days while its shortcuts silently do nothing.
     private static let disabledAlpha: CGFloat = 0.4
 
-    /// The icon is always "sparkles" -- idle, off and busy differ only in alpha, not symbol. It is
-    /// the button's own image, so the system click highlight and template inversion work correctly.
-    /// While busy, it pulses via the button's alpha (symbol-effect animations would require an
-    /// overlay view, which breaks the highlight).
+    /// The icon is always the three sparkles (`StatusIconRenderer`) -- idle, off and busy differ in
+    /// alpha, not shape. It is the button's own image, so the system click highlight and template
+    /// inversion work correctly. While busy the sparkles flare one after another
+    /// (`StatusIconTwinkle`): fresh frames of the button's image, since symbol effects would need an
+    /// overlay view, which breaks the highlight.
     private func updateStatusIcon(busy: Bool) {
         guard let button = statusItem?.button else { return }
         let enabled = appState.settings.enabled
         let description = busy ? "BindAll — working" : (enabled ? "BindAll" : "BindAll — off")
-        let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-        var image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: description)
-        image = image?.withSymbolConfiguration(config)
-        image?.isTemplate = true
-        button.image = image
-
-        pulseTimer?.invalidate()
-        pulseTimer = nil
+        twinkleTimer?.invalidate()
+        twinkleTimer = nil
+        button.image = StatusIconRenderer.image(description: description)
         if busy {
-            var dimmed = false
-            pulseTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: true) { _ in
+            button.alphaValue = 1
+            let start = Date.now
+            twinkleTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 20, repeats: true) { _ in
                 Task { @MainActor in
-                    guard let button = self.statusItem?.button else { return }
-                    dimmed.toggle()
-                    NSAnimationContext.runAnimationGroup { context in
-                        context.duration = 0.4
-                        button.animator().alphaValue = dimmed ? 0.4 : 1.0
-                    }
+                    let alphas = StatusIconTwinkle.alphas(at: Date.now.timeIntervalSince(start))
+                    self.statusItem?.button?.image = StatusIconRenderer.image(alphas: alphas, description: description)
                 }
             }
         } else {

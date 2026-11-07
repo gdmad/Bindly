@@ -19,6 +19,7 @@ BindAll/
 ├── App/
 │   ├── BindAllApp.swift        # @main; placeholder SwiftUI Settings scene — UI is AppKit-driven
 │   ├── AppDelegate.swift       # NSStatusItem menu (actions + shortcuts), settings window, icon, login
+│   ├── StatusIconRenderer.swift / StatusIconTwinkle.swift # the drawn tray icon and its busy wave
 │   └── AppState.swift          # @Observable: settings persistence, Keychain keys (keychainRevision), isProcessing;
 │                               # views read it via @Environment(AppState.self), AppKit code via Observations { }
 ├── Hotkeys/
@@ -463,9 +464,12 @@ thread (and, with it, the active proofread popup tap the system would then disab
 ## Key Guarantees
 - Menu-bar agent (`LSUIElement`); no Dock icon. The settings window temporarily switches the activation
   policy to `.regular` so it can come to the front, then back to `.accessory` on close.
-- The status icon is always the `sparkles` symbol; the three states differ only in the button's alpha
-  (`AppDelegate.updateStatusIcon`): full while idle, pulsing while an action runs, and dimmed to
-  `disabledAlpha` while the master switch (`settings.enabled`) is off. The master switch gates the
+- The status icon is always the same three sparkles, drawn by `StatusIconRenderer` (a template image
+  laid out like the `sparkles` symbol, which has no per-layer variable rendering); the three states
+  differ only in alpha (`AppDelegate.updateStatusIcon`): full while idle, the sparkles flaring one
+  after another while an action runs (`StatusIconTwinkle`, frames of the button's own image at
+  20 fps, so the click highlight still works), and the button dimmed to `disabledAlpha` while the
+  master switch (`settings.enabled`) is off. The master switch gates the
   hotkey bursts, autocomplete and proofread alike, so "off" must stay visually distinguishable --
   otherwise a disabled app looks exactly like a working one whose shortcuts do nothing.
 - The status menu draws every shortcut hint itself (six of them, one right-aligned column) and has

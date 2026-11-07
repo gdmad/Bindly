@@ -1225,6 +1225,18 @@ do {
     check(shifted.handle(.keyUp(at: 1, shift: true)) == .finish(shift: true), "Shift at release is reported")
 }
 
+print("StatusIconTwinkle")
+do {
+    let start = StatusIconTwinkle.alphas(at: 0)
+    check(start.allSatisfy { $0 >= StatusIconTwinkle.dim - 1e-9 && $0 <= 1 }, "alphas stay between dim and full")
+    let peak = StatusIconTwinkle.alphas(at: 0.2 * StatusIconTwinkle.period)
+    check(abs(peak[0] - 1) < 1e-9 && peak[1] < 1 && peak[2] < peak[1] + 1e-9, "the big sparkle peaks first")
+    let second = StatusIconTwinkle.alphas(at: 0.2 * StatusIconTwinkle.period + StatusIconTwinkle.stagger)
+    check(abs(second[1] - 1) < 1e-9, "the next one peaks a stagger later")
+    check(abs(StatusIconTwinkle.alpha(phase: 0.7) - StatusIconTwinkle.dim) < 1e-9, "dim for the rest of the round")
+    check(abs(StatusIconTwinkle.alpha(phase: 1.2) - StatusIconTwinkle.alpha(phase: 0.2)) < 1e-9, "it repeats every period")
+}
+
 if failures == 0 {
     print("ALL TESTS PASSED")
     exit(0)
