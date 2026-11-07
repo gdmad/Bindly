@@ -406,7 +406,11 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   and `QuickTranslateController.close()` order the window out at once but free it on the next main
   run-loop turn: Close is clicked in that very window, and freeing it (with its SwiftUI hierarchy)
   while AppKit is still delivering the click stopped the app after Summarize. The E2E clicks the real
-  Close buttons (Summarize, the Fix all preview) and checks the app keeps running.
+  Close buttons (Summarize, the Fix all preview) and checks the app keeps running. The content goes
+  in `IntegralSizeLayout`, which rounds its size up to whole points: with a text-sized width such
+  as 483.6 pt the window (483 or 484) and its content kept re-laying each other out until the stack
+  ran out (seen with a custom prompt's preview and in the crash logs). `keepOnScreen` runs after a
+  resize, not inside its notification, and only moves the window (`setFrameOrigin`).
 - **Preview** (`UI/Preview*`): every text-replacing star action shows a word diff (`TextDiff.words`,
   LCS over word+whitespace tokens; `DiffText` renders added on green + underline, removed red +
   strikethrough) with Changes/Result, Close / Copy / Apply (Return). `previewFromMenu` (default on)
@@ -450,6 +454,16 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   field's AXStaticText children. Skips last for the whole run in every app, so each group types its
   own sentence. Never sends a bare Return outside TextEdit and BindAll's own windows. SwiftUI
   fields ignore Unicode-only synthesized keys, so the driver sets their text through AX.
+  Groups (`Tests/E2E/main.swift`, `CoreScenarios.swift`, `ElectronScenarios.swift`): autocomplete,
+  proofread, fixAll, dictionary, history, explain, preSend, translateInPlace, voice, stars,
+  removeTells, quick, tray, hotkeys (⌘C ⌘C in place, ⌘C ⌘C ⌘C translation window, Restore
+  clipboard), starActions (Show translation, an action key, a custom prompt to its result), cancel
+  (Esc while an action runs), master (the Enabled switch), settings (every tab of the window),
+  slack, claude. Star items go through `runStarItem`, which waits for the star to move to the
+  selection before clicking it. Checks on model output test its shape (`isShouting`), not its words:
+  the on-device model phrases things its own way. A failed precondition is reported as
+  "setup: ..." and still counts as a failure. The `say` recording is made once and reused while it
+  lasts at least a second.
 
 
 ```bash

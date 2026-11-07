@@ -14,7 +14,7 @@ final class FloatingPanelHost {
         close()
         let field = field ?? FocusedField.rect()
         self.field = field
-        let hosting = NSHostingController(rootView: content)
+        let hosting = NSHostingController(rootView: IntegralSizeLayout { content })
         hosting.sizingOptions = [.preferredContentSize]
         let panel = KeyablePanel(contentViewController: hosting)
         panel.styleMask = [.borderless]
@@ -30,10 +30,15 @@ final class FloatingPanelHost {
         self.panel = panel
         panel.layoutIfNeeded()
         panel.setFrameOrigin(PanelPlacement.origin(size: panel.frame.size, near: field, window: FocusedField.windowRect()))
-        // Growing keeps the top edge where it was, so a prompt field gets taller downwards.
+        // Growing keeps the top edge where it was, so a prompt field gets taller downwards. The move
+        // back on screen waits for the resize to finish: done from inside the notification, with a
+        // redraw, it started another layout pass, the hosting view resized the window again, and a
+        // tall window at the screen's edge recursed until the stack ran out.
         resizeObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: panel,
                                                                 queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.keepOnScreen() }
+            MainActor.assumeIsolated {
+                DispatchQueue.main.async { self?.keepOnScreen() }
+            }
         }
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
@@ -62,6 +67,7 @@ final class FloatingPanelHost {
         if frame.maxY > visible.maxY - PanelPlacement.inset {
             frame.origin.y = visible.maxY - PanelPlacement.inset - frame.height
         }
-        if frame != panel.frame { panel.setFrame(frame, display: true) }
+        // Only the origin changes, so this cannot resize the window and set the loop going again.
+        if abs(frame.origin.y - panel.frame.origin.y) > 0.5 { panel.setFrameOrigin(frame.origin) }
     }
 }
