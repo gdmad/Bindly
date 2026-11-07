@@ -71,6 +71,7 @@ BindAll/
 │   ├── ProofreadLanguage.swift        # language resolution; ru/uk disambiguation for "auto"
 │   ├── LanguageToolProofreadProvider.swift # actor: paragraph-scoped checks + cache
 │   ├── ProofreadAX.swift              # focused field text/selection, word bounds, in-place select
+│   ├── TextOccurrence.swift           # pure: the occurrence of a word nearest an offset (leaf lookup)
 │   ├── IssueApplier.swift             # validated single fix: AX write, else verified select+paste
 │   ├── WordBoundary.swift             # word range under the caret (click-to-proofread trigger)
 │   ├── UnderlineGeometry.swift        # pure geometry: rect flip, underline drop/thickness, line check
@@ -142,6 +143,7 @@ BindAll/
     ├── Settings.swift          # Codable settings, ProviderKind, HotkeyConfig
     ├── ActionKey.swift         # {key, label, prompt, hotkey?}; built-in w / u / l / о / гг
     ├── KeychainStore.swift     # API keys (generic password)
+    ├── ShortcutConflicts.swift # pure: every shortcut in the settings and the duplicate check
     └── LoginItemManager.swift  # SMAppService launch-at-login
 Tests/
 ├── Unit/                       # pure-logic assertions (no XCTest host needed): Harness.swift (check/eq and
@@ -393,7 +395,7 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   last 8 results, `HistoryMenuTitle`; picking one puts its output in place through the preview when
   `previewFromMenu` is on; only with history on), and for the field star "N issues: show the first". `StarContext` captures element, value, selection and map;
   replacing re-activates the app, selects `appRange` and pastes.
-- **Windows** (result `PopupController`, `PreviewController`, `CustomPromptController`): one
+- **Windows** (placement is the pure, unit-tested `PanelPlacement.origin(size:near:window:visible:)`; result `PopupController`, `PreviewController`, `CustomPromptController`): one
   `FloatingPanelHost` -- a borderless `KeyablePanel` (Esc via `onEscape`, since borderless panels do
   not reach `onExitCommand`), `sizingOptions = .preferredContentSize`, so it is as big as its content
   (380-560 pt wide, the body scrolls past 60% of the screen height) and follows it as it grows,
