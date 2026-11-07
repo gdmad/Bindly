@@ -1,6 +1,6 @@
 import Foundation
 
-/// No two actions may share keys: the four built-in shortcuts, the action keys and the Push to Talk
+/// No two actions may share keys: the built-in shortcuts, the action keys and the Push to Talk
 /// hold keys when they are ordinary shortcuts. The Shortcuts tab checks every recorder against all
 /// the others through this.
 enum ShortcutConflicts {
@@ -10,6 +10,8 @@ enum ShortcutConflicts {
             ("fix", settings.defaultActionHotkey), ("translate", settings.translateHotkey),
             ("screen", settings.screenTranslateHotkey), ("quick", settings.quickTranslateHotkey),
         ]
+        if let c = settings.explainHotkey { all.append(("explain", c)) }
+        if let c = settings.summarizeHotkey { all.append(("summarize", c)) }
         if case .shortcut(let c) = settings.pushToTalkKey { all.append(("ptt", c)) }
         if case .shortcut(let c) = settings.voiceTranslateKey { all.append(("voiceTranslate", c)) }
         all += settings.actionKeys.compactMap { key in key.hotkey.map { (key.id.uuidString, $0) } }

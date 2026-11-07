@@ -276,6 +276,10 @@ struct Settings: Codable, Equatable {
     var translateHotkey: HotkeyConfig = .translate
     var screenTranslateHotkey: HotkeyConfig = .screenTranslate
     var quickTranslateHotkey: HotkeyConfig = .quickTranslate
+    /// Explain and Summarize are for reading someone else's text, so they live in the menu bar and
+    /// have no shortcut until the user sets one.
+    var explainHotkey: HotkeyConfig?
+    var summarizeHotkey: HotkeyConfig?
 
     func provider(_ kind: ProviderKind) -> ProviderConfig {
         providers.first(where: { $0.kind == kind }) ?? .makeDefault(kind)
@@ -300,7 +304,7 @@ extension Settings {
              correctEnabled, starFieldEnabled, starSelectionEnabled, previewFromMenu, previewFromHotkeys,
              recentPrompts, maskAISlopRules, removeTellsWithAI, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
              openRouterFreeOnly, providers, defaultActionHotkey, translateHotkey,
-             screenTranslateHotkey, quickTranslateHotkey
+             screenTranslateHotkey, quickTranslateHotkey, explainHotkey, summarizeHotkey
     }
 
     /// Old key names still honoured on decode (never written back).
@@ -376,6 +380,8 @@ extension Settings {
         if let v = try c.decodeIfPresent(HotkeyConfig.self, forKey: .translateHotkey) { translateHotkey = v }
         if let v = try c.decodeIfPresent(HotkeyConfig.self, forKey: .screenTranslateHotkey) { screenTranslateHotkey = v }
         if let v = try c.decodeIfPresent(HotkeyConfig.self, forKey: .quickTranslateHotkey) { quickTranslateHotkey = v }
+        explainHotkey = try c.decodeIfPresent(HotkeyConfig.self, forKey: .explainHotkey)
+        summarizeHotkey = try c.decodeIfPresent(HotkeyConfig.self, forKey: .summarizeHotkey)
     }
 }
 

@@ -162,12 +162,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // drawn too, on purpose. A real key equivalent makes the system reserve its own column right
         // of the widest title in the menu -- and our drawn line counts as a title -- so it would
         // always sit to the right of ours, and moving ours only moves it further. With no real key
-        // equivalents in the menu there is no second column, and all six line up. The two keys still
+        // equivalents in the menu there is no second column, and they all line up. The two keys still
         // work while the menu is open: see `menuWillOpen`.
         let s = appState.settings
         let leading: [(title: String, shortcut: String, action: Selector)] = [
             ("Fix selection", HotkeyFormatter.string(s.defaultActionHotkey), #selector(menuFix)),
             ("Translate selection", HotkeyFormatter.string(s.translateHotkey), #selector(menuTranslate)),
+            ("Explain selection", s.explainHotkey.map(HotkeyFormatter.string) ?? "", #selector(menuExplain)),
+            ("Summarize selection", s.summarizeHotkey.map(HotkeyFormatter.string) ?? "", #selector(menuSummarize)),
             ("Translate from screen", HotkeyFormatter.string(s.screenTranslateHotkey), #selector(menuScreenTranslate)),
             ("Quick Translate", HotkeyFormatter.string(s.quickTranslateHotkey), #selector(menuQuickTranslate)),
         ]
@@ -359,6 +361,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     @objc private func menuFix() { coordinator.menuFix() }
     @objc private func menuTranslate() { coordinator.menuTranslate() }
+    @objc private func menuExplain() { coordinator.menuExplain() }
+    @objc private func menuSummarize() { coordinator.menuSummarize() }
     @objc private func menuScreenTranslate() { coordinator.menuScreenTranslate() }
     @objc private func menuQuickTranslate() { coordinator.menuQuickTranslate() }
 }

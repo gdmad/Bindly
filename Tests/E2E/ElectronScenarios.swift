@@ -287,14 +287,7 @@ func electronScenarios(_ target: ElectronTarget) {
     E2E.pause(1.0)
     E2E.key(kVK_ANSI_A, .maskCommand)
     E2E.pause(1.2)
-    if let starNow = E2E.window("BindAll Star")?.bounds, let testPid = E2E.testApp?.processIdentifier {
-        E2E.click(CGPoint(x: starNow.midX, y: starNow.midY))
-        E2E.pause(0.6)
-        if let item = E2E.find(in: AXUIElementCreateApplication(testPid), depth: 6, { (E2E.attr($0, kAXTitleAttribute) as? String) == "Summarize" }) {
-            E2E.press(item)
-        } else {
-            pickMenuItem(downs: 7)
-        }
+    if pressTrayItem("Summarize selection") {
         let shown = E2E.wait(40) { E2E.window("BindAll Translation") != nil }
         record("Summarize shows its result", shown)
         if shown, let close = E2E.testElement(window: "BindAll Translation", E2E.named("Close")).flatMap(E2E.frame) {
@@ -306,7 +299,7 @@ func electronScenarios(_ target: ElectronTarget) {
             if !alive { return }
         }
     } else {
-        record("Summarize shows its result", false, "no star on the selection")
+        record("Summarize shows its result", false, "no Summarize selection in the menu bar")
     }
     focusComposer(pid)
 

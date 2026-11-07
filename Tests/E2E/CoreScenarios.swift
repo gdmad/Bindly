@@ -137,7 +137,7 @@ func starActionScenarios() {
     clearField()
     E2E.type("a quiet line of text")
     E2E.pause(1.0)
-    if runStarItem("UPPERCASE", downs: 8) {
+    if runStarItem("UPPERCASE", downs: 6) {
         let preview = E2E.wait(20) { E2E.window("BindAll Preview") != nil }
         record("an action key from the star shows a preview", preview)
         if preview {
@@ -153,7 +153,7 @@ func starActionScenarios() {
     clearField()
     E2E.type("привет, завтра встреча в 10")
     E2E.pause(1.0)
-    guard runStarItem("Custom prompt…", downs: 13), E2E.wait(3, { E2E.window("BindAll Prompt") != nil }) else {
+    guard runStarItem("Custom prompt…", downs: 11), E2E.wait(3, { E2E.window("BindAll Prompt") != nil }) else {
         record("Custom prompt: its window opens", false); E2E.key(kVK_Escape); return
     }
     let promptPid = E2E.testApp!.processIdentifier
@@ -184,7 +184,9 @@ func cancelScenario() {
     clearField()
     E2E.type("Совещание переносится на четверг, потому что заказчик не успел прислать ТЗ. ")
     E2E.pause(1.0)
-    guard runStarItem("Explain", downs: 6) else { record("setup: the selection star shows", false); return }
+    E2E.key(kVK_ANSI_A, .maskCommand)
+    E2E.pause(1.2)
+    guard pressTrayItem("Explain selection") else { record("setup: Explain selection is in the menu bar", false); return }
     // Esc while it runs, not before: the working star says it has started.
     let started = E2E.wait(4, step: 0.02) { (E2E.window("BindAll Star")?.bounds.width ?? 0) > 26 }
     guard started else { record("setup: the action starts", false, "windows \(E2E.windows().map(\.name))"); return }
@@ -196,7 +198,9 @@ func cancelScenario() {
     let idle = E2E.wait(3) { (E2E.window("BindAll Star")?.bounds.width ?? 0) < 26 }
     record("the star is idle again", idle, "star \(E2E.window("BindAll Star").map { "\($0.bounds)" } ?? "hidden")")
     focusTextEdit()
-    if runStarItem("Explain", downs: 6) {
+    E2E.key(kVK_ANSI_A, .maskCommand)
+    E2E.pause(1.2)
+    if pressTrayItem("Explain selection") {
         let shown = E2E.wait(30) { E2E.window("BindAll Translation") != nil }
         record("the next action still runs", shown)
         if shown { clickButton("Close", in: "BindAll Translation") }

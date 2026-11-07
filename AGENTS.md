@@ -172,6 +172,10 @@ language, permissions) · Providers (connections only). Rarely changed options s
 - **Cmd+C ×3** → translate the selection, shown in a popup near the cursor
 - **Cmd+E** → OCR: select a screen region, recognize text, translate
 - **Shift+Cmd+E** → Quick Translate window
+- **Explain selection / Summarize selection** → no shortcut by default (`explainHotkey`,
+  `summarizeHotkey` are optional); also in the menu bar. They are for reading someone else's text, so
+  they are not in the star menu: the result opens in the popup, the text stays, nothing goes to
+  history (`HotkeyCoordinator.Reading`, run through `runDefaultAction` with `showOnly`)
 - **Proofread** (LanguageTool), only when enabled on Settings → Proofread, has **no shortcut**: a
   pause in typing (~0.6 s) re-checks the focused field and underlines every issue in place
   (straight underlines; spelling is red, grammar yellow, punctuation green, style blue -- LanguageTool's own
@@ -388,8 +392,8 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   password and tiny fields. Uses `ProofreadAX.focus(analyze: false)` (no hidden-break walk) and the
   offset map for the selection's end. A click opens an `NSMenu` built by the coordinator: Fix, Fix
   spelling (LanguageTool `correct`), Show translation (popup), Replace with translation (Apple
-  Translation, same language pair rules, the result replaces the text through the preview), Explain and Summarize (show-only: the result
-  goes to the popup, the text is untouched, nothing is recorded in history), action keys (a key with
+  Translation, same language pair rules, the result replaces the text through the preview), Remove AI
+  tells, action keys (a key with
   `ActionKey.showOnly` shows its result too, from the star and from its own shortcut), Custom
   prompt..., History (the
   last 8 results, `HistoryMenuTitle`; picking one puts its output in place through the preview when
@@ -406,7 +410,7 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   and `QuickTranslateController.close()` order the window out at once but free it on the next main
   run-loop turn: Close is clicked in that very window, and freeing it (with its SwiftUI hierarchy)
   while AppKit is still delivering the click stopped the app after Summarize. The E2E clicks the real
-  Close buttons (Summarize, the Fix all preview) and checks the app keeps running. The content goes
+  Close buttons (Summarize from the menu bar, the Fix all preview) and checks the app keeps running. The content goes
   in `IntegralSizeLayout`, which rounds its size up to whole points: with a text-sized width such
   as 483.6 pt the window (483 or 484) and its content kept re-laying each other out until the stack
   ran out (seen with a custom prompt's preview and in the crash logs). `keepOnScreen` runs after a
@@ -459,7 +463,8 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   removeTells, quick, tray, hotkeys (⌘C ⌘C in place, ⌘C ⌘C ⌘C translation window, Restore
   clipboard), starActions (Show translation, an action key, a custom prompt to its result), cancel
   (Esc while an action runs), master (the Enabled switch), settings (every tab of the window),
-  slack, claude. Star items go through `runStarItem`, which waits for the star to move to the
+  slack, claude. Explain and Summarize run from the menu bar (`pressTrayItem`), and explain checks
+  the star menu no longer lists them. Star items go through `runStarItem`, which waits for the star to move to the
   selection before clicking it. Checks on model output test its shape (`isShouting`), not its words:
   the on-device model phrases things its own way. A failed precondition is reported as
   "setup: ..." and still counts as a failure. The `say` recording is made once and reused while it
@@ -518,7 +523,7 @@ thread (and, with it, the active proofread popup tap the system would then disab
   master switch (`settings.enabled`) is off. The master switch gates the
   hotkey bursts, autocomplete and proofread alike, so "off" must stay visually distinguishable --
   otherwise a disabled app looks exactly like a working one whose shortcuts do nothing.
-- The status menu draws every shortcut hint itself (six of them, one right-aligned column) and has
+- The status menu draws every shortcut hint itself (eight of them, one right-aligned column; Explain and Summarize show none until one is set) and has
   **no real key equivalents**. Give an item a real one and the system reserves its own column right of
   the widest title -- our drawn line counts as a title -- so it lands to the right of ours and moving
   ours only pushes it further; that is why Settings and Quit are drawn too. Their keys still work

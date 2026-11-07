@@ -17,6 +17,17 @@ struct ShortcutsSettingsView: View {
             }
 
             Section {
+                LabeledContent("Explain selection") {
+                    ShortcutRecorder(optionalConfig: $appState.settings.explainHotkey, others: others(excluding: "explain"))
+                }
+                LabeledContent("Summarize selection") {
+                    ShortcutRecorder(optionalConfig: $appState.settings.summarizeHotkey, others: others(excluding: "summarize"))
+                }
+            } header: {
+                HelpHeader("Reading", "For text someone else wrote: the result opens in a window and the text stays as it is. No shortcut by default; both are also in the menu bar.")
+            }
+
+            Section {
                 HoldKeyPicker(title: "Push to Talk", modifierKey: .rightOption,
                               key: $appState.settings.pushToTalkKey, others: others(excluding: "ptt"))
                 HoldKeyPicker(title: "Dictate and translate", modifierKey: .rightCommand,

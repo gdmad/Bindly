@@ -98,6 +98,8 @@ func runSettingsTests() {
     allChanged.translateHotkey = HotkeyConfig(keyCode: 2, modifiers: HotkeyModifiers(command: true, shift: true), repeatCount: 2)
     allChanged.screenTranslateHotkey = HotkeyConfig(keyCode: 3, modifiers: HotkeyModifiers(command: true, control: true), repeatCount: 1)
     allChanged.quickTranslateHotkey = HotkeyConfig(keyCode: 4, modifiers: HotkeyModifiers(command: true, option: true), repeatCount: 3)
+    allChanged.explainHotkey = HotkeyConfig(keyCode: 14, modifiers: HotkeyModifiers(command: false, option: true, control: true), repeatCount: 1)
+    allChanged.summarizeHotkey = HotkeyConfig(keyCode: 1, modifiers: HotkeyModifiers(command: false, option: true, control: true), repeatCount: 1)
 
     let savedSettings = try! JSONEncoder().encode(allChanged)
     check(try! JSONDecoder().decode(Settings.self, from: savedSettings) == allChanged,
@@ -147,5 +149,10 @@ func runSettingsTests() {
         settings.pushToTalkKey = .rightOption
         check(ShortcutConflicts.all(in: settings).count == 4 + settings.actionKeys.filter { $0.hotkey != nil }.count,
               "a modifier hold key is no shortcut to clash with")
+        let explain = HotkeyConfig(keyCode: 14, modifiers: HotkeyModifiers(command: true, option: true), repeatCount: 1)
+        settings.explainHotkey = explain
+        check(ShortcutConflicts.others(excluding: "summarize", in: settings).contains(explain),
+              "an Explain shortcut counts against the others")
+        check(!ShortcutConflicts.others(excluding: "explain", in: settings).contains(explain), "but not against itself")
     }
 }

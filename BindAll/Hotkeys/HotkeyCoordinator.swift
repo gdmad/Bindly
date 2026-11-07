@@ -210,7 +210,7 @@ final class HotkeyCoordinator {
 
     /// What a star menu item does.
     enum StarAction {
-        case fix, spelling, translate, translateInPlace, removeTells, explain, summarize
+        case fix, spelling, translate, translateInPlace, removeTells
         case actionKey(ActionKey)
         case prompt(String, showOnly: Bool)
     }
@@ -227,8 +227,6 @@ final class HotkeyCoordinator {
         add("Show translation", "globe") { [weak self] in self?.runStarAction(.translate, context) }
         add("Replace with translation", "character.bubble") { [weak self] in self?.runStarAction(.translateInPlace, context) }
         add("Remove AI tells", "eraser") { [weak self] in self?.runStarAction(.removeTells, context) }
-        add("Explain", "questionmark.bubble") { [weak self] in self?.runStarAction(.explain, context) }
-        add("Summarize", "text.alignleft") { [weak self] in self?.runStarAction(.summarize, context) }
         let keys = appState.settings.actionKeys.filter { !$0.prompt.isEmpty }
         if !keys.isEmpty {
             menu.addItem(.separator())
@@ -334,11 +332,9 @@ final class HotkeyCoordinator {
         case .actionKey(let key): (.actionKey, key.title, key.logToken)
         case .prompt: (.customPrompt, "Custom prompt", "source:star")
         case .translate, .translateInPlace: (.translate, "Translate", "source:star")
-        case .explain: (.explain, "Explain", "source:star")
-        case .summarize: (.summarize, "Summary", "source:star")
         }
         let showOnly = switch action {
-        case .explain, .summarize, .prompt(_, true): true
+        case .prompt(_, true): true
         case .actionKey(let key): key.showOnly
         default: false
         }
@@ -352,12 +348,10 @@ final class HotkeyCoordinator {
                     result = try await EngineFactory.makeLanguageTool(appState: self.appState).correct(text)
                 case .removeTells:
                     result = try await self.removeTells(from: text, settings: settings)
-                case .fix, .actionKey, .prompt, .translate, .translateInPlace, .explain, .summarize:
+                case .fix, .actionKey, .prompt, .translate, .translateInPlace:
                     let instruction: String = switch action {
                     case .actionKey(let key): key.prompt
                     case .prompt(let prompt, _): prompt
-                    case .explain: Self.explainPrompt
-                    case .summarize: Self.summarizePrompt
                     default: settings.defaultPrompt
                     }
                     let engine = EngineFactory.make(kind: settings.defaultEngine, appState: self.appState)
@@ -408,16 +402,6 @@ final class HotkeyCoordinator {
         }
         return result
     }
-
-    static let explainPrompt = """
-        Explain what this text says and means in plain words, briefly, in the same language as the \
-        text. Spell out jargon, abbreviations and anything implied. Reply with the explanation only.
-        """
-
-    static let summarizePrompt = """
-        Summarize this text in one to three sentences, in the same language as the text. Keep names, \
-        numbers and decisions. Reply with the summary only.
-        """
 
     static let removeTellsPrompt = """
         Rewrite this text so it no longer reads as AI-generated: drop stock phrases (delve, truly, \
@@ -485,6 +469,7 @@ final class HotkeyCoordinator {
     private func reconfigureWatched() {
         let s = appState.settings
         let configs = [s.defaultActionHotkey, s.translateHotkey, s.screenTranslateHotkey, s.quickTranslateHotkey]
+            + [s.explainHotkey, s.summarizeHotkey].compactMap { $0 }
             + s.actionKeys.compactMap(\.hotkey)
 
         // Group configs that share key+modifiers so the monitor knows the highest press count to
@@ -529,6 +514,10 @@ final class HotkeyCoordinator {
             runTranslate()
         } else if matches(s.screenTranslateHotkey) {
             translateFromScreen()
+        } else if s.explainHotkey.map(matches) == true {
+            runReading(.explain)
+        } else if s.summarizeHotkey.map(matches) == true {
+            runReading(.summarize)
         } else if let key = s.actionKeys.first(where: { $0.hotkey.map(matches) == true }) {
             // A custom action key bound to its own shortcut: run its prompt on the selection.
             runDefaultAction(fixedInstruction: key.prompt, actionKey: key, showOnly: key.showOnly)
@@ -593,14 +582,38 @@ final class HotkeyCoordinator {
         return false
     }
 
+    /// Explain and Summarize: about text someone else wrote, so the result is only shown.
+    nonisolated enum Reading {
+        case explain, summarize
+
+        var title: String { self == .explain ? "Explain" : "Summary" }
+        var feature: UsageFeature { self == .explain ? .explain : .summarize }
+        var prompt: String {
+            switch self {
+            case .explain: """
+                Explain what this text says and means in plain words, briefly, in the same language as the \
+                text. Spell out jargon, abbreviations and anything implied. Reply with the explanation only.
+                """
+            case .summarize: """
+                Summarize this text in one to three sentences, in the same language as the text. Keep names, \
+                numbers and decisions. Reply with the summary only.
+                """
+            }
+        }
+    }
+
+    private func runReading(_ reading: Reading, forceCopy: Bool = false) {
+        runDefaultAction(fixedInstruction: reading.prompt, forceCopy: forceCopy, showOnly: true, reading: reading)
+    }
+
     /// Runs the text pipeline on the current selection. With `fixedInstruction` (a per-key
     /// shortcut) the whole selection is the content; otherwise the separator/key syntax is parsed.
     private func runDefaultAction(fixedInstruction: String? = nil, forceCopy: Bool = false,
-                                  actionKey key: ActionKey? = nil, showOnly: Bool = false) {
+                                  actionKey key: ActionKey? = nil, showOnly: Bool = false, reading: Reading? = nil) {
         let actionKey = key?.logToken
-        let actionTitle = key?.title
+        let actionTitle = key?.title ?? reading?.title
         let settings = appState.settings
-        let feature: UsageFeature = actionKey == nil ? .fix : .actionKey
+        let feature: UsageFeature = reading?.feature ?? (actionKey == nil ? .fix : .actionKey)
         let source = forceCopy ? "source:menu" : "source:hotkey"
         let started = ContinuousClock.now
         let engine = EngineFactory.make(kind: settings.defaultEngine, appState: appState)
@@ -689,10 +702,12 @@ final class HotkeyCoordinator {
 
     /// Invoked from the status menu. Runs after a short delay so the menu fully dismisses and focus
     /// returns to the previously active app before the selection is copied.
-    private enum MenuAction { case fix, translate }
+    private enum MenuAction { case fix, translate, explain, summarize }
 
     func menuFix() { runFromMenu(.fix) }
     func menuTranslate() { runFromMenu(.translate) }
+    func menuExplain() { runFromMenu(.explain) }
+    func menuSummarize() { runFromMenu(.summarize) }
     func menuScreenTranslate() { translateFromScreen() }
 
     func menuQuickTranslate() {
@@ -707,6 +722,8 @@ final class HotkeyCoordinator {
             switch which {
             case .fix: self.runDefaultAction(forceCopy: true)
             case .translate: self.runTranslate(forceCopy: true)
+            case .explain: self.runReading(.explain, forceCopy: true)
+            case .summarize: self.runReading(.summarize, forceCopy: true)
             }
         }
     }

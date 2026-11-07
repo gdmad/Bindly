@@ -431,22 +431,29 @@ func pickMenuItem(downs: Int = 0, ups: Int = 0, thenRight: Bool = false) {
 func explainScenario() {
     group = "Explain"
     guard let pid = E2E.testApp?.processIdentifier else { return }
-    for (name, downs) in [("Explain", 6), ("Summarize", 7)] {
+    clearField()
+    E2E.type("Совещание переносится на четверг. ")
+    E2E.pause(1.0)
+    if runStarItem("Fix", downs: 1) {
+        // The menu is open now: Explain and Summarize are for someone else's text, not in it.
+        let app = AXUIElementCreateApplication(pid)
+        let listed = ["Explain", "Summarize"].filter { title in
+            E2E.find(in: app, depth: 6, { (E2E.attr($0, kAXTitleAttribute) as? String) == title }) != nil
+        }
+        record("the star menu has no Explain or Summarize", listed.isEmpty, "listed \(listed)")
+    }
+    if E2E.wait(15, { E2E.window("BindAll Preview") != nil }) { E2E.key(kVK_Escape) }
+    E2E.wait(2) { E2E.window("BindAll Preview") == nil }
+    focusTextEdit()
+    for name in ["Explain", "Summarize"] {
         clearField()
         let text = "Совещание переносится на четверг, потому что заказчик не успел прислать ТЗ. "
         E2E.type(text)
         E2E.pause(1.0)
         E2E.key(kVK_ANSI_A, .maskCommand)
         E2E.pause(1.2)
-        guard let star = E2E.window("BindAll Star")?.bounds else { record(name, false, "no star"); continue }
-        E2E.click(CGPoint(x: star.midX, y: star.midY))
-        E2E.pause(0.6)
+        guard pressTrayItem("\(name) selection") else { record("setup: \(name) selection is in the menu bar", false); continue }
         let app = AXUIElementCreateApplication(pid)
-        if let item = E2E.find(in: app, depth: 6, { (E2E.attr($0, kAXTitleAttribute) as? String) == name }) {
-            E2E.press(item)
-        } else {
-            pickMenuItem(downs: downs)
-        }
         let shown = E2E.wait(40) { E2E.window("BindAll Translation") != nil }
         var body = ""
         if shown, let panel = E2E.find(in: app, depth: 2, { (E2E.attr($0, kAXTitleAttribute) as? String) == "BindAll Translation" }) {
