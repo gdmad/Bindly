@@ -22,8 +22,9 @@ struct PopupCell: View {
     /// Lights up under the pointer on its own, for actions that are not part of the arrow selection
     /// (Add to dictionary, Close, Fix all), in the same color as a selected fix.
     var highlightsOnHover = false
-    /// A light fill at rest, so a text action reads as a button (Fix all).
-    var showsRestingFill = false
+    /// The name for VoiceOver and the tests when the visible text alone does not say it (Fix all
+    /// shows only its count).
+    var accessibilityText: String?
 
     @State private var hovered = false
 
@@ -52,10 +53,10 @@ struct PopupCell: View {
         // One element with a name, also when only the icon is drawn (Skip, Close) -- otherwise the
         // icon-only cells dropped out of the accessibility tree altogether.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(text)
+        .accessibilityLabel(accessibilityText ?? text)
         .accessibilityAddTraits(traits)
         .accessibilityActions {
-            if let onActivate { Button(text, action: onActivate) }
+            if let onActivate { Button(accessibilityText ?? text, action: onActivate) }
         }
     }
 
@@ -64,7 +65,7 @@ struct PopupCell: View {
 
     private var background: AnyShapeStyle {
         if isLit { AnyShapeStyle(Color(nsColor: .selectedContentBackgroundColor)) }
-        else if isSelected || showsRestingFill { AnyShapeStyle(.quaternary) }
+        else if isSelected { AnyShapeStyle(.quaternary) }
         else { AnyShapeStyle(.clear) }
     }
 

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The popup's top line: what is wrong and where this word sits among the problems found, then the
-/// Skip, Add to dictionary and Close buttons.
+/// Fix all, Skip, Add to dictionary and Close buttons.
 struct FixesPopupHeader: View {
     let title: String
     let kind: IssueKind
@@ -13,10 +13,16 @@ struct FixesPopupHeader: View {
     let onSkip: () -> Void
     var onAddWord: (() -> Void)?
     let onClose: () -> Void
+    /// Issues "Fix all" would change; the button shows from two up.
+    var fixAllCount = 0
+    var onFixAll: () -> Void = {}
 
     var body: some View {
         HStack(spacing: PopupMetrics.inlineSpacing) {
             FixesPopupSummary(title: title, kind: kind, position: position, fontSize: fontSize)
+            if fixAllCount >= 2 {
+                FixesPopupFixAllButton(count: fixAllCount, fontSize: fontSize, onActivate: onFixAll)
+            }
             FixesPopupSkipButton(isSelected: skipSelected, fontSize: fontSize,
                                  onHover: onHoverSkip, onActivate: onSkip)
             if let onAddWord {

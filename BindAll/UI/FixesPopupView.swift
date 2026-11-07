@@ -20,7 +20,7 @@ struct FixesPopupView: View {
     let onClose: () -> Void
     /// Above the word the fixes list bottom-up, the first nearest the word.
     var bottomUp = false
-    /// Issues "Fix all" would change; the button shows from two up.
+    /// Issues "Fix all" would change; its header button shows from two up.
     var fixAllCount = 0
     /// Nil hides "Add to dictionary" (only spelling issues offer it).
     var onAddWord: (() -> Void)?
@@ -30,7 +30,8 @@ struct FixesPopupView: View {
         VStack(alignment: .leading, spacing: PopupMetrics.cellSpacing) {
             FixesPopupHeader(title: title, kind: kind, position: position, fontSize: fontSize,
                              skipSelected: selected == skipIndex, onHoverSkip: hoverSkip, onSkip: skip,
-                             onAddWord: onAddWord, onClose: onClose)
+                             onAddWord: onAddWord, onClose: onClose,
+                             fixAllCount: fixAllCount, onFixAll: onFixAll)
             if replacements.isEmpty {
                 // Real information, not a hint: secondary rather than tertiary, which is hard to read
                 // on the material.
@@ -43,9 +44,6 @@ struct FixesPopupView: View {
                                  bottomUp: bottomUp,
                                  fontSize: fontSize, tileTopCount: tileTopCount,
                                  onHover: onHover, onActivate: onAccept)
-            }
-            if fixAllCount >= 2 {
-                FixesPopupFixAllButton(count: fixAllCount, fontSize: fontSize, onActivate: onFixAll)
             }
         }
         .frame(minWidth: PopupMetrics.minWidth, maxWidth: PopupMetrics.maxWidth, alignment: .leading)

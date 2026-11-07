@@ -113,7 +113,7 @@ BindAll/
 │   ├── ProofreadPopover.swift  # the fixes popup: presenter + placement above the word
 │   ├── FixesPopupView.swift    # the fixes popup's content: header + PopupItemsLayout
 │   ├── FixesPopupHeader / FixesPopupSummary / FixesPopupSkipButton .swift # kind + wording + counter, then the Skip icon
-│   ├── FixesPopupFixAllButton.swift   # "Fix all (N)" cell under the fixes
+│   ├── FixesPopupFixAllButton.swift   # Fix all: wand icon and count in the header row
 │   ├── StarShape.swift                # the star as a vector path
 │   ├── StarActivity.swift             # busy flag the star animates on
 │   ├── StarBusyView.swift / BrandPalette.swift # the working star (orbits) and the icon's colors
@@ -307,8 +307,8 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   dictionary, Close (a `PopupCell` like Skip, no longer a Button) and Fix all light up on their own
   (`PopupCell.highlightsOnHover`), in the same selection color as a chosen fix. The E2E moves the pointer before clicking (`hoverThenClick`): a
   click warped onto the panel without a prior move was what made the cross look like it needed two.
-- **Fix all:** with two or more fixable issues the fixes popup ends with a "Fix all (N)" cell
-  (`FixesPopupFixAllButton`, sized to its text at the right edge, a light resting fill so it reads as a button); ⌘Return in the popup does the same (`ProofreadKeyPolicy.fixAll`).
+- **Fix all:** with two or more fixable issues the fixes popup offers Fix all
+  (`FixesPopupFixAllButton`: a `wand.and.stars` icon with the count in the header row, before Skip, Add to dictionary and Close; VoiceOver and the tests know it as "Fix all (N)" through `PopupCell.accessibilityText`); ⌘Return in the popup does the same (`ProofreadKeyPolicy.fixAll`).
   `FixAll.apply` (pure) re-reads the field, relocates each issue and applies its first fix from the
   end, skipping overlaps; `ProofreadController.onFixAll` hands the field as a `StarContext` to the
   coordinator, which always shows the preview and writes the result the way star actions do.
