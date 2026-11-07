@@ -45,7 +45,7 @@ swiftc -O \
     BindAll/Autocomplete/InlineCompletion.swift \
     BindAll/Selection/TextDiff.swift \
     BindAll/Proofread/ProofreadKeyPolicy.swift \
-    Tests/main.swift \
+    Tests/Unit/*.swift \
     -o "$OUT"
 
 "$OUT"

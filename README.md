@@ -141,7 +141,7 @@ BindAll/
   Proofread/     ProofreadController, ProofreadAX, IssueApplier, IssueMerger, UnderlineOverlay
   UI/            SettingsView + one view per tab, PopupKit (shared popup chrome/placement)
   Store/         Settings, ActionKey, KeychainStore, HistoryStore, LoginItemManager, AppLanguages
-Tests/           run_tests.sh, main.swift, autocomplete ranking evaluator
+Tests/           run_tests.sh, Unit/ (unit tests by area), E2E/, autocomplete ranking evaluator
 ```
 
 The visible UI (status item, settings window, popups) is driven from `AppDelegate` with AppKit; the

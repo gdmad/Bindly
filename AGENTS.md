@@ -144,7 +144,9 @@ BindAll/
     ├── KeychainStore.swift     # API keys (generic password)
     └── LoginItemManager.swift  # SMAppService launch-at-login
 Tests/
-├── main.swift                  # pure-logic assertions across actions, settings, proofread, popups (no XCTest host needed)
+├── Unit/                       # pure-logic assertions (no XCTest host needed): Harness.swift (check/eq and
+│                               # shared helpers), one <Area>Tests.swift per area (Actions, Proofread,
+│                               # Autocomplete, Settings, UI, Voice), main.swift runs them all
 ├── run_tests.sh
 ├── eval_autocomplete.sh        # autocomplete ranking evaluator (hit@1/hit@3/MRR per prefix)
 ├── eval_autocomplete.swift     # harness: RU corpus, cold/warm store, baseline|context|semantic modes
