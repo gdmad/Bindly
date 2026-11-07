@@ -56,6 +56,9 @@ final class HotkeyCoordinator {
             guard let self else { return text }
             return try await self.translateDictation(text, to: code)
         }
+        voice.onDictated = { [weak self] text in
+            self?.recordHistory(kind: .voice, input: "", output: text, engine: "Speech", applied: true)
+        }
         updateVoice()
 
         // Every settings change -- or a key/token change in the Keychain -- re-applies everything; each
@@ -154,6 +157,7 @@ final class HotkeyCoordinator {
             self?.preview.show(title: "Fix all (\(count))", original: context.text, result: result,
 ) { [weak self] in
                 UsageLog.record(.proofread, .applied, detail: "fixAll:\(count)")
+                self?.recordHistory(kind: .action, input: context.text, output: result, engine: "LanguageTool", applied: true)
                 self?.replace(context, with: result)
             }
         }
@@ -184,11 +188,18 @@ final class HotkeyCoordinator {
 
     /// Push to Talk's "translate before inserting": Apple Translation, nothing when it is already
     /// in that language.
+    /// Following the Translation tab ("same"), it uses that pair both ways like every other
+    /// translation; a target picked for voice is one-way.
     private func translateDictation(_ text: String, to code: String) async throws -> String {
-        let detected = LanguageDetector.detect(text)
-        if detected?.languageCode?.identifier == code { return text }
-        let translation = try await translationCoordinator.translate(text, from: detected, to: Locale.Language(identifier: code))
-        recordHistory(kind: .translate, input: text, output: translation, engine: "Apple Translation")
+        let detected = LanguageDetector.detect(text)?.languageCode?.identifier
+        let s = appState.settings
+        let direction = s.pushToTalkTargetLanguage == "same"
+            ? LanguagePair.resolve(detected: detected, source: s.sourceLanguage, target: s.targetLanguage)
+            : LanguagePair.resolve(detected: detected, source: AppLanguages.autoTag, target: code)
+        if direction.isAlreadyThere { return text }
+        let translation = try await translationCoordinator.translate(text, from: direction.from.map { Locale.Language(identifier: $0) },
+                                                                     to: Locale.Language(identifier: direction.to))
+        recordHistory(kind: .translate, input: text, output: translation, engine: "Apple Translation", applied: true)
         return translation
     }
 
@@ -276,7 +287,7 @@ final class HotkeyCoordinator {
     /// Recent results; picking one puts it in place of the star's text, through the preview when
     /// that is on. Nil when history is off or empty.
     private func historyMenu(for context: StarContext) -> NSMenuItem? {
-        let entries = HistoryStore.shared.entries.prefix(HistoryMenuTitle.count)
+        let entries = HistoryStore.shared.entries.filter(\.applied).prefix(HistoryMenuTitle.count)
         guard appState.settings.historyEnabled, !entries.isEmpty else { return nil }
         let submenu = NSMenu()
         for entry in entries {
@@ -292,8 +303,12 @@ final class HotkeyCoordinator {
         return item
     }
 
+    /// From the selection star an entry replaces the selection; from the field star it goes in at
+    /// the caret -- replacing the whole draft with an old result would throw the draft away.
     private func insertFromHistory(_ entry: HistoryEntry, _ context: StarContext) {
         UsageLog.record(.star, .accepted, detail: "history")
+        var context = context
+        context.insertsAtCaret = !context.isSelection
         let apply: () -> Void = { [weak self] in self?.replace(context, with: entry.output) }
         if appState.settings.previewFromMenu {
             preview.show(title: "From history", original: context.subject, result: entry.output,
@@ -382,21 +397,21 @@ final class HotkeyCoordinator {
                 }
                 if Task.isCancelled { return }
                 let ms = UsageLog.elapsed(since: started)
-                // Show-only results are read, not inserted: they stay out of the history the star
-                // menu offers for putting text back in place.
-                if showOnly {
-                    UsageLog.record(feature, .shown, detail: detail, ms: ms)
-                    self.popup.show(title: title, text: result, original: text)
-                    return
-                }
                 let engineName = switch action {
                 case .spelling: "LanguageTool"
                 case .removeTells: settings.removeTellsWithAI ? settings.defaultEngine.displayName : "Rules"
                 default: settings.defaultEngine.displayName
                 }
-                self.recordHistory(kind: .action, input: text, output: result, engine: engineName)
+                // Kept either way; only an applied one is offered by the star's History.
+                let entry = self.recordHistory(kind: .action, input: text, output: result, engine: engineName)
+                if showOnly {
+                    UsageLog.record(feature, .shown, detail: detail, ms: ms)
+                    self.popup.show(title: title, text: result, original: text)
+                    return
+                }
                 let apply = { [weak self] in
                     UsageLog.record(feature, .applied, detail: detail, ms: ms)
+                    self?.markApplied(entry)
                     self?.replace(context, with: result)
                 }
                 // Remove AI tells always lists what no rule could take out; other actions do when the
@@ -731,15 +746,16 @@ final class HotkeyCoordinator {
                 if settings.maskAISlop {
                     result = MaskAISlop.apply(to: result, rules: settings.maskRules)
                 }
+                let entry = self.recordHistory(kind: .action, input: content, output: result,
+                                               engine: settings.defaultEngine.displayName)
                 if showOnly {
                     UsageLog.record(feature, .shown, detail: actionKey ?? source, ms: UsageLog.elapsed(since: started))
                     self.popup.show(title: actionTitle ?? "Result", text: result, original: content)
                     return
                 }
-                self.recordHistory(kind: .action, input: content, output: result,
-                                   engine: settings.defaultEngine.displayName)
                 let original = content
                 let replace = { [weak self] in
+                    self?.markApplied(entry)
                     if let anchor, Self.sameText(anchor.subject, text) {
                         self?.replace(anchor, with: result)
                     } else {
@@ -836,9 +852,15 @@ final class HotkeyCoordinator {
     }
 
     /// Records a successful operation in history (if enabled in settings).
-    func recordHistory(kind: HistoryEntry.Kind, input: String, output: String, engine: String) {
-        guard appState.settings.historyEnabled else { return }
-        HistoryStore.shared.record(kind: kind, input: input, output: output, engine: engine)
+    private func markApplied(_ id: UUID?) {
+        if let id { HistoryStore.shared.markApplied(id) }
+    }
+
+    /// Returns the entry's id, for `markApplied` once the result goes into the text.
+    @discardableResult
+    func recordHistory(kind: HistoryEntry.Kind, input: String, output: String, engine: String, applied: Bool = false) -> UUID? {
+        guard appState.settings.historyEnabled else { return nil }
+        return HistoryStore.shared.record(kind: kind, input: input, output: output, engine: engine, applied: applied)
     }
 
     /// Shared translation + popup, using the configured two-language pair.
@@ -851,23 +873,19 @@ final class HotkeyCoordinator {
         let detected = LanguageDetector.detect(text)
         let detectedCode = detected?.languageCode?.identifier
         let sourceSetting = settings.sourceLanguage
-        let from: Locale.Language?
-        let targetCode: String
-        if sourceSetting == AppLanguages.autoTag {
-            // Auto-detect the source; translate into the configured target.
-            from = detected
-            targetCode = settings.targetLanguage
-        } else {
-            // Explicit source: bidirectional pair {source, target}.
-            from = detected ?? Locale.Language(identifier: sourceSetting)
-            targetCode = (detectedCode == sourceSetting) ? settings.targetLanguage : sourceSetting
-        }
+        let direction = LanguagePair.resolve(detected: detectedCode, source: sourceSetting, target: settings.targetLanguage)
+        let from = direction.from.map { Locale.Language(identifier: $0) }
+        let targetCode = direction.to
         let target = Locale.Language(identifier: targetCode)
         let sourceDisplay = detectedCode.map { AppLanguages.name(for: $0) } ?? AppLanguages.name(for: sourceSetting)
 
         // Nothing to translate when the text is already in the target language. This is the common
         // false trigger for the download prompt when the source is auto-detected.
-        if let detectedCode, detectedCode == targetCode {
+        // From the screen the recognized text is a result in itself: shown whenever it cannot be
+        // translated, instead of only saying why.
+        let isOCR = historyKind == .ocr
+        if direction.isAlreadyThere {
+            if isOCR { return popup.show(title: "Recognized text: already in \(AppLanguages.name(for: targetCode))", text: text) }
             popup.show(title: "Translation",
                        text: "This text is already in \(AppLanguages.name(for: targetCode)).")
             return
@@ -881,6 +899,9 @@ final class HotkeyCoordinator {
             let forward = await TranslationSupport.isInstalledConfirmed(from: from, to: target)
             let backward = await TranslationSupport.isInstalledConfirmed(from: target, to: from)
             if !forward && !backward {
+                if isOCR {
+                    return popup.show(title: "Recognized text: \(sourceDisplay) -> \(AppLanguages.name(for: targetCode)) is not downloaded", text: text)
+                }
                 popup.show(
                     title: "Translation",
                     text: "\(sourceDisplay) -> \(AppLanguages.name(for: targetCode)) is not downloaded yet. Open System Settings > General > Language & Region > Translation Languages to download it, then try again."
@@ -892,12 +913,13 @@ final class HotkeyCoordinator {
         do {
             let translation = try await translationCoordinator.translate(text, from: from, to: target)
             if Task.isCancelled { return }
-            recordHistory(kind: historyKind, input: text, output: translation, engine: "Apple Translation")
+            let entry = recordHistory(kind: historyKind, input: text, output: translation, engine: "Apple Translation")
             UsageLog.record(feature, .shown, ms: UsageLog.elapsed(since: started))
             if let context {
                 let title = "Translate: \(sourceDisplay) → \(AppLanguages.name(for: targetCode))"
                 let apply: () -> Void = { [weak self] in
                     UsageLog.record(feature, .applied, detail: "inPlace")
+                    self?.markApplied(entry)
                     self?.replace(context, with: translation)
                 }
                 if settings.previewFromMenu {
@@ -912,6 +934,7 @@ final class HotkeyCoordinator {
         } catch {
             if isCancellation(error) { return }
             UsageLog.record(feature, .failed, reason: "error")
+            if isOCR { return popup.show(title: "Recognized text: translation failed", text: text) }
             popup.show(title: "Translation failed", text: error.localizedDescription)
         }
     }

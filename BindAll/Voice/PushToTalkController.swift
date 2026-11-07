@@ -23,6 +23,8 @@ final class PushToTalkController {
 
     /// Translates the dictated text into the given language code; supplied by the coordinator.
     var translate: ((String, String) async throws -> String)?
+    /// Dictation put into the text without translating (a translation is recorded by `translate`).
+    var onDictated: ((String) -> Void)?
 
     private var config = Config()
     private let monitor = HoldKeyMonitor()
@@ -189,6 +191,7 @@ final class PushToTalkController {
             guard self.session == id else { return }
             self.presenter.hide()
             TextInjector.replaceSelection(with: text, restorePrevious: self.config.restoreClipboard, target: self.target)
+            if !translate { self.onDictated?(text) }
             UsageLog.record(.voice, .applied, detail: translate ? "translated" : nil,
                             ms: UsageLog.elapsed(since: self.started))
         }

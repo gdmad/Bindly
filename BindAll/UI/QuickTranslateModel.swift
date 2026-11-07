@@ -64,13 +64,22 @@ final class QuickTranslateModel {
         needsDownload = false
         copied = false
         output = ""
-        let src: Locale.Language = source == AppLanguages.autoTag
-            ? (LanguageDetector.detect(text) ?? Locale.Language(identifier: "en"))
-            : Locale.Language(identifier: source)
+        // The window's own pair, chosen right there, goes one way; only an automatic source is
+        // resolved, so text already in the target is said to be, not "English -> English".
+        let detected = LanguageDetector.detect(text)?.languageCode?.identifier
+        if source == AppLanguages.autoTag, detected == target {
+            isTranslating = false
+            output = "This text is already in \(AppLanguages.name(for: target))."
+            return
+        }
+        let src = Locale.Language(identifier: source == AppLanguages.autoTag ? (detected ?? "en") : source)
         let tgt = Locale.Language(identifier: target)
         Task {
             defer { isTranslating = false }
-            guard await TranslationSupport.isInstalledConfirmed(from: src, to: tgt) else {
+            // A pack installed one way covers both, as the other translations check it.
+            let installed = await TranslationSupport.isInstalledConfirmed(from: src, to: tgt)
+            let installedBack = installed ? true : await TranslationSupport.isInstalledConfirmed(from: tgt, to: src)
+            guard installed || installedBack else {
                 needsDownload = true
                 let from = AppLanguages.name(for: src.languageCode?.identifier ?? "")
                 let to = AppLanguages.name(for: target)

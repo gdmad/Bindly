@@ -39,6 +39,8 @@ swiftc -O \
     BindAll/Proofread/ListMarkers.swift \
     BindAll/Proofread/AppOffsetMap.swift \
     BindAll/Engines/TranslationLayout.swift \
+    BindAll/Engines/LanguagePair.swift \
+    BindAll/Store/AppLanguages.swift \
     BindAll/Engines/OCRParagraphs.swift \
     BindAll/UI/PopupTilePacker.swift \
     BindAll/Engines/LanguageToolEngine.swift \

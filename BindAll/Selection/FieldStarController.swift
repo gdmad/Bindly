@@ -130,7 +130,7 @@ final class FieldStarController {
                                   selection: kind == "selection" ? target.selection : NSRange(location: 0, length: 0),
                                   offsetMap: target.offsetMap,
                                   anchor: NSPoint(x: origin.x + StarButton.size / 2, y: origin.y),
-                                  isEditable: target.isEditable)
+                                  isEditable: target.isEditable, caret: target.caret)
         // Counted once per field and kind, not on every re-show after typing or scrolling.
         let sameField = shownElement.map { CFEqual($0, target.element) } ?? false
         if !(sameField && shownKind == kind) { UsageLog.record(.star, .shown, detail: kind) }

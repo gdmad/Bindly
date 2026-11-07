@@ -3,6 +3,15 @@ import CoreGraphics
 import Foundation
 
 func runUITests() {
+    print("LanguagePair")
+    let auto = LanguagePair.resolve(detected: "ru", source: "auto", target: "en")
+    check(auto == .init(from: "ru", to: "en") && !auto.isAlreadyThere, "auto: into the target")
+    check(LanguagePair.resolve(detected: "en", source: "auto", target: "en").isAlreadyThere, "auto: already in the target")
+    check(LanguagePair.resolve(detected: nil, source: "auto", target: "en") == .init(from: nil, to: "en"), "auto, unknown: the framework detects")
+    check(LanguagePair.resolve(detected: "ru", source: "ru", target: "en") == .init(from: "ru", to: "en"), "pair: source into target")
+    check(LanguagePair.resolve(detected: "en", source: "ru", target: "en") == .init(from: "en", to: "ru"), "pair: target back into source")
+    check(LanguagePair.resolve(detected: nil, source: "ru", target: "en") == .init(from: "ru", to: "en"), "pair, unknown: taken as the source")
+
     print("PanelWidth")
     check(PanelWidth.fitting(["Ok"]) == 380, "a short text gets the narrowest window")
     check(PanelWidth.fitting([String(repeating: "word ", count: 80)]) == 560, "a long line gets the widest")

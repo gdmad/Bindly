@@ -29,6 +29,7 @@ BindAll/
 ├── Selection/
 │   ├── SelectionReader.swift   # Reads selection from the pasteboard (AX attribute fallback)
 │   ├── TextInjector.swift      # Sets pasteboard + synthesizes Cmd+V; copy helper
+│   ├── EdgeWhitespace.swift / ReplaceTarget.swift # pure: a result keeps the subject's edges; where it goes now
 │   └── InjectedEvents.swift    # Marks/detects BindAll's own synthetic keys, so proofread/autocomplete ignore each other's writes
 ├── Engines/
 │   ├── AIEngine.swift          # protocol + EngineError
@@ -38,6 +39,7 @@ BindAll/
 │   │                                 # check()/parseMatches()/issues() feed Proofread
 │   ├── TranslationService.swift      # Apple Translation framework + NL language detection
 │   ├── TranslationLayout.swift # pure: puts the source's line breaks back into a translation
+│   ├── LanguagePair.swift      # pure: which way a translation goes, for every entry point
 │   ├── OCRParagraphs.swift     # pure: joins wrapped OCR lines back into paragraphs
 │   └── OCRService.swift        # screencapture region + Vision text recognition
 ├── Voice/                      # Push to Talk (off by default)
@@ -259,6 +261,16 @@ engine and translation task is `currentTask`, so Esc cancels it; the local Esc m
 only while there is a task. The 25 s watchdog cancels the task, not just the busy flag. Fix spelling
 skips personal-dictionary words (`LanguageToolEngine.correct(_:dictionary:)`); history records the
 engine that actually ran (LanguageTool, Rules, or the AI engine); "Save as action key" keeps Show.
+History keeps every result -- shown ones too (Explain, translation popups, Quick Translate, a
+closed preview) -- with `HistoryEntry.applied`, set at Apply (`markApplied`); old entries decode as
+applied. Fix all and plain dictation (kind `voice`) are recorded as applied. The star's History lists
+applied entries only; from the field star an entry is inserted at the caret
+(`StarContext.insertsAtCaret`), from the selection star it replaces the selection. One direction
+rule for translations, `LanguagePair.resolve` (pure): automatic source -> target; an explicit source
+works both ways; unknown language -> target. Used by the shortcut, the star, OCR and dictation that
+follows the Translation tab; Quick Translate keeps its own one-way pair but says "already in X"
+instead of asking to download X -> X, and checks the pack both ways. OCR shows the recognized text
+whenever it cannot be translated (already in the target, no pack, failure).
 
 ## Engines
 - **Engine for text actions** (`Settings → Providers`): Apple on-device, DeepSeek, OpenRouter, OpenAI,

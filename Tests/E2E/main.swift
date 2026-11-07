@@ -423,6 +423,27 @@ func historyScenario() {
     record("picking the newest History entry shows a preview", applyPreview())
     record("Apply puts the result in place", E2E.wait(5) { fieldText().trimmingCharacters(in: .whitespacesAndNewlines) == remembered },
            "now: \(fieldText()), expected: \(remembered)")
+
+    // From the field star (nothing selected) the entry goes in at the caret; the draft stays.
+    clearField()
+    let draft = "Черновик остаётся. "
+    E2E.type(draft)
+    E2E.pause(1.5)
+    guard E2E.wait(4, { E2E.window("BindAll Star") != nil }), let star = E2E.window("BindAll Star")?.bounds else {
+        record("the field star's History inserts at the caret", false, "no field star"); return
+    }
+    E2E.click(CGPoint(x: star.midX, y: star.midY))
+    E2E.pause(0.6)
+    if let history = item({ $0 == "History" }) {
+        E2E.press(history)
+        E2E.pause(0.5)
+        if let entry = item({ $0.contains("звёздоч") }) { E2E.press(entry) } else { pickMenuItem() }
+    } else {
+        pickMenuItem(ups: 1, thenRight: true)
+    }
+    _ = applyPreview()
+    record("the field star's History inserts at the caret", E2E.wait(5) { fieldText().hasPrefix(draft) && fieldText().contains(remembered) },
+           "now: \(fieldText())")
 }
 
 /// Picks an item of the open star menu with the keyboard (the menu is not always in the AX tree):

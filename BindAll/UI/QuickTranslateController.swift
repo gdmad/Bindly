@@ -31,7 +31,7 @@ final class QuickTranslateController: NSObject, NSWindowDelegate {
             onClose: { [weak self] in self?.close() },
             onTranslated: { [weak self] input, output in
                 guard let self, self.appState.settings.historyEnabled else { return }
-                HistoryStore.shared.record(kind: .quick, input: input, output: output, engine: "Apple Translation")
+                HistoryStore.shared.record(kind: .quick, input: input, output: output, engine: "Apple Translation", applied: false)
             }
         )
         let view = QuickTranslateView(model: model)

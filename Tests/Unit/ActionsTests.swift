@@ -3,6 +3,17 @@ import CoreGraphics
 import Foundation
 
 func runActionsTests() {
+    print("HistoryEntry applied")
+    do {
+        let old = #"[{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","date":0,"kind":"action","input":"a","output":"b","engine":"x"}]"#
+        let decoded = try? JSONDecoder().decode([HistoryEntry].self, from: Data(old.utf8))
+        check(decoded?.first?.applied == true, "an entry from before the flag counts as applied")
+        var shown = HistoryEntry(date: Date(), kind: .translate, input: "a", output: "b", engine: "x")
+        shown.applied = false
+        let back = (try? JSONEncoder().encode([shown])).flatMap { try? JSONDecoder().decode([HistoryEntry].self, from: $0) }
+        check(back?.first?.applied == false, "a shown-only entry stays shown-only")
+    }
+
     print("EdgeWhitespace")
     check(EdgeWhitespace.wrap("Fixed line", like: "fixd line\n") == "Fixed line\n", "a line keeps its line break")
     check(EdgeWhitespace.wrap(" Word ", like: " word") == " Word", "the original's edges, not the result's")
