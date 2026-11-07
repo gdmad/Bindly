@@ -41,7 +41,8 @@ struct ShortcutsSettingsView: View {
                     Text("No action keys yet. Add them on the AI Actions tab.")
                         .foregroundStyle(.secondary)
                 }
-                ForEach(appState.settings.actionKeys) { key in
+                // A key with no instruction does nothing, so it gets no shortcut either.
+                ForEach(appState.settings.actionKeys.filter { !$0.prompt.isEmpty }) { key in
                     LabeledContent(key.title) {
                         ShortcutRecorder(optionalConfig: hotkeyBinding(for: key.id), others: others(excluding: key.id.uuidString))
                     }

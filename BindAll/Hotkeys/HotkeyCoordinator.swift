@@ -308,17 +308,17 @@ final class HotkeyCoordinator {
         customPrompt.show(recent: appState.settings.recentPrompts,
                           scope: context.isSelection ? "Selection" : "Whole text",
 ) { [weak self] prompt, showOnly, save in
-            self?.rememberPrompt(prompt, saveAsActionKey: save)
+            self?.rememberPrompt(prompt, saveAsActionKey: save, showOnly: showOnly)
             self?.runStarAction(.prompt(prompt, showOnly: showOnly), context)
         }
     }
 
-    private func rememberPrompt(_ prompt: String, saveAsActionKey: Bool) {
+    private func rememberPrompt(_ prompt: String, saveAsActionKey: Bool, showOnly: Bool) {
         var recent = appState.settings.recentPrompts.filter { $0 != prompt }
         recent.insert(prompt, at: 0)
         appState.settings.recentPrompts = Array(recent.prefix(5))
         if saveAsActionKey, !appState.settings.actionKeys.contains(where: { $0.prompt == prompt }) {
-            appState.settings.actionKeys.append(ActionKey(label: String(prompt.prefix(40)), prompt: prompt))
+            appState.settings.actionKeys.append(ActionKey(label: String(prompt.prefix(40)), prompt: prompt, showOnly: showOnly))
         }
     }
 
@@ -331,14 +331,14 @@ final class HotkeyCoordinator {
             UsageLog.record(.star, .accepted, detail: "translate")
             guard !isBusy else { return }
             beginBusy()
-            Task { await translateAndShow(text, historyKind: .translate); endBusy() }
+            currentTask = Task { await translateAndShow(text, historyKind: .translate); endBusy() }
             return
         }
         if case .translateInPlace = action {
             UsageLog.record(.star, .accepted, detail: "translateInPlace")
             guard !isBusy else { return }
             beginBusy()
-            Task { await translateAndShow(text, historyKind: .translate, replacing: context); endBusy() }
+            currentTask = Task { await translateAndShow(text, historyKind: .translate, replacing: context); endBusy() }
             return
         }
         guard !isBusy else { return }
@@ -365,7 +365,8 @@ final class HotkeyCoordinator {
                 var result: String
                 switch action {
                 case .spelling:
-                    result = try await EngineFactory.makeLanguageTool(appState: self.appState).correct(text)
+                    result = try await EngineFactory.makeLanguageTool(appState: self.appState)
+                        .correct(text, dictionary: PersonalDictionary.set(settings.personalDictionary))
                 case .removeTells:
                     result = try await self.removeTells(from: text, settings: settings)
                 case .fix, .actionKey, .prompt, .translate, .translateInPlace, .reading:
@@ -388,13 +389,23 @@ final class HotkeyCoordinator {
                     self.popup.show(title: title, text: result, original: text)
                     return
                 }
-                self.recordHistory(kind: .action, input: text, output: result, engine: settings.defaultEngine.displayName)
+                let engineName = switch action {
+                case .spelling: "LanguageTool"
+                case .removeTells: settings.removeTellsWithAI ? settings.defaultEngine.displayName : "Rules"
+                default: settings.defaultEngine.displayName
+                }
+                self.recordHistory(kind: .action, input: text, output: result, engine: engineName)
                 let apply = { [weak self] in
                     UsageLog.record(feature, .applied, detail: detail, ms: ms)
                     self?.replace(context, with: result)
                 }
+                // Remove AI tells always lists what no rule could take out; other actions do when the
+                // "Point out stock phrases" rule is on.
                 var note: String?
-                if case .removeTells = action {
+                let listsPhrases = if case .removeTells = action { true } else {
+                    settings.maskAISlop && settings.maskRules.contains(.stockPhrases)
+                }
+                if listsPhrases {
                     let left = MaskAISlop.stockPhrases(in: result)
                     if !left.isEmpty { note = "Stock phrases left: " + left.joined(separator: ", ") }
                 }
@@ -554,6 +565,8 @@ final class HotkeyCoordinator {
         let s = appState.settings
         guard s.enabled, !appState.isRecordingShortcut else { return }
         burstChangeCount = changeCount
+        // In BindAll's own windows (Settings, a result) Cmd+C is just copying.
+        let inBindAll = NSWorkspace.shared.frontmostApplication?.processIdentifier == ProcessInfo.processInfo.processIdentifier
 
         func matches(_ h: HotkeyConfig) -> Bool {
             h.keyCode == keyCode && h.modifiers == modifiers && h.repeatCount == count
@@ -567,7 +580,7 @@ final class HotkeyCoordinator {
             return
         }
 
-        guard !isBusy else { return }
+        guard !isBusy, !inBindAll else { return }
 
         if matches(s.defaultActionHotkey) {
             runDefaultAction()
@@ -594,6 +607,11 @@ final class HotkeyCoordinator {
         installEscMonitor()
         busyWatchdog?.cancel()
         let work = DispatchWorkItem { [weak self] in
+            // Stop the action too: left running, a late result would be pasted wherever the user is
+            // by then, with Esc no longer able to stop it.
+            if self?.currentTask != nil { UsageLog.record(.fix, .failed, reason: "timeout") }
+            self?.currentTask?.cancel()
+            self?.currentTask = nil
             self?.isBusy = false
             self?.appState.isProcessing = false
             self?.stars.setBusy(false)
@@ -623,8 +641,10 @@ final class HotkeyCoordinator {
             if event.keyCode == 53 { self?.currentTask?.cancel() }
         }
         escLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 { self?.currentTask?.cancel(); return nil }
-            return event
+            // Only while there is something to cancel: otherwise Esc belongs to the window.
+            guard event.keyCode == 53, let task = self?.currentTask else { return event }
+            task.cancel()
+            return nil
         }
     }
 
@@ -667,8 +687,7 @@ final class HotkeyCoordinator {
         runDefaultAction(fixedInstruction: reading.prompt, forceCopy: forceCopy, showOnly: true, reading: reading)
     }
 
-    /// Runs the text pipeline on the current selection. With `fixedInstruction` (a per-key
-    /// shortcut) the whole selection is the content; otherwise the separator/key syntax is parsed.
+    /// Runs the text pipeline on the current selection with `fixedInstruction`, or the default prompt.
     private func runDefaultAction(fixedInstruction: String? = nil, forceCopy: Bool = false,
                                   actionKey key: ActionKey? = nil, showOnly: Bool = false, reading: Reading? = nil) {
         let actionKey = key?.logToken
@@ -750,7 +769,7 @@ final class HotkeyCoordinator {
 
     private func runTranslate(forceCopy: Bool = false) {
         beginBusy()
-        Task { [weak self] in
+        currentTask = Task { [weak self] in
             guard let self else { return }
             defer { self.endBusy() }
 
@@ -785,7 +804,8 @@ final class HotkeyCoordinator {
     }
 
     private func runFromMenu(_ which: MenuAction) {
-        guard appState.settings.enabled, !isBusy else { return }
+        // A click is a clear request: the master switch stands down only what fires by itself.
+        guard !isBusy else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             guard let self else { return }
             switch which {
@@ -871,6 +891,7 @@ final class HotkeyCoordinator {
 
         do {
             let translation = try await translationCoordinator.translate(text, from: from, to: target)
+            if Task.isCancelled { return }
             recordHistory(kind: historyKind, input: text, output: translation, engine: "Apple Translation")
             UsageLog.record(feature, .shown, ms: UsageLog.elapsed(since: started))
             if let context {
@@ -889,6 +910,7 @@ final class HotkeyCoordinator {
             popup.show(title: "Translation", text: translation, original: text, sourceLanguage: sourceDisplay,
                        targetLanguage: AppLanguages.name(for: targetCode))
         } catch {
+            if isCancellation(error) { return }
             UsageLog.record(feature, .failed, reason: "error")
             popup.show(title: "Translation failed", text: error.localizedDescription)
         }

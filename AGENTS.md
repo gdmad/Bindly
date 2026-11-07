@@ -254,6 +254,11 @@ back only where its text still is (`ReplaceTarget`: unchanged, or found again ne
 when there is no offset map), checks the select and the selected text, and otherwise shows the
 result to copy ("Not replaced"); the hotkey preview captures its selection (`selectionContext`) and
 goes through it. Results keep the subject's leading/trailing whitespace (`EdgeWhitespace`).
+Hotkey bursts do nothing while BindAll itself is in front (Quick Translate's toggle aside). Every
+engine and translation task is `currentTask`, so Esc cancels it; the local Esc monitor swallows Esc
+only while there is a task. The 25 s watchdog cancels the task, not just the busy flag. Fix spelling
+skips personal-dictionary words (`LanguageToolEngine.correct(_:dictionary:)`); history records the
+engine that actually ran (LanguageTool, Rules, or the AI engine); "Save as action key" keeps Show.
 
 ## Engines
 - **Engine for text actions** (`Settings → Providers`): Apple on-device, DeepSeek, OpenRouter, OpenAI,
@@ -340,7 +345,7 @@ goes through it. Results keep the subject's leading/trailing whitespace (`EdgeWh
   otherwise (Russian is only there), both on-device, models via `AssetInventory`. The language is the
   setting or the keyboard layout's. "Translate before inserting" (or Shift held at release, which
   flips it once) runs Apple Translation first; if that fails the dictation goes to the clipboard.
-  **Dictate and translate** (`voiceTranslateEnabled`, on by default; `voiceTranslateKey`, right
+  **Dictate and translate** (`voiceTranslateEnabled`, off by default -- it opens the microphone; `HoldKeyMonitor` counts mouse clicks and scrolling as "another key", so a Cmd-click never records; `voiceTranslateKey`, right
   Command): its own hold key that always translates, also with plain Push to Talk off.
   `HoldKeyMonitor` watches both keys as slots (one hold at a time). The voice target language is
   "same" by default, meaning the Translation tab's target.
@@ -536,7 +541,7 @@ thread (and, with it, the active proofread popup tap the system would then disab
   dim 0.15, each swelling at its peak; the first frame already has the big one lit, and a wave plays
   at least two rounds and stops at the end of one, so a quick action is seen; frames of the button's
   own image at 20 fps, so the click highlight still works), and the button dimmed to `disabledAlpha` while the
-  master switch (`settings.enabled`) is off. The master switch gates the
+  master switch (`settings.enabled`) is off. It does not gate the menu-bar items: a click is a clear request. The master switch gates the
   hotkey bursts, autocomplete and proofread alike, so "off" must stay visually distinguishable --
   otherwise a disabled app looks exactly like a working one whose shortcuts do nothing.
 - The status menu draws every shortcut hint itself (eight of them, one right-aligned column; Explain and Summarize show none until one is set) and has

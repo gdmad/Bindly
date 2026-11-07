@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// One successful operation kept in history. API keys are never part of an entry.
 struct HistoryEntry: Codable, Identifiable, Equatable {
@@ -35,13 +36,13 @@ struct HistoryEntry: Codable, Identifiable, Equatable {
 
 /// Persists the last operations as JSON in Application Support. Main-actor: called from the
 /// pipelines and read by the menu, both on the main thread.
-@MainActor
+@MainActor @Observable
 final class HistoryStore {
     static let shared = HistoryStore()
-    static let limit = 50
+    nonisolated static let limit = 50
 
     private(set) var entries: [HistoryEntry] = []
-    private let fileURL: URL
+    @ObservationIgnored private let fileURL: URL
 
     init(fileURL: URL? = nil) {
         if let fileURL {

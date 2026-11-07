@@ -31,6 +31,11 @@ struct GeneralSettingsView: View {
             Section {
                 HelpToggleRow("Keep history", "Stores the last 50 results locally (menu bar > History, and History in the star menu) so a closed popup or overwritten paste can be recovered. Stored on this Mac only; never includes API keys.",
                               isOn: $appState.settings.historyEnabled)
+                if !appState.settings.historyEnabled, !HistoryStore.shared.entries.isEmpty {
+                    LabeledContent("Kept from before") {
+                        Button("Clear History", role: .destructive) { HistoryStore.shared.clear() }
+                    }
+                }
                 UsageDataRow()
             } header: {
                 HelpHeader("Data", "What BindAll keeps on this Mac. Nothing here leaves it.")

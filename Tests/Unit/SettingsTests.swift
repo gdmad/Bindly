@@ -82,7 +82,7 @@ func runSettingsTests() {
     allChanged.pushToTalkLanguage = "ru"
     allChanged.pushToTalkTranslate = true
     allChanged.pushToTalkTargetLanguage = "de"
-    allChanged.voiceTranslateEnabled = false
+    allChanged.voiceTranslateEnabled = true
     allChanged.voiceTranslateKey = .rightOption
     allChanged.historyEnabled = false
     allChanged.sourceLanguage = "de"

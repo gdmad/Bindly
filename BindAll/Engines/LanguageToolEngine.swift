@@ -27,9 +27,11 @@ struct LanguageToolEngine: Equatable {
     let language: String
 
     /// Corrects `text` and returns the result with all suggested replacements applied.
-    func correct(_ text: String) async throws -> String {
+    /// Every first suggestion applied, except on words in the personal dictionary (`dictionary`,
+    /// normalized): Fix spelling must not "correct" a name the user taught, as Fix all does not.
+    func correct(_ text: String, dictionary: Set<String> = []) async throws -> String {
         let matches = try await rawMatches(text, languageOverride: nil)
-        return Self.applyMatches(matches, to: text)
+        return Self.applyMatches(matches, to: text, skipping: dictionary)
     }
 
     /// Checks `text` and returns the matches in structured form, for the proofreading pipeline which
@@ -160,12 +162,17 @@ struct LanguageToolEngine: Equatable {
     /// Applies LanguageTool `matches` (first replacement of each) to `text`.
     /// Offsets and lengths are UTF-16 code units (LanguageTool uses Java char indices), so edits are
     /// done on an `NSMutableString` and applied right-to-left to keep earlier offsets valid.
-    static func applyMatches(_ matches: [[String: Any]], to text: String) -> String {
+    static func applyMatches(_ matches: [[String: Any]], to text: String, skipping dictionary: Set<String> = []) -> String {
+        let ns = text as NSString
         let edits: [(offset: Int, length: Int, replacement: String)] = matches.compactMap { m in
             guard let offset = m["offset"] as? Int,
                   let length = m["length"] as? Int,
                   let replacements = m["replacements"] as? [[String: Any]],
                   let value = replacements.first?["value"] as? String else { return nil }
+            if !dictionary.isEmpty, offset >= 0, length > 0, offset + length <= ns.length,
+               dictionary.contains(PersonalDictionary.normalize(ns.substring(with: NSRange(location: offset, length: length)))) {
+                return nil
+            }
             return (offset, length, value)
         }.sorted { $0.offset > $1.offset }
 

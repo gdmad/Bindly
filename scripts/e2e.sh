@@ -29,7 +29,7 @@ settings = {
     "autocompleteLanguages": ["ru"], "languageToolMode": "free", "languageToolLanguage": "ru",
     "proofreadMinLength": 5, "starFieldEnabled": True, "starSelectionEnabled": True,
     "previewFromMenu": True, "defaultEngine": "apple", "historyEnabled": True, "preSendCheck": True,
-    "pushToTalkEnabled": True, "pushToTalkLanguage": "ru", "pushToTalkTargetLanguage": "en",
+    "pushToTalkEnabled": True, "voiceTranslateEnabled": True, "pushToTalkLanguage": "ru", "pushToTalkTargetLanguage": "en",
     "sourceLanguage": "ru", "targetLanguage": "en", "restoreClipboard": True,
 }
 data = json.dumps(settings).encode().hex()

@@ -278,6 +278,19 @@ func masterSwitchScenario() {
         // The dimming is relative: light and dark menu bars differ, the difference does not.
         record("off: the tray icon is dimmed", abs(dim - bright) > 0.01, String(format: "brightness %.3f → %.3f", bright, dim))
     }
+    // A menu item is a click, not a trigger: it still runs while off.
+    clearField()
+    E2E.type("Совещание переносится на четверг. ")
+    E2E.pause(0.5)
+    E2E.key(kVK_ANSI_A, .maskCommand)
+    E2E.pause(0.5)
+    if pressTrayItem("Translate selection") {
+        let shown = E2E.wait(20) { E2E.window("BindAll Translation") != nil }
+        record("off: a menu-bar item still runs", shown)
+        if shown { clickButton("Close", in: "BindAll Translation") }
+        E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+    }
+    focusTextEdit()
     guard pressTrayItem("Enabled") else { record("on again: the Enabled item is found", false); return }
     isEnabledNow = true
     clearField()

@@ -42,6 +42,8 @@ final class HoldKeyMonitor: @unchecked Sendable {
         guard tap == nil else { return }
         let mask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
             | (1 << CGEventType.flagsChanged.rawValue)
+            | (1 << CGEventType.leftMouseDown.rawValue) | (1 << CGEventType.rightMouseDown.rawValue)
+            | (1 << CGEventType.otherMouseDown.rawValue) | (1 << CGEventType.scrollWheel.rawValue)
         let callback: CGEventTapCallBack = { _, type, event, refcon in
             guard let refcon else { return Unmanaged.passUnretained(event) }
             return Unmanaged<HoldKeyMonitor>.fromOpaque(refcon).takeUnretainedValue().handle(type: type, event: event)
@@ -131,6 +133,11 @@ final class HoldKeyMonitor: @unchecked Sendable {
         }
         if type == .flagsChanged { return pass }
         let wasDown = held != nil
+        // A Cmd-click or Cmd-scroll uses the key as a modifier: it is "another key", never speech.
+        if type != .keyDown, type != .keyUp {
+            if wasDown { send(.other) }
+            return pass
+        }
 
         guard type == .keyDown else { return pass }
         if code == kVK_Escape, recording {

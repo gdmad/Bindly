@@ -11,6 +11,9 @@ func runProofreadTests() {
     eq(LanguageToolEngine.applyMatches([ltMatch(0, 3, "the"), ltMatch(4, 3, "the")], to: "teh teh"),
        "the the", "two replacements applied right-to-left")
     eq(LanguageToolEngine.applyMatches([], to: "no change"), "no change", "no matches keeps text")
+    eq(LanguageToolEngine.applyMatches([ltMatch(0, 6, "Mishka"), ltMatch(7, 3, "the")], to: "Mishko teh cat",
+                                       skipping: PersonalDictionary.set(["mishko"])),
+       "Mishko the cat", "a dictionary word is not corrected, the rest is")
     eq(LanguageToolEngine.applyMatches([["offset": 0, "length": 3]], to: "teh cat"),
        "teh cat", "match without replacements is skipped")
     eq(LanguageToolEngine.applyMatches([ltMatch(100, 3, "x")], to: "short"),

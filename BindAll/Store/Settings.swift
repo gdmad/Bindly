@@ -218,7 +218,7 @@ struct Settings: Codable, Equatable {
     var pushToTalkTranslate: Bool = false
     var pushToTalkTargetLanguage: String = "same" // "same" = the Translation tab's target
     // Dictate and translate: its own hold key, always translates, works with Push to Talk off.
-    var voiceTranslateEnabled: Bool = true
+    var voiceTranslateEnabled: Bool = false
     var voiceTranslateKey: PushToTalkKey = .rightCommand
 
     // Translation. Source may be "auto" (detect). With an explicit source, the configured pair is
