@@ -9,17 +9,16 @@ struct QuickTranslateActionBar: View {
     var body: some View {
         // Copy, the main action, is rightmost with Close next to it; Clear throws the text away, so
         // it sits apart on the left rather than one slip away from Copy.
-        HStack(spacing: 10) {
+        PanelActionBar {
             Button(action: clear) {
                 Text("Clear").frame(minWidth: 56)
             }
-            .controlSize(.large)
             .disabled(!model.canClear)
             .help("Clear the text and its translation")
             if model.needsDownload {
                 Button("Open Language Settings", action: TranslationSupport.openLanguageSettings)
             }
-            Spacer()
+        } trailing: {
             CloseButton(action: model.onClose)
             CopyButton(copied: model.copied, action: model.copyOutput)
                 .disabled(!model.canCopy)

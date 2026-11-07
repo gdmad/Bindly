@@ -113,6 +113,9 @@ BindAll/
 │   ├── FixesPopupFixAllButton.swift   # "Fix all (N)" cell under the fixes
 │   ├── StarShape.swift                # the star as a vector path
 │   ├── StarActivity.swift             # busy flag the star animates on
+│   ├── FloatingPanelHost.swift        # the borderless, content-sized window behind result/preview/prompt
+│   ├── PanelPlacement.swift / FocusedField.swift # next to the field: below, above, or centered
+│   ├── PanelChrome.swift / PanelActionBar.swift  # shared window look and button row
 │   ├── FixesPopupAddWordButton.swift  # book icon: add the word to the personal dictionary
 │   ├── PersonalDictionarySection.swift # Settings -> Proofread: the dictionary's words
 │   ├── PopupMessageView.swift  # one-line notice in the same chrome
@@ -337,14 +340,22 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   (debounced), hidden on key-down/scroll; follows the Proofread app filter; skips BindAll itself,
   password and tiny fields. Uses `ProofreadAX.focus(analyze: false)` (no hidden-break walk) and the
   offset map for the selection's end. A click opens an `NSMenu` built by the coordinator: Fix, Fix
-  spelling (LanguageTool `correct`), Translate (popup), Translate in place (Apple Translation, same
-  language pair rules as Translate, the result replaces the text through the preview), Explain and Summarize (show-only: the result
+  spelling (LanguageTool `correct`), Show translation (popup), Replace with translation (Apple
+  Translation, same language pair rules, the result replaces the text through the preview), Explain and Summarize (show-only: the result
   goes to the popup, the text is untouched, nothing is recorded in history), action keys (a key with
   `ActionKey.showOnly` shows its result too, from the star and from its own shortcut), Custom
   prompt..., History (the
   last 8 results, `HistoryMenuTitle`; picking one puts its output in place through the preview when
   `previewFromMenu` is on; only with history on), and for the field star "N issues: show the first". `StarContext` captures element, value, selection and map;
   replacing re-activates the app, selects `appRange` and pastes.
+- **Windows** (result `PopupController`, `PreviewController`, `CustomPromptController`): one
+  `FloatingPanelHost` -- a borderless `KeyablePanel` (Esc via `onEscape`, since borderless panels do
+  not reach `onExitCommand`), `sizingOptions = .preferredContentSize`, so it is as big as its content
+  (380-560 pt wide, the body scrolls past 60% of the screen height) and follows it as it grows,
+  keeping its top edge. Placed by `PanelPlacement`: under the field (`FocusedField.rect()`, the
+  focused element), above it when there is no room, else centered on the app's window. Look:
+  `.panelChrome()` (material, radius 14, hairline border) and `PanelActionBar` (secondary left,
+  Close and the main action right); Quick Translate uses the same bar.
 - **Preview** (`UI/Preview*`): every text-replacing star action shows a word diff (`TextDiff.words`,
   LCS over word+whitespace tokens; `DiffText` renders added on green + underline, removed red +
   strikethrough) with Changes/Result, Close / Copy / Apply (Return). `previewFromMenu` (default on)

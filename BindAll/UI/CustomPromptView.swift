@@ -12,36 +12,35 @@ struct CustomPromptView: View {
                 .foregroundStyle(Color.brand)
                 .overlay { WindowDragHandle().allowsHitTesting(false) }
             TextField("Prompt", text: $model.prompt, prompt: Text("What should happen to the text?"), axis: .vertical)
-                .lineLimit(2...5)
+                .lineLimit(1...8)
                 .textFieldStyle(.roundedBorder)
                 .focused($focused)
                 .onSubmit(runAndReplace)
             if !model.recent.isEmpty {
                 CustomPromptRecentList(prompts: model.recent, use: model.use)
             }
-            HStack(spacing: 10) {
+            PanelActionBar {
                 Toggle("Save as action key", isOn: $model.saveAsActionKey)
                     .toggleStyle(.checkbox)
-                Spacer()
+            } trailing: {
                 CloseButton(action: model.onClose)
                 Button(action: runAndShow) {
                     Text("Show").frame(minWidth: 56)
                 }
-                .controlSize(.large)
                 .disabled(!model.canRun)
                 .help("Show the result without changing the text (⌥Return)")
                 .keyboardShortcut(.return, modifiers: .option)
                 Button(action: runAndReplace) {
                     Text("Run").frame(minWidth: 56)
                 }
-                .controlSize(.large)
                 .buttonStyle(.borderedProminent)
                 .disabled(!model.canRun)
                 .help("Run and preview the change (Return)")
             }
         }
-        .padding(14)
         .frame(width: 460)
+        .fixedSize(horizontal: false, vertical: true)
+        .panelChrome()
         .onExitCommand(perform: model.onClose)
         .onAppear { focused = true }
     }

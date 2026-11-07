@@ -425,9 +425,18 @@ func explainScenario() {
             E2E.snapshot(E2E.window("BindAll Translation")!.bounds, to: outDir.appending(path: "\(name.lowercased()).png"))
         }
         record("\(name) shows its result in a popup", shown && !body.contains("Error"), shown ? "" : "no popup")
+        if let popup = E2E.window("BindAll Translation")?.bounds, let fieldFrame = textEditField().flatMap(E2E.frame) {
+            let near = popup.minY >= fieldFrame.minY - 40 && popup.minY <= fieldFrame.maxY + 40
+                || popup.maxY >= fieldFrame.minY - 40 && popup.maxY <= fieldFrame.minY + 40
+                || fieldFrame.insetBy(dx: -10, dy: -10).contains(CGPoint(x: popup.midX, y: popup.midY))
+            record("\(name): the window is by the field, on screen, at least 380 wide",
+                   near && E2E.isOnScreen(popup) && popup.width >= 380, "popup \(popup), field \(fieldFrame)")
+        }
         record("\(name) leaves the text alone", fieldText() == text, "now: \(fieldText())")
         E2E.key(kVK_Escape)
-        E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+        let closed = E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+        record("\(name): Esc closes the window", closed, "front \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
+        if !closed { E2E.key(kVK_Escape) }
     }
 }
 
@@ -481,7 +490,7 @@ func translateInPlaceScenario() {
     guard let star = E2E.window("BindAll Star")?.bounds else { record("Translate in place", false, "no star"); return }
     E2E.click(CGPoint(x: star.midX, y: star.midY))
     E2E.pause(0.6)
-    if let item = E2E.find(in: AXUIElementCreateApplication(pid), depth: 6, { (E2E.attr($0, kAXTitleAttribute) as? String) == "Translate in place" }) {
+    if let item = E2E.find(in: AXUIElementCreateApplication(pid), depth: 6, { (E2E.attr($0, kAXTitleAttribute) as? String) == "Replace with translation" }) {
         E2E.press(item)
     } else {
         pickMenuItem(downs: 4)
@@ -582,6 +591,9 @@ func starScenarios() {
             print("    windows: \(E2E.windows().map { "\($0.name) \($0.bounds)" }); used \(item == nil ? "keys" : "AX")")
         }
         record("Fix spelling shows a preview", preview)
+        if let shown = E2E.window("BindAll Preview")?.bounds {
+            record("the preview is on screen and at least 380 wide", E2E.isOnScreen(shown) && shown.width >= 380, "\(shown)")
+        }
         if preview {
             E2E.snapshot(E2E.window("BindAll Preview")!.bounds, to: outDir.appending(path: "preview.png"))
             E2E.allowBareReturn = true
@@ -603,6 +615,18 @@ func starScenarios() {
             let shown = E2E.wait(3) { E2E.window("BindAll Prompt") != nil }
             let rect = E2E.window("BindAll Prompt")?.bounds ?? .zero
             record("the custom prompt panel opens fully on screen", shown && E2E.isOnScreen(rect), "panel \(rect)")
+            // A long prompt makes the window taller instead of scrolling inside two lines.
+            let promptApp = AXUIElementCreateApplication(pid)
+            if let field = E2E.find(in: promptApp, depth: 10, { (E2E.attr($0, kAXRoleAttribute) as? String) == "AXTextArea"
+                || (E2E.attr($0, kAXRoleAttribute) as? String) == "AXTextField" }) {
+                let long = Array(repeating: "Сделай текст короче и вежливее, сохрани смысл.", count: 5).joined(separator: " ")
+                AXUIElementSetAttributeValue(field, kAXValueAttribute as CFString, long as CFString)
+                E2E.type(" ", toPid: pid)
+                E2E.pause(0.8)
+                let grown = E2E.window("BindAll Prompt")?.bounds ?? .zero
+                record("the prompt window grows with the text", grown.height > rect.height + 20 && E2E.isOnScreen(grown),
+                       "\(rect.height) → \(grown.height)")
+            }
             E2E.key(kVK_Escape)
             E2E.wait(2) { E2E.window("BindAll Prompt") == nil }
         } else {

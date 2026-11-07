@@ -150,7 +150,7 @@ final class HotkeyCoordinator {
         // Many words change at once, so the result is always previewed before it is written.
         proofread.onFixAll = { [weak self] context, result, count in
             self?.preview.show(title: "Fix all (\(count))", original: context.text, result: result,
-                               near: context.anchor) { [weak self] in
+) { [weak self] in
                 UsageLog.record(.proofread, .applied, detail: "fixAll:\(count)")
                 self?.replace(context, with: result)
             }
@@ -222,8 +222,8 @@ final class HotkeyCoordinator {
         }
         add("Fix", "wand.and.stars") { [weak self] in self?.runStarAction(.fix, context) }
         add("Fix spelling", "textformat.abc") { [weak self] in self?.runStarAction(.spelling, context) }
-        add("Translate", "globe") { [weak self] in self?.runStarAction(.translate, context) }
-        add("Translate in place", "character.bubble") { [weak self] in self?.runStarAction(.translateInPlace, context) }
+        add("Show translation", "globe") { [weak self] in self?.runStarAction(.translate, context) }
+        add("Replace with translation", "character.bubble") { [weak self] in self?.runStarAction(.translateInPlace, context) }
         add("Remove AI tells", "eraser") { [weak self] in self?.runStarAction(.removeTells, context) }
         add("Explain", "questionmark.bubble") { [weak self] in self?.runStarAction(.explain, context) }
         add("Summarize", "text.alignleft") { [weak self] in self?.runStarAction(.summarize, context) }
@@ -278,7 +278,7 @@ final class HotkeyCoordinator {
         let apply: () -> Void = { [weak self] in self?.replace(context, with: entry.output) }
         if appState.settings.previewFromMenu {
             preview.show(title: "From history", original: context.subject, result: entry.output,
-                         near: context.anchor, onApply: apply)
+                         onApply: apply)
         } else {
             apply()
         }
@@ -288,7 +288,7 @@ final class HotkeyCoordinator {
         UsageLog.record(.customPrompt, .shown)
         customPrompt.show(recent: appState.settings.recentPrompts,
                           scope: context.isSelection ? "Selection" : "Whole text",
-                          near: context.anchor) { [weak self] prompt, showOnly, save in
+) { [weak self] prompt, showOnly, save in
             self?.rememberPrompt(prompt, saveAsActionKey: save)
             self?.runStarAction(.prompt(prompt, showOnly: showOnly), context)
         }
@@ -383,7 +383,7 @@ final class HotkeyCoordinator {
                 }
                 if settings.previewFromMenu {
                     self.preview.show(title: title, original: text, result: result, note: note,
-                                      near: context.anchor, onApply: apply)
+                                      onApply: apply)
                 } else {
                     apply()
                 }
@@ -645,7 +645,7 @@ final class HotkeyCoordinator {
                 }
                 if settings.previewFromHotkeys {
                     self.preview.show(title: actionTitle ?? "Fix", original: original,
-                                      result: result, near: NSEvent.mouseLocation, onApply: replace)
+                                      result: result, onApply: replace)
                 } else {
                     replace()
                 }
@@ -789,7 +789,7 @@ final class HotkeyCoordinator {
                     self?.replace(context, with: translation)
                 }
                 if settings.previewFromMenu {
-                    preview.show(title: title, original: text, result: translation, near: context.anchor, onApply: apply)
+                    preview.show(title: title, original: text, result: translation, onApply: apply)
                 } else {
                     apply()
                 }
