@@ -278,6 +278,10 @@ func fixAllScenario() {
     }
     record("the popup offers Fix all", button != nil)
     guard let button, let frame = E2E.frame(button) else { E2E.key(kVK_Escape); return }
+    if let popup = E2E.window("BindAll Fixes")?.bounds {
+        record("Fix all is compact at the right edge", frame.width < popup.width * 0.7 && popup.maxX - frame.maxX < 24,
+               "button \(Int(frame.minX))...\(Int(frame.maxX)) in popup \(Int(popup.minX))...\(Int(popup.maxX))")
+    }
     E2E.click(CGPoint(x: frame.midX, y: frame.midY))
     let preview = E2E.wait(4) { E2E.window("BindAll Preview") != nil }
     record("Fix all shows a preview", preview)

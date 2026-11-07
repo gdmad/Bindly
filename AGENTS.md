@@ -302,10 +302,10 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   touched. `PreSendExtraApps` (UserDefaults, set only by scripts/e2e.sh) adds TextEdit for the E2E.
 - **Hover in the fixes popup:** fixes and Skip light up through the arrow selection; Add to
   dictionary, Close (a `PopupCell` like Skip, no longer a Button) and Fix all light up on their own
-  (`PopupCell.highlightsOnHover`). The E2E moves the pointer before clicking (`hoverThenClick`): a
+  (`PopupCell.highlightsOnHover`), in the same selection color as a chosen fix. The E2E moves the pointer before clicking (`hoverThenClick`): a
   click warped onto the panel without a prior move was what made the cross look like it needed two.
 - **Fix all:** with two or more fixable issues the fixes popup ends with a "Fix all (N)" cell
-  (`FixesPopupFixAllButton`, full width with an accent outline, so it reads as a button); ⌘Return in the popup does the same (`ProofreadKeyPolicy.fixAll`).
+  (`FixesPopupFixAllButton`, sized to its text at the right edge, a light resting fill so it reads as a button); ⌘Return in the popup does the same (`ProofreadKeyPolicy.fixAll`).
   `FixAll.apply` (pure) re-reads the field, relocates each issue and applies its first fix from the
   end, skipping overlaps; `ProofreadController.onFixAll` hands the field as a `StarContext` to the
   coordinator, which always shows the preview and writes the result the way star actions do.

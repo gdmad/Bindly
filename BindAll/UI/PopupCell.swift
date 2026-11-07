@@ -20,10 +20,10 @@ struct PopupCell: View {
     /// purely keyboard-driven), which is also what keeps it from being announced as a button.
     var onActivate: (() -> Void)?
     /// Lights up under the pointer on its own, for actions that are not part of the arrow selection
-    /// (Add to dictionary, Close, Fix all).
+    /// (Add to dictionary, Close, Fix all), in the same color as a selected fix.
     var highlightsOnHover = false
-    /// Drawn as a button: an accent outline, for Fix all.
-    var isProminent = false
+    /// A light fill at rest, so a text action reads as a button (Fix all).
+    var showsRestingFill = false
 
     @State private var hovered = false
 
@@ -42,12 +42,6 @@ struct PopupCell: View {
         .padding(.vertical, PopupMetrics.cellPaddingV)
         .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
         .background(background, in: RoundedRectangle(cornerRadius: PopupMetrics.cellRadius))
-        .overlay {
-            if isProminent {
-                RoundedRectangle(cornerRadius: PopupMetrics.cellRadius)
-                    .strokeBorder(Color.accentColor.opacity(0.6), lineWidth: 1)
-            }
-        }
         .contentShape(Rectangle())
         .onHover { inside in if highlightsOnHover { hovered = inside } }
         // A tap gesture rather than a Button: the panel is non-activating and never key, and
@@ -65,13 +59,17 @@ struct PopupCell: View {
         }
     }
 
+    /// The full selection color: a selected fix, or an action under the pointer.
+    private var isLit: Bool { (isSelected && !softSelection) || hovered }
+
     private var background: AnyShapeStyle {
-        guard isSelected else { return hovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear) }
-        return softSelection ? AnyShapeStyle(.quaternary) : AnyShapeStyle(Color(nsColor: .selectedContentBackgroundColor))
+        if isLit { AnyShapeStyle(Color(nsColor: .selectedContentBackgroundColor)) }
+        else if isSelected || showsRestingFill { AnyShapeStyle(.quaternary) }
+        else { AnyShapeStyle(.clear) }
     }
 
     private var foreground: AnyShapeStyle {
-        if isSelected && !softSelection { AnyShapeStyle(Color(nsColor: .selectedMenuItemTextColor)) }
+        if isLit { AnyShapeStyle(Color(nsColor: .selectedMenuItemTextColor)) }
         else if isSecondary { AnyShapeStyle(.secondary) }
         else { AnyShapeStyle(.primary) }
     }
