@@ -583,4 +583,15 @@ func runProofreadTests() {
         check(ps(0, warning: true) == .passAndDismiss, "typing on goes through and drops the warning")
         eq(PreSendPolicy.warningText(count: 1).prefix(12).description, "1 issue left", "singular wording")
     }
+
+    print("TextOccurrence.nearest")
+    do {
+        let text = "малако и снова малако, опять малако" as NSString
+        check(TextOccurrence.nearest("снова", in: text, to: 0)?.location == 9, "a single occurrence")
+        check(TextOccurrence.nearest("малако", in: text, to: 14)?.location == 15, "the nearest of three")
+        check(TextOccurrence.nearest("малако", in: text, to: 100)?.location == 29, "the last when the estimate is past it")
+        check(TextOccurrence.nearest("молоко", in: text, to: 5) == nil, "none when absent")
+        check(TextOccurrence.nearest("x", in: "" as NSString, to: 0) == nil && TextOccurrence.nearest("", in: text, to: 0) == nil,
+              "nothing in an empty text or for an empty word")
+    }
 }

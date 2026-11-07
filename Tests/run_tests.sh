@@ -30,6 +30,9 @@ swiftc -O \
     BindAll/Proofread/PreSendPolicy.swift \
     BindAll/Voice/HoldKeyPolicy.swift \
     BindAll/App/StatusIconTwinkle.swift \
+    BindAll/Store/ShortcutConflicts.swift \
+    BindAll/Proofread/TextOccurrence.swift \
+    BindAll/UI/PanelPlacement.swift \
     BindAll/Voice/AudioLevelMeter.swift \
     BindAll/Proofread/ListMarkers.swift \
     BindAll/Proofread/AppOffsetMap.swift \

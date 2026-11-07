@@ -51,9 +51,11 @@ final class PushToTalkController {
     func configure(_ config: Config) {
         let wasEnabled = self.config.enabled || self.config.translateKeyEnabled
         self.config = config
+        let watched = PushToTalkKey.monitored(dictate: config.enabled ? config.key : nil,
+                                              translate: config.translateKeyEnabled ? config.translateKey : nil)
         var keys: [HoldKeyMonitor.Slot: PushToTalkKey] = [:]
-        if config.enabled { keys[.dictate] = config.key }
-        if config.translateKeyEnabled, config.translateKey != config.key || !config.enabled { keys[.translate] = config.translateKey }
+        keys[.dictate] = watched.dictate
+        keys[.translate] = watched.translate
         monitor.keys = keys
         if !keys.isEmpty, AccessibilityPermission.isGranted {
             if !monitor.isRunning { monitor.start() }

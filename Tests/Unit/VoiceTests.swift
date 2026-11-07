@@ -49,4 +49,18 @@ func runVoiceTests() {
         meter.reset()
         check(meter.stats.buffers == 0 && meter.stats.peakDecibels < AudioLevelMeter.silentDecibels, "reset starts silent")
     }
+
+    print("PushToTalkKey.monitored")
+    do {
+        let only = PushToTalkKey.monitored(dictate: .rightOption, translate: nil)
+        check(only.dictate == .rightOption && only.translate == nil, "only dictation")
+        let translateOnly = PushToTalkKey.monitored(dictate: nil, translate: .rightCommand)
+        check(translateOnly.dictate == nil && translateOnly.translate == .rightCommand, "only dictate-and-translate")
+        let both = PushToTalkKey.monitored(dictate: .rightOption, translate: .rightCommand)
+        check(both.dictate == .rightOption && both.translate == .rightCommand, "both on their own keys")
+        let shared = PushToTalkKey.monitored(dictate: .rightOption, translate: .rightOption)
+        check(shared.dictate == .rightOption && shared.translate == nil, "one key for both: dictation keeps it")
+        let none = PushToTalkKey.monitored(dictate: nil, translate: nil)
+        check(none.dictate == nil && none.translate == nil, "both off: nothing is watched")
+    }
 }

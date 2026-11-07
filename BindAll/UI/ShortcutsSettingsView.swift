@@ -50,13 +50,7 @@ struct ShortcutsSettingsView: View {
 
     /// Every other shortcut, so no two actions share keys -- the hold keys included.
     private func others(excluding id: String) -> [HotkeyConfig] {
-        let s = appState.settings
-        var all: [(String, HotkeyConfig)] = [("fix", s.defaultActionHotkey), ("translate", s.translateHotkey),
-                                             ("screen", s.screenTranslateHotkey), ("quick", s.quickTranslateHotkey)]
-        if case .shortcut(let c) = s.pushToTalkKey { all.append(("ptt", c)) }
-        if case .shortcut(let c) = s.voiceTranslateKey { all.append(("voiceTranslate", c)) }
-        all += s.actionKeys.compactMap { key in key.hotkey.map { (key.id.uuidString, $0) } }
-        return all.filter { $0.0 != id }.map(\.1)
+        ShortcutConflicts.others(excluding: id, in: appState.settings)
     }
 
     /// Resolves the key by id on every access: the array changes under the list (see ActionKeysSettingsView).

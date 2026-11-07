@@ -401,7 +401,7 @@ enum ProofreadAX {
             let local = NSRange(location: range.location - offset,
                                 length: min(range.length, length - (range.location - offset)))
             guard let expected, ns.substring(with: local) != expected else { return (leaf.element, local) }
-            if let found = nearest(expected, in: ns, to: local.location) { return (leaf.element, found) }
+            if let found = TextOccurrence.nearest(expected, in: ns, to: local.location) { return (leaf.element, found) }
         }
         // Offsets did not line up with any leaf: look for the text itself, nearest the estimate.
         guard let expected else { return nil }
@@ -409,26 +409,13 @@ enum ProofreadAX {
         var best: (leaf: AXUIElement, range: NSRange, distance: Int)?
         for leaf in leaves {
             let ns = leaf.text as NSString
-            if let found = nearest(expected, in: ns, to: range.location - offset) {
+            if let found = TextOccurrence.nearest(expected, in: ns, to: range.location - offset) {
                 let distance = abs(found.location + offset - range.location)
                 if best == nil || distance < best!.distance { best = (leaf.element, found, distance) }
             }
             offset += ns.length
         }
         return best.map { ($0.leaf, $0.range) }
-    }
-
-    private static func nearest(_ needle: String, in text: NSString, to estimate: Int) -> NSRange? {
-        var best: NSRange?
-        var search = NSRange(location: 0, length: text.length)
-        while search.length > 0 {
-            let found = text.range(of: needle, options: [.literal], range: search)
-            guard found.location != NSNotFound else { break }
-            if best == nil || abs(found.location - estimate) < abs(best!.location - estimate) { best = found }
-            let next = found.location + max(1, found.length)
-            search = NSRange(location: next, length: text.length - next)
-        }
-        return best
     }
 
     /// Finds the list items, quotes and code blocks that a Chromium field shows on separate lines but

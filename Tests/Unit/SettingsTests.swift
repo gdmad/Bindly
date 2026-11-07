@@ -129,4 +129,23 @@ func runSettingsTests() {
     check(decode("{\"autocompleteLayout\":\"tile\"}").autocompleteLayout == .tile,
           "the new autocompleteLayout wins over the legacy key")
     check(decode("{}").proofreadLayout == .column, "proofread layout defaults to column")
+
+    print("ShortcutConflicts")
+    do {
+        var settings = Settings()
+        let twice = HotkeyConfig.defaultAction
+        check(ShortcutConflicts.isDuplicate(twice, among: [twice]), "the same shortcut is a duplicate")
+        check(!ShortcutConflicts.isDuplicate(HotkeyConfig(keyCode: 8, modifiers: HotkeyModifiers(command: true), repeatCount: 1),
+                                            among: [twice]), "a different number of presses is not")
+        check(!ShortcutConflicts.isDuplicate(HotkeyConfig(keyCode: 8, modifiers: HotkeyModifiers(command: true, shift: true), repeatCount: 2),
+                                            among: [twice]), "nor are different modifiers")
+        let hold = HotkeyConfig(keyCode: 49, modifiers: HotkeyModifiers(command: false, control: true), repeatCount: 1)
+        settings.pushToTalkKey = .shortcut(hold)
+        check(ShortcutConflicts.isDuplicate(hold, among: ShortcutConflicts.others(excluding: "fix", in: settings)),
+              "a Push to Talk shortcut counts against the others")
+        check(!ShortcutConflicts.others(excluding: "ptt", in: settings).contains(hold), "but not against itself")
+        settings.pushToTalkKey = .rightOption
+        check(ShortcutConflicts.all(in: settings).count == 4 + settings.actionKeys.filter { $0.hotkey != nil }.count,
+              "a modifier hold key is no shortcut to clash with")
+    }
 }

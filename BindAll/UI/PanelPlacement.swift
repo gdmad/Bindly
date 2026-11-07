@@ -10,7 +10,12 @@ enum PanelPlacement {
     static func origin(size: NSSize, near field: CGRect, window: CGRect?) -> NSPoint {
         let probe = NSPoint(x: field.midX, y: field.midY)
         let screen = NSScreen.screens.first { $0.frame.contains(probe) } ?? NSScreen.main
-        let visible = screen?.visibleFrame ?? CGRect(origin: .zero, size: size)
+        return origin(size: size, near: field, window: window,
+                      visible: screen?.visibleFrame ?? CGRect(origin: .zero, size: size))
+    }
+
+    /// The same, for a given visible screen area (AppKit coordinates).
+    static func origin(size: NSSize, near field: CGRect, window: CGRect?, visible: CGRect) -> NSPoint {
         let x = min(max(field.minX, visible.minX + inset), visible.maxX - size.width - inset)
         let below = field.minY - gap - size.height
         if below >= visible.minY + inset { return NSPoint(x: x, y: below) }

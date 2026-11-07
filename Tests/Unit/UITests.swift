@@ -110,4 +110,22 @@ func runUITests() {
         check(StatusIconTwinkle.stopTime(endedAt: 0.2) == 2 * StatusIconTwinkle.period, "a quick action still plays two rounds")
         check(StatusIconTwinkle.stopTime(endedAt: 2.4) == 3 * StatusIconTwinkle.period, "a longer one ends at the end of its round")
     }
+
+    print("PanelPlacement")
+    do {
+        let visible = CGRect(x: 0, y: 0, width: 1000, height: 800)
+        let size = NSSize(width: 400, height: 200)
+        let low = PanelPlacement.origin(size: size, near: CGRect(x: 100, y: 500, width: 300, height: 30), window: nil, visible: visible)
+        check(low == NSPoint(x: 100, y: 500 - PanelPlacement.gap - 200), "under the field when there is room")
+        let high = PanelPlacement.origin(size: size, near: CGRect(x: 100, y: 100, width: 300, height: 30), window: nil, visible: visible)
+        check(high == NSPoint(x: 100, y: 130 + PanelPlacement.gap), "above it when there is not")
+        let tall = NSSize(width: 400, height: 500)
+        let window = CGRect(x: 200, y: 100, width: 600, height: 600)
+        let middle = PanelPlacement.origin(size: tall, near: CGRect(x: 100, y: 380, width: 300, height: 30), window: window, visible: visible)
+        check(middle == NSPoint(x: 300, y: 150), "centered on the app's window when neither fits")
+        let right = PanelPlacement.origin(size: size, near: CGRect(x: 900, y: 500, width: 80, height: 30), window: nil, visible: visible)
+        check(right.x == 1000 - 400 - PanelPlacement.inset, "kept inside the right edge")
+        let left = PanelPlacement.origin(size: size, near: CGRect(x: -50, y: 500, width: 80, height: 30), window: nil, visible: visible)
+        check(left.x == PanelPlacement.inset, "and the left one")
+    }
 }
