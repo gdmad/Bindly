@@ -204,7 +204,7 @@ language, permissions) · Providers (connections only). Rarely changed options s
   behind once the popup closes turned a single Backspace into deleting the whole word); the underline
   already marks it, and `IssueApplier` makes the selection itself right before pasting a fix.
 - Each `ActionKey` may have its own recorded shortcut that runs its prompt on the selection directly.
-- **Esc** cancels an in-flight action.
+- **Esc** cancels an in-flight action; any error a cancelled task throws counts as the cancel (`isCancellation` checks `Task.isCancelled`: the on-device model throws its own error, which used to end in an "Error" window).
 - **Word autocomplete** (off by default; enable and configure on the Autocomplete tab): as you type, a list of case-matched completions appears near the caret; arrow keys choose,
   **Tab** (and optionally Return) inserts; any other key, a click anywhere, or leaving the app
   dismisses it. Completions are **ranked by the preceding words** (the "Rank by context" setting,

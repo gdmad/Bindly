@@ -583,8 +583,11 @@ final class HotkeyCoordinator {
         if let m = escLocalMonitor { NSEvent.removeMonitor(m); escLocalMonitor = nil }
     }
 
+    /// Esc cancels the running task; engines report that in their own ways (the on-device model
+    /// throws its own error, not `CancellationError`), so a cancelled task counts whatever it threw --
+    /// otherwise Esc ended in an "Error" window.
     private func isCancellation(_ error: Error) -> Bool {
-        if error is CancellationError { return true }
+        if Task.isCancelled || error is CancellationError { return true }
         if let urlError = error as? URLError, urlError.code == .cancelled { return true }
         if case OCRService.OCRError.cancelled = error { return true }
         return false
