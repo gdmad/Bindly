@@ -255,8 +255,10 @@ enum ProofreadAX {
     /// The app's own text, read through `AXStringForRange` in chunks (Slack refuses one range over the
     /// whole field), lined up against `text`. Nil when the two are the same or cannot be lined up.
     /// Cached for the last text: underlines, clicks and fixes all ask about the same one.
-    static func offsetMap(for element: AXUIElement, text: String) -> AppOffsetMap? {
-        if let cached = mapCache, cached.text == text, CFEqual(cached.element, element) { return cached.map }
+    /// `cached: false` for callers off the main thread (autocomplete's work queue): the cache is
+    /// main-thread state.
+    static func offsetMap(for element: AXUIElement, text: String, cached useCache: Bool = true) -> AppOffsetMap? {
+        if useCache, let cached = mapCache, cached.text == text, CFEqual(cached.element, element) { return cached.map }
         var app = ""
         var location = 0
         var chunk = 256
@@ -276,7 +278,7 @@ enum ProofreadAX {
         if map == nil, app != text {
             log.debug("offset map: app text (\((app as NSString).length, privacy: .public)) does not line up with the value (\((text as NSString).length, privacy: .public))")
         }
-        mapCache = (element, text, map)
+        if useCache { mapCache = (element, text, map) }
         return map
     }
 

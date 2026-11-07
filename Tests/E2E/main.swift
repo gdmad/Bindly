@@ -165,6 +165,23 @@ func autocompleteScenarios() {
         skip("switching the input language closes it", "only one keyboard input source is enabled")
     }
 
+    // Several lines: the gray text still follows the caret on the last one, with no gap.
+    clearField()
+    E2E.type("Первая строка текста.\nВторая строка.\nСегодня мы обсуждали прив")
+    let multi = E2E.wait(4) { E2E.window("BindAll Inline") != nil }
+    var note = "windows \(E2E.windows().map(\.name))"
+    var tight = false
+    if let inline = E2E.window("BindAll Inline")?.bounds, let el = textEditField() {
+        let ns = E2E.value(el) as NSString
+        let r = ns.range(of: "прив", options: .backwards)
+        if let word = E2E.bounds(r, in: el) {
+            tight = abs(inline.minX - word.maxX) <= 1.5 && abs(inline.midY - word.midY) < 6
+            note = "inline \(inline), word \(word)"
+        }
+    }
+    record("on the third line it is still inline gray text, right after the word", multi && tight, note)
+    E2E.key(kVK_Escape)
+
     // Mid-line: the list, not inline text.
     E2E.type(" конец")
     for _ in 0..<5 { E2E.key(kVK_LeftArrow) }

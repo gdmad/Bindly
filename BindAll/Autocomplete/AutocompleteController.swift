@@ -505,7 +505,8 @@ final class AutocompleteController {
                 return
             case .text(let info):
                 resolvedPartial = AutocompleteEngine.partialWord(in: info.text, caretUTF16Offset: info.caret)
-                resolvedAnchor = self.anchor(for: info.element, caret: info.caret, primaryHeight: primaryHeight)
+                resolvedAnchor = self.caretAnchor(for: info, primaryHeight: primaryHeight)
+                    ?? self.anchor(for: info.element, caret: info.caret, primaryHeight: primaryHeight)
                 contextWords = AutocompleteEngine.precedingWords(in: info.text, caretUTF16Offset: info.caret, count: 2)
                 ghostPlace = cfg.inline ? self.ghostPlace(for: info, primaryHeight: primaryHeight) : nil
             case .unavailable:
@@ -656,7 +657,7 @@ final class AutocompleteController {
     /// Work-queue side: AX calls only.
     private func ghostPlace(for info: TextInfo, primaryHeight: CGFloat?) -> GhostPlace? {
         guard info.caret > 0, InlineCompletion.caretAtLineEnd(in: info.text, caret: info.caret),
-              let rect = caretAnchor(for: info.element, caret: info.caret, primaryHeight: primaryHeight),
+              let rect = caretAnchor(for: info, primaryHeight: primaryHeight),
               rect.height > 4 else { return nil }
         let font = fieldFont(info.element, at: info.caret - 1)
         return GhostPlace(caretCharacter: rect, fontSize: font?.size, fontName: font?.name)
@@ -751,10 +752,16 @@ final class AutocompleteController {
 
     // MARK: - Accessibility
 
+    /// Touched only on the `work` queue: the last field's offset map, so typing on one line does not
+    /// rebuild it for every key.
+    private var workMapCache: (element: AXUIElement, text: String, map: AppOffsetMap?)?
+
     private struct TextInfo {
         let element: AXUIElement
         let text: String
+        /// In value offsets (translated from the app's own when the two differ, see `AppOffsetMap`).
         let caret: Int
+        let map: AppOffsetMap?
     }
 
     private enum FocusState {
@@ -788,13 +795,25 @@ final class AutocompleteController {
         var range = CFRange()
         guard AXValueGetValue(rangeRef as! AXValue, .cfRange, &range), range.length == 0 else { return .unavailable }
 
-        return .text(TextInfo(element: element, text: text, caret: range.location))
+        // Slack's selection counts its own text, which drops some of the value's newlines; only a
+        // multi-line field can differ, so a one-line field never pays for the map.
+        var map: AppOffsetMap?
+        if text.contains("\n") {
+            if let last = workMapCache, last.text == text, CFEqual(last.element, element) {
+                map = last.map
+            } else {
+                map = ProofreadAX.offsetMap(for: element, text: text, cached: false)
+                workMapCache = (element, text, map)
+            }
+        }
+        let caret = map?.valueOffset(range.location) ?? range.location
+        return .text(TextInfo(element: element, text: text, caret: caret, map: map))
     }
 
     /// Best anchor for the chip: caret rect, else the focused element's frame, else the mouse. AppKit
     /// screen coordinates -- its height lets the popup rise above it when there is no room below.
     private func anchor(for element: AXUIElement, caret: Int, primaryHeight: CGFloat?) -> CGRect {
-        caretAnchor(for: element, caret: caret, primaryHeight: primaryHeight)
+        caretAnchor(for: element, caret: caret, primaryHeight: primaryHeight, text: nil, map: nil)
             ?? elementFrameAnchor(for: element, primaryHeight: primaryHeight) ?? mouseAnchor()
     }
 
@@ -816,12 +835,33 @@ final class AutocompleteController {
         return rect.offsetBy(dx: 6, dy: 6)
     }
 
-    /// AppKit rect of the caret, derived from the rect of the character before it (Quartz, top-left).
-    /// Chromium answers that on the field's text leaves, not on the field.
-    private func caretAnchor(for element: AXUIElement, caret: Int, primaryHeight: CGFloat?) -> CGRect? {
-        guard let rect = ProofreadAX.boundsForRange(NSRange(location: max(0, caret - 1), length: 1), in: element) else {
-            return nil
+    private func caretAnchor(for info: TextInfo, primaryHeight: CGFloat?) -> CGRect? {
+        caretAnchor(for: info.element, caret: info.caret, primaryHeight: primaryHeight, text: info.text, map: info.map)
+    }
+
+    /// AppKit rect of the character before the caret (Quartz in, AppKit out).
+    ///
+    /// With the text known, the last few characters of the line are measured as one run and must
+    /// read back as themselves: Chromium answers only on its text leaves, which leave out the
+    /// newlines between lines, so a bare offset lands on the wrong line. The run's right edge is the
+    /// caret's.
+    private func caretAnchor(for element: AXUIElement, caret: Int, primaryHeight: CGFloat?,
+                             text: String?, map: AppOffsetMap?) -> CGRect? {
+        var quartz: CGRect?
+        if let text {
+            let ns = text as NSString
+            var start = caret
+            while start > 0, caret - start < 8, ns.character(at: start - 1) != 0x0A { start -= 1 }
+            guard start < caret else { return nil }
+            let run = NSRange(location: start, length: caret - start)
+            let appRun = map?.appRange(run) ?? run
+            if let rect = ProofreadAX.boundsForRange(appRun, in: element, expecting: ns.substring(with: run)) {
+                quartz = CGRect(x: rect.maxX - 1, y: rect.minY, width: 1, height: rect.height)
+            }
+        } else {
+            quartz = ProofreadAX.boundsForRange(NSRange(location: max(0, caret - 1), length: 1), in: element)
         }
+        guard let rect = quartz else { return nil }
         let base = primaryHeight ?? rect.maxY
         return UnderlineGeometry.appKitRect(fromQuartz: rect, primaryScreenHeight: base)
     }

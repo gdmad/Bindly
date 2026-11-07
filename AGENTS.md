@@ -331,9 +331,13 @@ count for that key is reached (only counts with a larger sibling wait out the ti
   gray right after the caret by `InlineGhostOverlay` (click-through panel). The font comes from the
   field's `AXFont` attribute when reported, otherwise from the line height. Tab accepts as usual;
   Down replaces the inline text with the list (browsing). Mid-line, for corrections, or with no
-  precise caret rect, the list is shown as before. The caret rect comes from
-  `ProofreadAX.boundsForRange`, which falls back to the field's text leaves (Slack, Claude and
-  other Chromium fields answer only there).
+  precise caret rect, the list is shown as before. The caret rect is the right edge of the last few
+  characters of the line, measured as one run with `ProofreadAX.boundsForRange(expecting:)` (which
+  falls back to the field's text leaves, where Slack, Claude and other Chromium fields answer; the
+  expected text keeps it on the right line, since the leaves leave out the newlines). In a
+  multi-line field the caret is translated with `AppOffsetMap` (built uncached on the work queue,
+  `workMapCache`). The gray text is drawn by `GhostTextView` from x = 0 (no label inset) in a
+  pixel-aligned panel.
 - **Stars** (`Selection/FieldStarController.swift`): one violet four-point star (`StarShape`, a vector
   path, 10 pt in a 20 pt target, 11 px at 1x; `Color.brand`, the icon's violet; the panel frame is
   pixel-aligned with `backingAlignedRect` and has no window shadow, so it stays sharp). While an

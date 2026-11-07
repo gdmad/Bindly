@@ -310,7 +310,7 @@ func electronScenarios(_ target: ElectronTarget) {
     record("at the end of a line it is inline gray text", E2E.window("BindAll Inline") != nil,
            "shown as \(E2E.windows().map(\.name))")
     if let inline = E2E.window("BindAll Inline")?.bounds, let typed = rect("прив") {
-        record("the gray text follows the caret", abs(inline.minX - typed.maxX) < 12 && abs(inline.midY - typed.midY) < 12,
+        record("the gray text follows the caret", abs(inline.minX - typed.maxX) <= 2 && abs(inline.midY - typed.midY) < 8,
                "inline \(inline), word \(typed)")
     }
     let before = text()
@@ -339,5 +339,27 @@ func electronScenarios(_ target: ElectronTarget) {
     let midLine = E2E.wait(3) { E2E.window("BindAll Suggestions") != nil }
     record("in the middle of a line the list is shown", midLine && E2E.window("BindAll Inline") == nil,
            "windows: \(E2E.windows().map(\.name))")
+    dismiss()
+
+    // Several lines (Shift+Return, never a bare Return): still gray text on the last line.
+    clearComposer()
+    E2E.type("Первая строка\nВторая строка\nСегодня мы обсуждали прив")
+    let multi = E2E.wait(4) { E2E.window("BindAll Inline") != nil }
+    var note = "windows \(E2E.windows().map(\.name))"
+    if let inline = E2E.window("BindAll Inline")?.bounds, let el = composer(of: pid) {
+        let value = E2E.value(el) as NSString
+        let r = value.range(of: "обсуждали прив", options: .backwards)
+        var word: CGRect?
+        collect(el, depth: 8) { child in
+            guard word == nil, (E2E.attr(child, kAXRoleAttribute) as? String) == "AXStaticText" else { return }
+            let local = (E2E.value(child) as NSString).range(of: "прив", options: .backwards)
+            if local.location != NSNotFound, E2E.value(child).contains("обсуждали") { word = E2E.bounds(local, in: child) }
+        }
+        _ = r
+        if let word { note = "inline \(inline), word \(word)" }
+        record("on the third line it is still inline gray text", multi && (word.map { abs(inline.minX - $0.maxX) <= 2 && abs(inline.midY - $0.midY) < 8 } ?? false), note)
+    } else {
+        record("on the third line it is still inline gray text", false, note)
+    }
     dismiss()
 }
