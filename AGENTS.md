@@ -480,6 +480,11 @@ thread (and, with it, the active proofread popup tap the system would then disab
 ## Key Guarantees
 - Menu-bar agent (`LSUIElement`); no Dock icon. The settings window temporarily switches the activation
   policy to `.regular` so it can come to the front, then back to `.accessory` on close.
+- **Accent color:** `Assets.xcassets/AccentColor` (BindAll's violet, `#990FE0`, lighter in dark mode,
+  with high-contrast variants), named by `NSAccentColorName` in Info.plist, so default buttons,
+  toggles, segmented controls, focus rings and the popups' `selectedContentBackgroundColor`
+  selection are violet. macOS uses it only while System Settings > Appearance > Accent color is
+  Multicolor (the default); a color the user picked there wins, as it should.
 - The status icon is always the same three sparkles, drawn by `StatusIconRenderer` (a template image
   laid out like the `sparkles` symbol, which has no per-layer variable rendering); the three states
   differ only in alpha and size (`AppDelegate.updateStatusIcon`): full while idle, the sparkles

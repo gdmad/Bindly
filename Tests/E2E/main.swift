@@ -229,6 +229,7 @@ func proofreadScenarios() {
             let way = above ? kVK_UpArrow : kVK_DownArrow
             let since = Date()
             for _ in 0..<8 { E2E.key(way); E2E.pause(0.08) }
+            if let shown = E2E.window("BindAll Fixes") { E2E.snapshot(shown.bounds, to: outDir.appending(path: "fixes-selected.png")) }
             E2E.allowBareReturn = true
             E2E.key(kVK_Return)
             E2E.allowBareReturn = false
