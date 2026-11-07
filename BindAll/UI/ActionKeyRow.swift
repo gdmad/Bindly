@@ -19,14 +19,6 @@ struct ActionKeyRow: View {
         DisclosureGroup(isExpanded: $isExpanded) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Text("Key").foregroundStyle(.secondary)
-                    TextField("Key", text: deferredWrite($key.key), prompt: Text("key"))
-                        .labelsHidden()
-                        .textFieldStyle(.plain)
-                        .multilineTextAlignment(.leading)
-                        .monospaced()
-                        .frame(width: 140)
-                        .darkField()
                     Spacer()
                     Text("Shortcut").foregroundStyle(.secondary)
                     ShortcutRecorder(optionalConfig: $key.hotkey, others: others)
@@ -67,15 +59,14 @@ struct ActionKeyRow: View {
             // The whole summary line toggles the row, not just the chevron.
             Button(action: toggle) {
                 HStack(spacing: 8) {
-                    Text(key.key.isEmpty ? "—" : key.key)
-                        .monospaced()
-                        .bold()
-                    // The name if there is one -- the built-in keys ship with good ones -- and the
-                    // instruction itself otherwise.
-                    Text(key.label.isEmpty ? key.prompt : key.label)
-                        .foregroundStyle(.secondary)
+                    Text(key.title)
                         .lineLimit(1)
                         .truncationMode(.tail)
+                    if let hotkey = key.hotkey {
+                        Text(HotkeyFormatter.string(hotkey))
+                            .foregroundStyle(.secondary)
+                            .monospaced()
+                    }
                     Spacer(minLength: 0)
                 }
                 .contentShape(.rect)

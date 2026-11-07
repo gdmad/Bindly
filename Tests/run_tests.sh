@@ -8,7 +8,6 @@ swiftc -O \
     BindAll/Store/ActionKey.swift \
     BindAll/Store/PushToTalkKey.swift \
     BindAll/Store/Settings.swift \
-    BindAll/Actions/PromptParser.swift \
     BindAll/Actions/MaskAISlopRule.swift \
     BindAll/Actions/MaskAISlop.swift \
     BindAll/Store/AppPaths.swift \

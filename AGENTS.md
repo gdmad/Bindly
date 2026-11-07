@@ -78,7 +78,6 @@ BindAll/
 │   ├── UnderlineOverlay.swift         # click-through panel with a straight underline under every found issue
 │   └── ProofreadController.swift      # session, key tap (only while the popup is up), click popup
 ├── Actions/
-│   ├── PromptParser.swift      # separator split + action-key resolution
 │   ├── ActionRouter.swift      # EngineFactory (builds an AIEngine from settings)
 │   └── MaskAISlop.swift        # typography normalizer (dashes/quotes/emoji)
 ├── UI/
@@ -96,7 +95,7 @@ BindAll/
 │   ├── LanguageSelectionBinding.swift  # Binding<[String]>.contains(code) / .isAuto for menu toggles
 │   ├── ProofreadSettingsView.swift     # proofread tab (on/off, fixes, layout, language, per-app)
 │   ├── AppFilterSection.swift          # shared per-app allow/deny section (autocomplete + proofread)
-│   ├── ActionKeysSettingsView.swift / ActionKeyRow.swift # action keys; rows bound by id, never by index
+│   ├── ActionKeysSettingsView.swift / ActionKeyRow.swift # action keys (name, instruction, shortcut, show-only); rows bound by id, never by index
 │   ├── ProvidersSettingsView.swift     # engine picker + AI providers (keys, models; drafts written back deferred)
 │   ├── ShortcutRecorder.swift / HotkeyFormatter.swift # click-to-record shortcut field, glyph formatting
 │   ├── DarkFieldStyle / ClearFocusOnAppear / DeferredWrite .swift # input box style, no auto-focus on
@@ -147,7 +146,7 @@ Info.plist                      # LSUIElement, version (source of truth for vers
 ```
 
 ## Triggers (defaults, all configurable in Settings → Actions → Shortcuts)
-- **Cmd+C ×2** → default action: fix spelling/grammar, or run a custom prompt (separator / action key)
+- **Cmd+C ×2** → default action: the default prompt (spelling/grammar) on the whole selection
 - **Cmd+C ×3** → translate the selection, shown in a popup near the cursor
 - **Cmd+E** → OCR: select a screen region, recognize text, translate
 - **Shift+Cmd+E** → Quick Translate window

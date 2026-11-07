@@ -231,7 +231,7 @@ final class HotkeyCoordinator {
         if !keys.isEmpty {
             menu.addItem(.separator())
             for key in keys {
-                let title = key.label.isEmpty ? key.key : key.label
+                let title = key.title
                 add(title, "sparkle") { [weak self] in self?.runStarAction(.actionKey(key), context) }
             }
         }
@@ -299,7 +299,7 @@ final class HotkeyCoordinator {
         recent.insert(prompt, at: 0)
         appState.settings.recentPrompts = Array(recent.prefix(5))
         if saveAsActionKey, !appState.settings.actionKeys.contains(where: { $0.prompt == prompt }) {
-            appState.settings.actionKeys.append(ActionKey(key: "", label: String(prompt.prefix(40)), prompt: prompt))
+            appState.settings.actionKeys.append(ActionKey(label: String(prompt.prefix(40)), prompt: prompt))
         }
     }
 
@@ -325,7 +325,7 @@ final class HotkeyCoordinator {
         case .fix: (.fix, "Fix", "source:star")
         case .spelling: (.spelling, "Fix spelling", "source:star")
         case .removeTells: (.removeTells, "Remove AI tells", "source:star")
-        case .actionKey(let key): (.actionKey, key.label.isEmpty ? key.key : key.label, key.key)
+        case .actionKey(let key): (.actionKey, key.title, key.logToken)
         case .prompt: (.customPrompt, "Custom prompt", "source:star")
         case .translate, .translateInPlace: (.translate, "Translate", "source:star")
         case .explain: (.explain, "Explain", "source:star")
@@ -525,7 +525,7 @@ final class HotkeyCoordinator {
             translateFromScreen()
         } else if let key = s.actionKeys.first(where: { $0.hotkey.map(matches) == true }) {
             // A custom action key bound to its own shortcut: run its prompt on the selection.
-            runDefaultAction(fixedInstruction: key.prompt, actionKey: key.key, showOnly: key.showOnly)
+            runDefaultAction(fixedInstruction: key.prompt, actionKey: key, showOnly: key.showOnly)
         }
     }
 
@@ -584,7 +584,9 @@ final class HotkeyCoordinator {
     /// Runs the text pipeline on the current selection. With `fixedInstruction` (a per-key
     /// shortcut) the whole selection is the content; otherwise the separator/key syntax is parsed.
     private func runDefaultAction(fixedInstruction: String? = nil, forceCopy: Bool = false,
-                                  actionKey: String? = nil, showOnly: Bool = false) {
+                                  actionKey key: ActionKey? = nil, showOnly: Bool = false) {
+        let actionKey = key?.logToken
+        let actionTitle = key?.title
         let settings = appState.settings
         let feature: UsageFeature = actionKey == nil ? .fix : .actionKey
         let source = forceCopy ? "source:menu" : "source:hotkey"
@@ -612,43 +614,30 @@ final class HotkeyCoordinator {
                 return
             }
 
-            let parsed: ParsedAction
-            if let fixedInstruction {
-                parsed = ParsedAction(
-                    content: text.trimmingCharacters(in: .whitespacesAndNewlines),
-                    instruction: fixedInstruction,
-                    hadExplicitInstruction: true
-                )
-            } else {
-                parsed = PromptParser.parse(
-                    text: text,
-                    separator: settings.separator,
-                    defaultPrompt: settings.defaultPrompt,
-                    actionKeys: settings.actionKeys
-                )
-            }
+            let content = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let instruction = fixedInstruction ?? settings.defaultPrompt
 
             do {
-                var result = try await engine.process(text: parsed.content, instruction: parsed.instruction)
+                var result = try await engine.process(text: content, instruction: instruction)
                 if Task.isCancelled { return }
                 if settings.maskAISlop {
                     result = MaskAISlop.apply(to: result, rules: settings.maskRules)
                 }
                 if showOnly {
                     UsageLog.record(feature, .shown, detail: actionKey ?? source, ms: UsageLog.elapsed(since: started))
-                    self.popup.show(title: actionKey.map { "Action \($0)" } ?? "Result", text: result, original: parsed.content)
+                    self.popup.show(title: actionTitle ?? "Result", text: result, original: content)
                     return
                 }
-                self.recordHistory(kind: .action, input: parsed.content, output: result,
+                self.recordHistory(kind: .action, input: content, output: result,
                                    engine: settings.defaultEngine.displayName)
-                let original = parsed.content
+                let original = content
                 let replace = {
                     TextInjector.replaceSelection(with: result, restorePrevious: settings.restoreClipboard, target: target)
                     UsageLog.record(feature, .applied, detail: actionKey ?? source,
                                     ms: UsageLog.elapsed(since: started))
                 }
                 if settings.previewFromHotkeys {
-                    self.preview.show(title: actionKey.map { "Action \($0)" } ?? "Fix", original: original,
+                    self.preview.show(title: actionTitle ?? "Fix", original: original,
                                       result: result, near: NSEvent.mouseLocation, onApply: replace)
                 } else {
                     replace()

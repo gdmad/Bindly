@@ -15,49 +15,11 @@ func eq(_ a: String, _ b: String, _ message: String) {
     check(a == b, "\(message)  (got: \(a.debugDescription))")
 }
 
-print("PromptParser")
-let keys = ActionKey.defaults
-let defaultPrompt = "DEFAULT"
-
-// No separator → default prompt over whole text.
-let p1 = PromptParser.parse(text: "hello world", separator: "--", defaultPrompt: defaultPrompt, actionKeys: keys)
-check(!p1.hadExplicitInstruction, "no separator → default")
-eq(p1.instruction, defaultPrompt, "no separator uses default prompt")
-eq(p1.content, "hello world", "no separator keeps full content")
-
-// Action key resolution.
-let p2 = PromptParser.parse(text: "Ghbdtn rfr ltkf -- w", separator: "--", defaultPrompt: defaultPrompt, actionKeys: keys)
-check(p2.hadExplicitInstruction, "separator + key → explicit")
-eq(p2.content, "Ghbdtn rfr ltkf", "content trimmed before separator")
-check(p2.instruction.contains("layout"), "w resolves to layout prompt")
-
-// Freeform instruction.
-let p3 = PromptParser.parse(text: "Hello -- translate to Chinese", separator: "--", defaultPrompt: defaultPrompt, actionKeys: keys)
-eq(p3.content, "Hello", "freeform content")
-check(p3.instruction.hasPrefix("translate to Chinese"), "freeform instruction kept")
-
-// Case-insensitive key match (Cyrillic).
-let p4 = PromptParser.parse(text: "abc -- ГГ", separator: "--", defaultPrompt: defaultPrompt, actionKeys: keys)
-check(p4.instruction.contains("Привет!"), "ГГ matches гг case-insensitively")
-
-// All default keys resolve.
-for k in ["w", "u", "l", "о", "гг"] {
-    let p = PromptParser.parse(text: "x -- \(k)", separator: "--", defaultPrompt: defaultPrompt, actionKeys: keys)
-    check(p.hadExplicitInstruction && p.instruction != defaultPrompt, "default key \(k) resolves")
-}
-
-// Separator glued to the key (no spaces) also works.
-let pNoSpace = PromptParser.parse(text: "Ghbdtn rfr ltkf--w", separator: "--", defaultPrompt: defaultPrompt, actionKeys: keys)
-eq(pNoSpace.content, "Ghbdtn rfr ltkf", "no-space separator: content")
-check(pNoSpace.instruction.contains("layout"), "no-space separator: key resolves")
-
-// Empty suffix → default.
-let p5 = PromptParser.parse(text: "abc --", separator: "--", defaultPrompt: defaultPrompt, actionKeys: keys)
-check(!p5.hadExplicitInstruction, "empty suffix → default")
-
-// Uses LAST separator occurrence.
-let p6 = PromptParser.parse(text: "a -- b -- w", separator: "--", defaultPrompt: defaultPrompt, actionKeys: keys)
-eq(p6.content, "a -- b", "splits on last separator")
+print("ActionKey")
+check(ActionKey.defaults.allSatisfy { !$0.label.isEmpty }, "built-in keys are named")
+eq(ActionKey(label: "", prompt: "Line one\nline two").title, "Line one line two", "an unnamed key is titled by its prompt")
+let legacy = #"{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","key":"w","label":"Layout","prompt":"P"}"#
+check((try? JSONDecoder().decode(ActionKey.self, from: Data(legacy.utf8)))?.label == "Layout", "a key saved with the retired suffix still decodes")
 
 print("History ring buffer")
 func entry(_ output: String) -> HistoryEntry {
@@ -725,9 +687,8 @@ print("Settings persistence: every setting survives a round trip")
 var allChanged = Settings()
 allChanged.enabled = false
 allChanged.defaultEngine = .openai
-allChanged.separator = "//"
 allChanged.defaultPrompt = "custom prompt"
-allChanged.actionKeys = [ActionKey(key: "z", label: "Zap", prompt: "Zap it",
+allChanged.actionKeys = [ActionKey(label: "Zap", prompt: "Zap it",
                                    hotkey: HotkeyConfig(keyCode: 6,
                                                         modifiers: HotkeyModifiers(command: true, option: true),
                                                         repeatCount: 1))]
@@ -1205,8 +1166,8 @@ print("ActionKey showOnly")
 do {
     let old = #"{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","key":"w","label":"L","prompt":"P"}"#
     let decoded = try? JSONDecoder().decode(ActionKey.self, from: Data(old.utf8))
-    check(decoded?.showOnly == false && decoded?.key == "w", "a key saved before showOnly decodes as replacing")
-    var shown = ActionKey(key: "e", label: "Explain", prompt: "Explain")
+    check(decoded?.showOnly == false && decoded?.label == "L", "a key saved before showOnly decodes as replacing")
+    var shown = ActionKey(label: "Explain", prompt: "Explain")
     shown.showOnly = true
     let round = (try? JSONEncoder().encode(shown)).flatMap { try? JSONDecoder().decode(ActionKey.self, from: $0) }
     check(round?.showOnly == true, "showOnly survives a round trip")

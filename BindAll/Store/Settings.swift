@@ -176,7 +176,6 @@ struct Settings: Codable, Equatable {
     var defaultEngine: ProviderKind = .apple
 
     // Default action parsing
-    var separator: String = "--"
     var defaultPrompt: String =
         "Fix spelling, grammar and punctuation. Keep the same language and formatting. Return only the corrected text."
     var actionKeys: [ActionKey] = ActionKey.defaults
@@ -287,7 +286,7 @@ struct Settings: Codable, Equatable {
 /// extension so the implicit `Settings()` initializer is preserved.
 extension Settings {
     enum CodingKeys: String, CodingKey {
-        case enabled, defaultEngine, separator, defaultPrompt, actionKeys,
+        case enabled, defaultEngine, defaultPrompt, actionKeys,
              restoreClipboard, maskAISlop, autocompleteEnabled, autocompleteCount, autocompleteLayout,
              popupFontSize, autocompleteLanguages, autocompleteLearn, autocompleteNextWord,
              autocompleteAcceptReturn, autocompleteInline, autocompleteContextRanking, autocompleteAppMode, autocompleteApps,
@@ -312,7 +311,6 @@ extension Settings {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         if let v = try c.decodeIfPresent(Bool.self, forKey: .enabled) { enabled = v }
         if let v = try c.decodeIfPresent(ProviderKind.self, forKey: .defaultEngine) { defaultEngine = v }
-        if let v = try c.decodeIfPresent(String.self, forKey: .separator) { separator = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .defaultPrompt) { defaultPrompt = v }
         if let v = try c.decodeIfPresent([ActionKey].self, forKey: .actionKeys) { actionKeys = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .restoreClipboard) { restoreClipboard = v }

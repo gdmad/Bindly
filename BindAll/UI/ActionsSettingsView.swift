@@ -18,7 +18,7 @@ struct ActionsSettingsView: View {
                 Button("Restore default prompt", action: restoreDefaultPrompt)
                     .controlSize(.small)
             } header: {
-                HelpHeader("Default action", "With no separator, the selected text is processed with this prompt (spelling, grammar and punctuation by default).")
+                HelpHeader("Default action", "The Fix selection shortcut and the star's Fix run this prompt on the selected text (spelling, grammar and punctuation by default).")
             }
 
             Section {
@@ -30,23 +30,12 @@ struct ActionsSettingsView: View {
                 Text("Preview before replacing")
             }
 
-            Section {
-                LabeledContent("Separator") {
-                    TextField("Separator", text: deferredWrite($appState.settings.separator))
-                        .labelsHidden()
-                        .textFieldStyle(.plain)
-                        .darkField()
-                }
-            } header: {
-                HelpHeader("Separator", "Text after the last separator is treated as the instruction. Example: \"make this formal -- tr\" runs the tr action on the text before the separator.")
-            }
-
             MaskAISlopSection()
 
             Section {
                 ActionKeysSettingsView()
             } header: {
-                HelpHeader("Action keys", "Short keys you type after the separator. The instruction is sent to the AI for the text before the separator. A key can also get its own global shortcut (Record Shortcut in the expanded row): pressing it runs the instruction on the current selection directly, no separator needed.")
+                HelpHeader("Action keys", "Named instructions for the AI. Each one is in the star menu and can get its own global shortcut (Record Shortcut in the expanded row), which runs it on the current selection.")
             }
         }
         .formStyle(.grouped)

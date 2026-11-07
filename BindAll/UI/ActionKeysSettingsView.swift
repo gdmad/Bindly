@@ -23,7 +23,7 @@ struct ActionKeysSettingsView: View {
     }
 
     private func addKey() {
-        let new = ActionKey(key: "", label: "", prompt: "")
+        let new = ActionKey(label: "", prompt: "")
         newKeyID = new.id
         appState.settings.actionKeys.append(new)
     }
@@ -48,7 +48,7 @@ struct ActionKeysSettingsView: View {
         Binding(
             get: {
                 appState.settings.actionKeys.first(where: { $0.id == id })
-                    ?? ActionKey(key: "", label: "", prompt: "")
+                    ?? ActionKey(label: "", prompt: "")
             },
             set: { newValue in
                 if let index = appState.settings.actionKeys.firstIndex(where: { $0.id == id }) {
