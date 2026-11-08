@@ -907,7 +907,7 @@ func trayScenario() {
 
 guard E2E.testApp != nil else { print("BindAll E2E is not running"); exit(2) }
 let only = Set((ProcessInfo.processInfo.environment["E2E_ONLY"] ?? "").split(separator: ",").map(String.init))
-let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "explain", "preSend", "translateInPlace", "voice", "stars", "removeTells", "quick", "tray", "hotkeys", "starActions", "cancel", "master", "drag", "plainStar"]
+let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "explain", "preSend", "translateInPlace", "voice", "stars", "removeTells", "quick", "tray", "hotkeys", "starActions", "cancel", "master", "drag", "plainStar", "localServer"]
 let needsTextEdit = only.isEmpty || !only.isDisjoint(with: textEditGroups)
 func run(_ name: String, _ body: () -> Void) { if only.isEmpty || only.contains(name) { body() } }
 
@@ -940,6 +940,8 @@ if needsTextEdit {
     run("master", masterSwitchScenario)
     run("drag", dragScenario)
     run("plainStar", plainTextStarScenario)
+    // Downloads the server: only when asked for by name.
+    if only.contains("localServer") { localServerScenario() }
     clearField()
     let close = Process()
     close.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")

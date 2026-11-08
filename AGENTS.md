@@ -551,7 +551,10 @@ dimmed while Proofread is off.
   the on-device model phrases things its own way. A failed precondition is reported as
   "setup: ..." and still counts as a failure. The `say` recording is made once and reused while it
   lasts at least a second. `E2E_LT_URL=http://host:port` points the test build at a self-hosted
-  LanguageTool (mode Self-hosted).
+  LanguageTool (mode Self-hosted). `E2E_LOCAL_SERVER=1 E2E_ONLY=localServer` runs the local server's whole chain
+  (`LocalServerScenario.swift`: install, loopback-only java from the test build's own folder, checking
+  through it, Custom URL and back, a busy port, update check, quit and relaunch, Remove); it downloads
+  ~300 MB, so it runs only when named, and `e2e.sh` kills its java and deletes its folder on exit.
 
 
 ```bash
