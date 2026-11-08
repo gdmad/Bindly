@@ -108,6 +108,21 @@ func electronScenarios(_ target: ElectronTarget) {
     guard let field = composer(of: pid), E2E.value(field).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
         skip("all", "no empty composer in focus; nothing was typed"); return
     }
+    // Every key from here on goes only to this very field, or to BindAll's own windows. Anything
+    // else -- a channel's box, another app -- stops the typing for good.
+    let testPid = E2E.testApp?.processIdentifier
+    E2E.keysBlocked = false
+    E2E.keyGuard = {
+        guard let front = NSWorkspace.shared.frontmostApplication?.processIdentifier else { return false }
+        if front == testPid { return true }
+        guard front == pid, let focused = E2E.focusedElement(of: pid) else { return false }
+        return CFEqual(focused, field)
+    }
+    defer {
+        if E2E.keysBlocked { record("the run stayed in its own draft", false, "typing was stopped when the focus left it") }
+        E2E.keyGuard = nil
+        E2E.keysBlocked = false
+    }
     let text = { composer(of: pid).map(E2E.value) ?? "" }
     func rect(_ word: String) -> CGRect? {
         guard let el = composer(of: pid) else { return nil }

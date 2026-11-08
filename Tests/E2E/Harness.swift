@@ -23,7 +23,23 @@ enum E2E {
 
     // MARK: Keyboard and mouse
 
+    /// Asked before every keystroke while set: false stops all keys for the rest of the group. In a
+    /// chat app it is what keeps the run inside its own draft.
+    nonisolated(unsafe) static var keyGuard: (() -> Bool)?
+    nonisolated(unsafe) static var keysBlocked = false
+
+    static func keysAllowed() -> Bool {
+        if keysBlocked { return false }
+        if let keyGuard, !keyGuard() {
+            keysBlocked = true
+            print("    STOPPED: the focus left the test's own draft; no more keys are sent")
+            return false
+        }
+        return true
+    }
+
     static func key(_ code: Int, _ flags: CGEventFlags = []) {
+        guard keysAllowed() else { return }
         precondition(!(code == kVK_Return && flags.isEmpty) || allowBareReturn, "a bare Return is never sent")
         for down in [true, false] {
             let event = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: down)!
@@ -38,6 +54,7 @@ enum E2E {
     nonisolated(unsafe) static var allowBareReturn = false
 
     static func type(_ text: String, perCharacter delay: useconds_t = 25_000) {
+        guard keysAllowed() else { return }
         for character in text {
             if character == "\n" { key(kVK_Return, .maskShift); continue }
             let units = Array(String(character).utf16)
