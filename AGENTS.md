@@ -132,8 +132,8 @@ BindAll/
 │   ├── HistoryPanelView.swift / HistoryRow.swift / HistoryDetail.swift # History popover from the menu bar
 │   ├── PopupController.swift   # floating NSPanel for translation/results; closes on Esc/Close only
 │   ├── PopupModel.swift / PopupView.swift / PopupHeader.swift / PopupOriginalSection.swift
-│   │                           # result popup: header is the only drag area, copy-original icon
-│   ├── WindowDragHandle.swift  # NSView that drags its window (body stays text-selectable)
+│   │                           # result popup: header drags the window, copy-original icon
+│   ├── WindowDragHandle.swift  # NSView that drags its window: over each header (beside, not over, the preview's switch), under `PanelChrome` and Quick Translate so margins and gaps drag too; text stays selectable
 │   ├── KeyablePanel.swift      # NSPanel that can become key from an accessory app
 │   ├── QuickTranslate*.swift   # Quick Translate window: controller, @Observable model, view, language
 │   │                           # bar, input (vertical TextField: system placeholder level with the
@@ -509,7 +509,7 @@ dimmed while Proofread is off.
   proofread, fixAll, dictionary, history, explain, preSend, translateInPlace, voice, stars,
   removeTells, quick, tray, hotkeys (⌘C ⌘C in place, ⌘C ⌘C ⌘C translation window, Restore
   clipboard), starActions (Show translation, an action key, a custom prompt to its result), cancel
-  (Esc while an action runs), master (the Enabled switch), settings (every tab of the window),
+  (Esc while an action runs), master (the Enabled switch), settings (every tab of the window), drag (result, preview, prompt and Quick Translate windows move by header and margin),
   slack, claude. Explain and Summarize run from the menu bar (`pressTrayItem`), and explain checks
   the star menu no longer lists them. Star items go through `runStarItem`, which waits for the star to move to the
   selection before clicking it. Checks on model output test its shape (`isShouting`), not its words:

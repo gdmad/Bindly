@@ -348,3 +348,94 @@ func settingsScenario() {
     if let close = E2E.attr(settings, kAXCloseButtonAttribute) { E2E.press(close as! AXUIElement) }
     record("the window closes and BindAll keeps running", E2E.wait(3) { window() == nil } && isAlive())
 }
+
+// MARK: - Every window can be dragged
+
+/// Drags `name` by its header and by its bottom margin; true when both moved it.
+/// `headerY`: how far down the header's free area is (Quick Translate's top bar is all pickers but its
+/// 12 pt padding).
+func dragsBy(_ name: String, headerY: CGFloat = 22) -> (header: Bool, margin: Bool, detail: String) {
+    guard let start = E2E.window(name)?.bounds else { return (false, false, "no window") }
+    E2E.drag(from: CGPoint(x: start.minX + 40, y: start.minY + headerY), to: CGPoint(x: start.minX + 100, y: start.minY + 62))
+    E2E.pause(0.4)
+    let afterHeader = E2E.window(name)?.bounds ?? start
+    // Moved the way it was pulled; the system may round or snap the last few points.
+    let header = afterHeader.minX - start.minX > 40 && afterHeader.minY - start.minY > 25
+    E2E.drag(from: CGPoint(x: afterHeader.minX + 40, y: afterHeader.maxY - 5), to: CGPoint(x: afterHeader.minX - 20, y: afterHeader.maxY - 45))
+    E2E.pause(0.4)
+    let afterMargin = E2E.window(name)?.bounds ?? afterHeader
+    let margin = afterHeader.minX - afterMargin.minX > 40 && afterHeader.minY - afterMargin.minY > 25
+    return (header, margin, "start \(start), after header \(afterHeader), after margin \(afterMargin)")
+}
+
+func dragScenario() {
+    group = "Drag"
+    func check(_ name: String, _ title: String, headerY: CGFloat = 22) {
+        let moved = dragsBy(name, headerY: headerY)
+        record("\(title): dragged by its header", moved.header, moved.detail)
+        record("\(title): dragged by its margin", moved.margin, moved.detail)
+    }
+
+    // The result window.
+    clearField()
+    let text = "Совещание переносится на четверг. "
+    E2E.type(text)
+    E2E.pause(0.5)
+    E2E.key(kVK_ANSI_A, .maskCommand)
+    E2E.pause(0.5)
+    if pressTrayItem("Explain selection"), E2E.wait(40, { E2E.window("BindAll Translation") != nil }) {
+        E2E.pause(0.5)
+        check("BindAll Translation", "the result window")
+        record("…and its Close still works", clickButton("Close", in: "BindAll Translation") && E2E.wait(2) { E2E.window("BindAll Translation") == nil })
+    } else {
+        record("setup: Explain opens its window", false)
+    }
+
+    // The preview, and its Changes / Result switch still switches.
+    focusTextEdit()
+    clearField()
+    E2E.type("Тут малако в тексте. ")
+    E2E.pause(1.0)
+    if runStarItem("Fix spelling (LanguageTool)", downs: 2), E2E.wait(15, { E2E.window("BindAll Preview") != nil }) {
+        E2E.pause(0.5)
+        check("BindAll Preview", "the preview")
+        let result = E2E.testElement(window: "BindAll Preview", E2E.named("Result")).flatMap(E2E.frame)
+        if let result { E2E.click(CGPoint(x: result.midX, y: result.midY)) }
+        E2E.pause(0.4)
+        // On Result the text shows without the struck-out word.
+        let switched = E2E.wait(2) { !E2E.dumpTestWindows("BindAll Preview").contains("малако") }
+        record("…its Changes / Result switch still takes clicks", result != nil && switched)
+        E2E.key(kVK_Escape)
+        E2E.wait(2) { E2E.window("BindAll Preview") == nil }
+        record("…and the text is as it was", fieldText().contains("малако"), "now: \(fieldText())")
+    } else {
+        record("setup: Fix spelling opens the preview", false)
+    }
+
+    // The custom prompt (a second try: the star can still be settling after the preview).
+    focusTextEdit()
+    E2E.pause(1.0)
+    let promptOpened = (1...2).contains { _ in
+        runStarItem("Custom prompt…", downs: 11) && E2E.wait(3, { E2E.window("BindAll Prompt") != nil })
+    }
+    if promptOpened {
+        E2E.pause(0.5)
+        check("BindAll Prompt", "the custom prompt")
+        E2E.key(kVK_Escape)
+        E2E.wait(2) { E2E.window("BindAll Prompt") == nil }
+    } else {
+        record("setup: Custom prompt opens", false)
+    }
+
+    // Quick Translate.
+    E2E.key(kVK_ANSI_E, [.maskCommand, .maskShift])
+    if E2E.wait(4, { E2E.window("BindAll Quick Translate") != nil }) {
+        E2E.pause(0.8)
+        check("BindAll Quick Translate", "Quick Translate", headerY: 5)
+        E2E.key(kVK_Escape)
+        E2E.wait(2) { E2E.window("BindAll Quick Translate") == nil }
+    } else {
+        record("setup: Quick Translate opens", false)
+    }
+    focusTextEdit()
+}

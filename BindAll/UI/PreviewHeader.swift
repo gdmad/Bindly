@@ -7,8 +7,13 @@ struct PreviewHeader: View {
 
     var body: some View {
         HStack {
-            Text(title).bold()
-            Spacer()
+            // The drag area stops short of the switch, which must keep its clicks.
+            HStack {
+                Text(title).bold()
+                Spacer()
+            }
+            .contentShape(.rect)
+            .overlay { WindowDragHandle() }
             Picker("Show", selection: $mode) {
                 ForEach(PreviewModel.Mode.allCases) { Text($0.rawValue).tag($0) }
             }
@@ -17,6 +22,5 @@ struct PreviewHeader: View {
             .fixedSize()
         }
         .font(.callout)
-        .overlay { WindowDragHandle().allowsHitTesting(false) }
     }
 }

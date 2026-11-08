@@ -75,6 +75,22 @@ enum E2E {
         }
     }
 
+    /// Presses at `from`, moves to `to` in small steps and lets go (Quartz coordinates).
+    static func drag(from: CGPoint, to: CGPoint) {
+        CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: from, mouseButton: .left)?.post(tap: .cghidEventTap)
+        usleep(150_000)
+        CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: from, mouseButton: .left)?.post(tap: .cghidEventTap)
+        usleep(120_000)
+        for step in 1...12 {
+            let t = CGFloat(step) / 12
+            let p = CGPoint(x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t)
+            CGEvent(mouseEventSource: nil, mouseType: .leftMouseDragged, mouseCursorPosition: p, mouseButton: .left)?.post(tap: .cghidEventTap)
+            usleep(25_000)
+        }
+        CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: to, mouseButton: .left)?.post(tap: .cghidEventTap)
+        usleep(200_000)
+    }
+
     /// Moves the pointer there first, the way a person reaches a button before clicking it.
     static func hoverThenClick(_ point: CGPoint) {
         CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left)?

@@ -10,7 +10,8 @@ struct CustomPromptView: View {
             Label("Custom prompt · \(model.scope)", systemImage: "sparkle")
                 .font(.callout.bold())
                 .foregroundStyle(Color.brand)
-                .overlay { WindowDragHandle().allowsHitTesting(false) }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay { WindowDragHandle() }
             TextField("Prompt", text: $model.prompt, prompt: Text("What should happen to the text?"), axis: .vertical)
                 .lineLimit(1...8)
                 .textFieldStyle(.roundedBorder)

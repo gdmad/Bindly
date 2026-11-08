@@ -17,6 +17,9 @@ struct QuickTranslateView: View {
             QuickTranslateFooter(isTranslating: model.isTranslating)
         }
         .frame(minWidth: 420, minHeight: 380)
+        // The window's content covers its title bar, and moving by the background does not reach
+        // through SwiftUI: the gaps around the controls drag it, as in the other windows.
+        .background { WindowDragHandle() }
         .background(.regularMaterial)
         .ignoresSafeArea()
         // Host the translation session in this visible window so the language-download prompt can
