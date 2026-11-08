@@ -258,8 +258,10 @@ struct Settings: Codable, Equatable {
     /// reached by URL alone. `token` is read from the Keychain by the caller.
     func languageToolConnection(token: String) -> (baseURL: String, username: String, apiKey: String) {
         switch languageToolMode {
-        case .free, .selfHosted:
+        case .free:
             return (languageToolBaseURL, "", "")
+        case .selfHosted:
+            return (LanguageToolURL.normalized(languageToolBaseURL), "", "")
         case .premium:
             return (languageToolBaseURL, languageToolUsername, token)
         }

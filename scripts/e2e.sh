@@ -23,7 +23,7 @@ xcodebuild -scheme BindAll -configuration Debug -derivedDataPath "$DD" \
 
 echo "==> Settings for the test build"
 python3 - <<'PY'
-import json, subprocess
+import json, os, subprocess
 settings = {
     "enabled": True, "correctEnabled": True, "autocompleteEnabled": True, "autocompleteInline": True,
     "autocompleteLanguages": ["ru"], "languageToolMode": "free", "languageToolLanguage": "ru",
@@ -32,6 +32,11 @@ settings = {
     "pushToTalkEnabled": True, "voiceTranslateEnabled": True, "pushToTalkLanguage": "ru", "pushToTalkTargetLanguage": "en",
     "sourceLanguage": "ru", "targetLanguage": "en", "restoreClipboard": True,
 }
+# E2E_LT_URL: run against a self-hosted LanguageTool instead of the free public server.
+lt_url = os.environ.get("E2E_LT_URL", "")
+if lt_url:
+    settings["languageToolMode"] = "selfHosted"
+    settings["languageToolBaseURL"] = lt_url
 data = json.dumps(settings).encode().hex()
 subprocess.run(["defaults", "write", "com.evgeny.bindall.e2e", "BindAll.settings.v1", "-data", data], check=True)
 PY

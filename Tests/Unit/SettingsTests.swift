@@ -137,6 +137,18 @@ func runSettingsTests() {
           "the new autocompleteLayout wins over the legacy key")
     check(decode("{}").proofreadLayout == .column, "proofread layout defaults to column")
 
+    print("LanguageToolURL")
+    check(LanguageToolURL.normalized("http://192.168.31.105:8081") == "http://192.168.31.105:8081/v2", "a bare address gets /v2")
+    check(LanguageToolURL.normalized("http://192.168.31.105:8081/") == "http://192.168.31.105:8081/v2", "a trailing slash too")
+    check(LanguageToolURL.normalized("http://lt.local:8081/v2/") == "http://lt.local:8081/v2", "a given path is kept")
+    check(LanguageToolURL.normalized("https://example.com/lt/v2") == "https://example.com/lt/v2", "a deeper path is kept")
+    do {
+        var s = Settings()
+        s.languageToolMode = .selfHosted
+        s.languageToolBaseURL = "http://192.168.31.105:8081"
+        check(s.languageToolConnection(token: "").baseURL == "http://192.168.31.105:8081/v2", "self-hosted uses it")
+    }
+
     print("Star apps")
     do {
         let old = decode(#"{"proofreadAppMode":"deny","proofreadApps":["com.apple.Terminal"]}"#)

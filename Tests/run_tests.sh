@@ -8,6 +8,7 @@ swiftc -O \
     BindAll/Store/ActionKey.swift \
     BindAll/Store/PushToTalkKey.swift \
     BindAll/Store/Settings.swift \
+    BindAll/Store/LanguageToolURL.swift \
     BindAll/Actions/MaskAISlopRule.swift \
     BindAll/Actions/MaskAISlop.swift \
     BindAll/Actions/KeyboardLayoutMap.swift \

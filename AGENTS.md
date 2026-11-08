@@ -149,6 +149,7 @@ BindAll/
     ├── KeychainStore.swift     # API keys (generic password)
     ├── ShortcutConflicts.swift # pure: every shortcut in the settings and the duplicate check
     ├── SelectionCommand.swift  # star actions also offered in the menu bar and as optional shortcuts
+    ├── LanguageToolURL.swift   # pure: a bare self-hosted address (http://host:8081) gets /v2
     └── LoginItemManager.swift  # SMAppService launch-at-login
 Tests/
 ├── Unit/                       # pure-logic assertions (no XCTest host needed): Harness.swift (check/eq and
@@ -521,7 +522,8 @@ dimmed while Proofread is off.
   selection before clicking it. Checks on model output test its shape (`isShouting`), not its words:
   the on-device model phrases things its own way. A failed precondition is reported as
   "setup: ..." and still counts as a failure. The `say` recording is made once and reused while it
-  lasts at least a second.
+  lasts at least a second. `E2E_LT_URL=http://host:port` points the test build at a self-hosted
+  LanguageTool (mode Self-hosted).
 
 
 ```bash
