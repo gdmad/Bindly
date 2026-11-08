@@ -16,7 +16,12 @@ struct ElectronTarget {
 
 let slackTarget = ElectronTarget(name: "Slack", bundleID: "com.tinyspeck.slackmacgap", allowsEscape: true) { pid in
     // "New message": a draft with no recipient yet, so even a stray send has nowhere to go.
-    if isNewMessage(pid) { focusComposer(pid); return }
+    // A draft left open can come back without its message box (only the recipient field): a
+    // fresh one has it.
+    if isNewMessage(pid) {
+        focusComposer(pid)
+        if composer(of: pid) != nil { return }
+    }
     E2E.key(kVK_ANSI_N, .maskCommand)
     E2E.pause(1.5)
     focusComposer(pid)
@@ -53,17 +58,25 @@ func composer(of pid: pid_t) -> AXUIElement? {
     return el
 }
 
-/// Clicks into the lowest empty text area of the front window: the message box, not the recipient field.
+/// Puts the caret back in the composer: the lowest text area of the front window (the message box,
+/// not the recipient field), preferring an empty one. A step that leaves text there (Summarize)
+/// still gets it back -- otherwise the next ⌘A, Delete and typing went to whatever had focus. In
+/// Slack only inside the "New message" draft, never a channel's own box.
 func focusComposer(_ pid: pid_t) {
-    if let el = composer(of: pid), E2E.value(el).isEmpty { return }
+    if composer(of: pid) != nil { return }
+    if NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == slackTarget.bundleID, !isNewMessage(pid) {
+        print("    not in the New message draft: nothing clicked"); return
+    }
     let app = AXUIElementCreateApplication(pid)
     guard let window = E2E.attr(app, kAXFocusedWindowAttribute).map({ $0 as! AXUIElement }) else { return }
-    var areas: [(AXUIElement, CGRect)] = []
+    var areas: [(AXUIElement, CGRect, Bool)] = []
     collect(window, depth: 40) { el in
-        if isTextArea(el), E2E.value(el).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-           let frame = E2E.frame(el), frame.width > 100 { areas.append((el, frame)) }
+        if isTextArea(el), let frame = E2E.frame(el), frame.width > 100 {
+            areas.append((el, frame, E2E.value(el).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+        }
     }
-    guard let area = areas.max(by: { $0.1.maxY < $1.1.maxY }) else { print("    no empty text area in the front window"); return }
+    let empty = areas.filter(\.2)
+    guard let area = (empty.isEmpty ? areas : empty).max(by: { $0.1.maxY < $1.1.maxY }) else { print("    no text area in the front window"); return }
     E2E.click(CGPoint(x: area.1.midX, y: area.1.midY))
     E2E.pause(0.5)
     if composer(of: pid) == nil {
