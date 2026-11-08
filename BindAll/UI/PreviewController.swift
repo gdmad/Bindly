@@ -23,7 +23,7 @@ final class PreviewController {
                                  })
         let field = field ?? FocusedField.rect()
         host.show(PreviewView(model: model, maxBodyHeight: PanelPlacement.maxHeight(near: field) - 120),
-                  title: "BindAll Preview", near: field, onEscape: model.onClose)
+                  title: "BindAll Preview", near: field, resizable: true, onEscape: model.onClose)
     }
 
     func close() {

@@ -25,7 +25,7 @@ final class PopupController {
             }
         }
         host.show(PopupView(model: model, maxBodyHeight: PanelPlacement.maxHeight(near: field) - 120),
-                  title: "BindAll Translation", near: field, onEscape: model.onClose)
+                  title: "BindAll Translation", near: field, resizable: true, onEscape: model.onClose)
         if let panel = host.panel { copyShortcut.install(on: panel, copyAll: model.copyText) }
     }
 

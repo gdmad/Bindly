@@ -5,6 +5,8 @@ struct PopupOriginalSection: View {
     let language: String?
     let copied: Bool
     let copy: () -> Void
+    let maxHeight: CGFloat
+    let isManual: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -23,13 +25,17 @@ struct PopupOriginalSection: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
+            // Its own share of the height, scrolling past it: as tall as the whole original, it
+            // pushed the window off the screen.
             ScrollView {
                 Text(original)
                     .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .foregroundStyle(.secondary)
             }
-            .frame(maxHeight: .infinity)
+            .scrollBounceBehavior(.basedOnSize)
+            .modifier(PanelScrollSizing(maxHeight: maxHeight, isManual: isManual))
         }
     }
 }

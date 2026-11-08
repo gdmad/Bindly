@@ -8,16 +8,34 @@ import SwiftUI
 final class FloatingPanelHost {
     private(set) var panel: KeyablePanel?
     private var resizeObserver: NSObjectProtocol?
+    private var liveResizeObserver: NSObjectProtocol?
     private var field = CGRect.zero
+    /// Stops the window following its content's size.
+    private var stopFollowingContent: (() -> Void)?
+    /// Handed to the content of a resizable window; see `PanelSizing`.
+    private(set) var sizing = PanelSizing()
 
-    func show<Content: View>(_ content: Content, title: String, near field: CGRect?, onEscape: @escaping () -> Void) {
+    /// `resizable`: the user may size it by hand (result and preview windows).
+    func show<Content: View>(_ content: Content, title: String, near field: CGRect?, resizable: Bool = false,
+                             onEscape: @escaping () -> Void) {
         close()
         let field = field ?? FocusedField.rect()
         self.field = field
-        let hosting = NSHostingController(rootView: IntegralSizeLayout { content })
+        let sizing = PanelSizing()
+        self.sizing = sizing
+        let hosting = NSHostingController(rootView: PanelContent(content: content, sizing: sizing))
         hosting.sizingOptions = [.preferredContentSize]
+        stopFollowingContent = { [weak hosting] in hosting?.sizingOptions = [] }
         let panel = KeyablePanel(contentViewController: hosting)
-        panel.styleMask = [.borderless]
+        panel.styleMask = resizable ? [.borderless, .resizable] : [.borderless]
+        if resizable {
+            panel.minSize = NSSize(width: 380, height: 160)
+            panel.onManualResize = { [weak self] in self?.becomeManual() }
+            liveResizeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willStartLiveResizeNotification,
+                                                                        object: panel, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.becomeManual() }
+            }
+        }
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
@@ -52,9 +70,20 @@ final class FloatingPanelHost {
         }
     }
 
+    /// From now on the window keeps the size it is given and the content fills it: following the
+    /// content too would undo the user's sizing on the next change (showing the original).
+    private func becomeManual() {
+        guard !sizing.isManual else { return }
+        stopFollowingContent?()
+        sizing.isManual = true
+    }
+
     func close() {
         if let resizeObserver { NotificationCenter.default.removeObserver(resizeObserver) }
         resizeObserver = nil
+        if let liveResizeObserver { NotificationCenter.default.removeObserver(liveResizeObserver) }
+        liveResizeObserver = nil
+        stopFollowingContent = nil
         guard let closing = panel else { return }
         panel = nil
         closing.onEscape = nil
@@ -68,6 +97,16 @@ final class FloatingPanelHost {
         guard let panel, let screen = panel.screen ?? NSScreen.main else { return }
         let visible = screen.visibleFrame
         var frame = panel.frame
+        let room = visible.height - 2 * PanelPlacement.inset
+        if frame.height > room {
+            // Taller than the screen: it can only fit by shrinking, and a window that follows its
+            // content would grow straight back -- so it stops following it and keeps this height.
+            becomeManual()
+            frame.size.height = room
+            frame.origin.y = visible.minY + PanelPlacement.inset
+            panel.setFrame(frame, display: true)
+            return
+        }
         if frame.minY < visible.minY + PanelPlacement.inset {
             // No more room below: the window moves up instead of running off the screen.
             frame.origin.y = visible.minY + PanelPlacement.inset

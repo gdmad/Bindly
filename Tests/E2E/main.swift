@@ -299,6 +299,12 @@ func fixAllScenario() {
         }
         record("the preview's buttons are inside its window", inside, "window \(window)")
     }
+    if let window = E2E.window("BindAll Preview")?.bounds {
+        E2E.drag(from: CGPoint(x: window.maxX - 9, y: window.maxY - 9), to: CGPoint(x: window.maxX + 101, y: window.maxY + 61))
+        E2E.pause(0.6)
+        let resized = E2E.window("BindAll Preview")?.bounds ?? window
+        record("the preview can be sized by hand", resized.width - window.width > 60 && resized.height - window.height > 30, "\(window) → \(resized)")
+    }
     E2E.allowBareReturn = true
     E2E.key(kVK_Return)
     E2E.allowBareReturn = false
@@ -512,6 +518,36 @@ func explainScenario() {
             record("\(name): Esc closes the window", closed, "front \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
             if !closed { E2E.key(kVK_Escape) }
         } else {
+            // Show Original keeps the window on screen with its buttons; the corner sizes it by hand,
+            // and the size then stays when the original is toggled.
+            if let toggle = E2E.testElement(window: "BindAll Translation", E2E.named("Show Original")) {
+                E2E.press(toggle)
+                E2E.pause(0.8)
+                if let shown = E2E.window("BindAll Translation")?.bounds {
+                    let inside = ["Close", "Copy"].allSatisfy { button in
+                        E2E.testElement(window: "BindAll Translation", E2E.named(button)).flatMap(E2E.frame)
+                            .map { shown.insetBy(dx: -1, dy: -1).contains($0) } ?? false
+                    }
+                    record("\(name): with the original shown the window stays on screen, buttons inside",
+                           E2E.isOnScreen(shown) && inside, "window \(shown)")
+                    E2E.drag(from: CGPoint(x: shown.maxX - 9, y: shown.maxY - 9), to: CGPoint(x: shown.maxX + 111, y: shown.maxY + 91))
+                    E2E.pause(0.6)
+                    let resized = E2E.window("BindAll Translation")?.bounds ?? shown
+                    record("\(name): the corner sizes the window by hand",
+                           resized.width - shown.width > 60 && resized.height - shown.height > 40, "\(shown) → \(resized)")
+                    E2E.press(toggle)
+                    E2E.pause(0.8)
+                    let after = E2E.window("BindAll Translation")?.bounds ?? resized
+                    let buttonsIn = ["Close", "Copy"].allSatisfy { button in
+                        E2E.testElement(window: "BindAll Translation", E2E.named(button)).flatMap(E2E.frame)
+                            .map { after.insetBy(dx: -1, dy: -1).contains($0) } ?? false
+                    }
+                    record("\(name): a hand-sized window keeps its size when the original is hidden",
+                           abs(after.height - resized.height) < 2 && abs(after.width - resized.width) < 2 && buttonsIn, "\(resized) → \(after)")
+                }
+            } else {
+                record("\(name): Show Original is offered", false)
+            }
             // Copy, then the window's own Close button: the click that used to free the window
             // while it was still handling it.
             if let copy = E2E.testElement(window: "BindAll Translation", E2E.named("Copy")).flatMap(E2E.frame) {

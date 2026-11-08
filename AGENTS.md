@@ -501,7 +501,12 @@ dimmed while Proofread is off.
   the height is measured at the width the text is drawn at; left to SwiftUI's ideal size the text was
   measured as one line and the window came out shorter than its content, hiding its header and
   buttons; the body scrolls past 60% of the screen height; one `setContentSize` after the first
-  layout corrects a window that still differs from its content). Result text goes through
+  layout corrects a window that still differs from its content). The result and preview windows
+  (`resizable: true`) can be sized by hand -- edges and the corner `ResizeGrip`; from the first manual
+  resize the host stops following the content (`sizingOptions = []`, `PanelSizing.isManual`) and the
+  content fills the window, its text areas scrolling. The translation and its original share one
+  height budget (55/45 of `maxBodyHeight`), so showing the original never pushes the window off
+  screen; a window still taller than the screen is shrunk to fit and switched to manual. Result text goes through
   `ResultMarkdown` (inline Markdown styled, headings as bold, Copy without the marks) and follows it as it grows,
   keeping its top edge. Placed by `PanelPlacement`: under the field (`FocusedField.rect()`, the
   focused element), above it when there is no room, else centered on the app's window. Look:

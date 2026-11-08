@@ -4,6 +4,9 @@ import SwiftUI
 struct PreviewView: View {
     @Bindable var model: PreviewModel
     let maxBodyHeight: CGFloat
+    @Environment(PanelSizing.self) private var sizing: PanelSizing?
+
+    private var isManual: Bool { sizing?.isManual ?? false }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -15,8 +18,7 @@ struct PreviewView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .frame(maxHeight: maxBodyHeight)
-            .fixedSize(horizontal: false, vertical: true)
+            .modifier(PanelScrollSizing(maxHeight: maxBodyHeight, isManual: isManual))
             if let note = model.note {
                 Label(note, systemImage: "exclamationmark.bubble")
                     .font(.callout)
@@ -40,9 +42,9 @@ struct PreviewView: View {
             }
             .layoutPriority(1)
         }
-        .frame(width: model.width, alignment: .topLeading)
-        .fixedSize(horizontal: false, vertical: true)
+        .modifier(PanelRootSizing(width: model.width, isManual: isManual))
         .panelChrome()
+        .overlay(alignment: .bottomTrailing) { ResizeGrip().frame(width: 14, height: 14).padding(3) }
         .onExitCommand(perform: model.onClose)
     }
 }
