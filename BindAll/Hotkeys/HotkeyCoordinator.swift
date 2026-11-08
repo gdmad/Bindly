@@ -253,13 +253,21 @@ final class HotkeyCoordinator {
         add("Show translation", "globe") { [weak self] in self?.runStarAction(.translate, context) }
         add("Replace with translation", "character.bubble") { [weak self] in self?.runStarAction(.translateInPlace, context) }
         add("Remove AI tells", "eraser") { [weak self] in self?.runStarAction(.removeTells, context) }
+        // The user's own AI actions in a submenu of their own, so the list can grow without
+        // pushing the built-in items apart.
         let keys = appState.settings.actionKeys.filter { !$0.prompt.isEmpty }
         if !keys.isEmpty {
             menu.addItem(.separator())
+            let submenu = NSMenu()
             for key in keys {
-                let title = key.title
-                add(title, "sparkle") { [weak self] in self?.runStarAction(.actionKey(key), context) }
+                let item = ClosureMenuItem(title: key.title) { [weak self] in self?.runStarAction(.actionKey(key), context) }
+                item.image = NSImage(systemSymbolName: "sparkle", accessibilityDescription: nil)
+                submenu.addItem(item)
             }
+            let actions = NSMenuItem(title: "Actions", action: nil, keyEquivalent: "")
+            actions.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: nil)
+            actions.submenu = submenu
+            menu.addItem(actions)
         }
         menu.addItem(.separator())
         add("Custom prompt…", "text.bubble") { [weak self] in self?.askForPrompt(context) }

@@ -9,9 +9,6 @@ struct PanelChrome: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(14)
-            // Under everything: the margins and the gaps between controls move the window, while
-            // buttons, fields and selectable text above it keep their own clicks.
-            .background { WindowDragHandle() }
             .background(.regularMaterial, in: .rect(cornerRadius: Self.radius))
             .overlay {
                 RoundedRectangle(cornerRadius: Self.radius)

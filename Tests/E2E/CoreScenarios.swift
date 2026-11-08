@@ -23,7 +23,8 @@ func pressTrayItem(_ title: String) -> Bool {
 }
 
 /// Opens the star's menu on the whole text and picks `title` (by AX, or `downs` steps of the keyboard).
-func runStarItem(_ title: String, downs: Int) -> Bool {
+/// With `submenu`, `downs` reaches the submenu's item and `subDowns` the item inside it.
+func runStarItem(_ title: String, downs: Int, in submenu: String? = nil, subDowns: Int = 0) -> Bool {
     guard let pid = E2E.testApp?.processIdentifier else { return false }
     let before = E2E.window("BindAll Star")?.bounds
     E2E.key(kVK_ANSI_A, .maskCommand)
@@ -37,7 +38,28 @@ func runStarItem(_ title: String, downs: Int) -> Bool {
     let current = E2E.window("BindAll Star")?.bounds ?? star
     E2E.click(CGPoint(x: current.midX, y: current.midY))
     E2E.pause(0.6)
-    if let item = E2E.find(in: AXUIElementCreateApplication(pid), depth: 6, { (E2E.attr($0, kAXTitleAttribute) as? String) == title }) {
+    let app = AXUIElementCreateApplication(pid)
+    func find(_ name: String) -> AXUIElement? {
+        E2E.find(in: app, depth: 8, { (E2E.attr($0, kAXTitleAttribute) as? String) == name })
+    }
+    if let submenu {
+        if let parent = find(submenu) {
+            E2E.press(parent)
+            E2E.pause(0.5)
+            if let item = find(title) { E2E.press(item); return true }
+            E2E.key(kVK_Escape)
+            E2E.pause(0.3)
+            E2E.click(CGPoint(x: current.midX, y: current.midY))
+            E2E.pause(0.6)
+        }
+        print("    \(title): not in the AX menu, picking with the keyboard")
+        for _ in 0..<downs { E2E.key(kVK_DownArrow) }
+        E2E.key(kVK_RightArrow)
+        E2E.pause(0.3)
+        pickMenuItem(downs: subDowns)
+        return true
+    }
+    if let item = find(title) {
         E2E.press(item)
     } else {
         print("    \(title): not in the AX menu, picking with the keyboard")
@@ -173,7 +195,7 @@ func starActionScenarios() {
     clearField()
     E2E.type("a quiet line of text")
     E2E.pause(1.0)
-    if runStarItem("UPPERCASE", downs: 6) {
+    if runStarItem("UPPERCASE", downs: 6, in: "Actions", subDowns: 1) {
         let preview = E2E.wait(20) { E2E.window("BindAll Preview") != nil }
         record("an action key from the star shows a preview", preview)
         if preview {
@@ -189,7 +211,7 @@ func starActionScenarios() {
     clearField()
     E2E.type("привет, завтра встреча в 10")
     E2E.pause(1.0)
-    guard runStarItem("Custom prompt…", downs: 11), E2E.wait(3, { E2E.window("BindAll Prompt") != nil }) else {
+    guard runStarItem("Custom prompt…", downs: 7), E2E.wait(3, { E2E.window("BindAll Prompt") != nil }) else {
         record("Custom prompt: its window opens", false); E2E.key(kVK_Escape); return
     }
     let promptPid = E2E.testApp!.processIdentifier
@@ -351,21 +373,17 @@ func settingsScenario() {
 
 // MARK: - Every window can be dragged
 
-/// Drags `name` by its header and by its bottom margin; true when both moved it.
+/// Drags `name` by its header; true when that moved it.
 /// `headerY`: how far down the header's free area is (Quick Translate's top bar is all pickers but its
 /// 12 pt padding).
-func dragsBy(_ name: String, headerY: CGFloat = 22) -> (header: Bool, margin: Bool, detail: String) {
-    guard let start = E2E.window(name)?.bounds else { return (false, false, "no window") }
+func dragsBy(_ name: String, headerY: CGFloat = 22) -> (header: Bool, detail: String) {
+    guard let start = E2E.window(name)?.bounds else { return (false, "no window") }
     E2E.drag(from: CGPoint(x: start.minX + 40, y: start.minY + headerY), to: CGPoint(x: start.minX + 100, y: start.minY + 62))
     E2E.pause(0.4)
     let afterHeader = E2E.window(name)?.bounds ?? start
     // Moved the way it was pulled; the system may round or snap the last few points.
     let header = afterHeader.minX - start.minX > 40 && afterHeader.minY - start.minY > 25
-    E2E.drag(from: CGPoint(x: afterHeader.minX + 40, y: afterHeader.maxY - 5), to: CGPoint(x: afterHeader.minX - 20, y: afterHeader.maxY - 45))
-    E2E.pause(0.4)
-    let afterMargin = E2E.window(name)?.bounds ?? afterHeader
-    let margin = afterHeader.minX - afterMargin.minX > 40 && afterHeader.minY - afterMargin.minY > 25
-    return (header, margin, "start \(start), after header \(afterHeader), after margin \(afterMargin)")
+    return (header, "start \(start), after \(afterHeader)")
 }
 
 func dragScenario() {
@@ -373,7 +391,6 @@ func dragScenario() {
     func check(_ name: String, _ title: String, headerY: CGFloat = 22) {
         let moved = dragsBy(name, headerY: headerY)
         record("\(title): dragged by its header", moved.header, moved.detail)
-        record("\(title): dragged by its margin", moved.margin, moved.detail)
     }
 
     // The result window.
@@ -416,7 +433,7 @@ func dragScenario() {
     focusTextEdit()
     E2E.pause(1.0)
     let promptOpened = (1...2).contains { _ in
-        runStarItem("Custom prompt…", downs: 11) && E2E.wait(3, { E2E.window("BindAll Prompt") != nil })
+        runStarItem("Custom prompt…", downs: 7) && E2E.wait(3, { E2E.window("BindAll Prompt") != nil })
     }
     if promptOpened {
         E2E.pause(0.5)

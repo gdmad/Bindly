@@ -28,5 +28,8 @@ struct QuickTranslateLanguageBar: View {
             .frame(maxWidth: .infinity)
         }
         .padding(12)
+        // The window's top bar: its content covers the title bar, and moving by the background
+        // does not reach through SwiftUI, so the space around the pickers drags it.
+        .background { WindowDragHandle() }
     }
 }
