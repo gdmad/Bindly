@@ -7,7 +7,10 @@ final class AppState {
     @ObservationIgnored private static let settingsKey = "BindAll.settings.v1"
 
     var settings: Settings {
-        didSet { persist() }
+        didSet {
+            persist()
+            syncLocalServer()
+        }
     }
 
     /// Live Accessibility permission status (updated by the coordinator).
@@ -24,6 +27,16 @@ final class AppState {
     /// True while the user is recording a shortcut in Settings (pauses global hotkeys).
     var isRecordingShortcut: Bool = false
 
+    /// The portable LanguageTool server (install, run, update, remove).
+    let localServer = LocalServerManager()
+    @ObservationIgnored private var localServerPlan: LocalServerPlan?
+
+    /// The part of the settings that decides whether the local server should be up, and where.
+    private struct LocalServerPlan: Equatable {
+        let wanted: Bool
+        let port: Int
+    }
+
     init() {
         if let data = UserDefaults.standard.data(forKey: Self.settingsKey),
            let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
@@ -31,6 +44,18 @@ final class AppState {
         } else {
             settings = Settings()
         }
+        localServer.appState = self
+        // After init, as the first settings value: this is what starts the server at launch.
+        Task { @MainActor [weak self] in self?.syncLocalServer() }
+    }
+
+    /// Starts, moves or stops the local server only when what decides it changed, not on every
+    /// settings write.
+    private func syncLocalServer() {
+        let plan = LocalServerPlan(wanted: settings.usesLocalServer, port: settings.localServerPort)
+        guard plan != localServerPlan else { return }
+        localServerPlan = plan
+        localServer.sync()
     }
 
     private func persist() {

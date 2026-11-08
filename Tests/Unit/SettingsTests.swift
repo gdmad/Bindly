@@ -85,6 +85,8 @@ func runSettingsTests() {
     allChanged.voiceTranslateEnabled = true
     allChanged.voiceTranslateKey = .rightOption
     allChanged.historyEnabled = false
+    allChanged.languageToolTarget = .local
+    allChanged.localServerPort = 9090
     allChanged.starAppMode = "deny"
     allChanged.spellingNoticeShown = true
     allChanged.textToolHotkeys = ["lowercase": HotkeyConfig(keyCode: 37, modifiers: HotkeyModifiers(command: true, control: true), repeatCount: 1)]

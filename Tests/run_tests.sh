@@ -48,6 +48,10 @@ swiftc -O \
     BindAll/Engines/OCRParagraphs.swift \
     BindAll/UI/PopupTilePacker.swift \
     BindAll/Engines/LanguageToolEngine.swift \
+    BindAll/LocalServer/LocalServerLayout.swift \
+    BindAll/LocalServer/LocalServerPort.swift \
+    BindAll/LocalServer/LocalServerRelease.swift \
+    BindAll/LocalServer/LocalServerManifest.swift \
     BindAll/Autocomplete/AutocompleteEngine.swift \
     BindAll/Autocomplete/AutocompleteLearningStore.swift \
     BindAll/Autocomplete/LearnedWordAudit.swift \

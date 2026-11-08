@@ -84,8 +84,13 @@ BindAll/
 │   └── ProofreadController.swift      # session, key tap (only while the popup is up), click popup
 ├── Actions/
 │   ├── ActionRouter.swift      # EngineFactory (builds an AIEngine from settings)
-│   └── MaskAISlop.swift        # typography normalizer (dashes/quotes/emoji)
 │   ├── TextTool.swift / KeyboardLayoutMap.swift # pure: fixed transforms without AI, and the old keys' migration
+│   └── MaskAISlop.swift        # typography normalizer (dashes/quotes/emoji)
+├── LocalServer/                # portable LanguageTool: own JRE + server in one folder, nothing system-wide
+│   ├── LocalServerManager.swift   # @Observable owner: install/update/start/stop/remove state machine
+│   ├── LocalServerInstaller.swift # download, verify, unpack into .staging, atomic swap, remove
+│   ├── LocalServerProcess.swift   # the java child, PID file, readiness poll, orphan reaping
+│   └── LocalServerLayout/Port/Release/Manifest/State/Error, FileDownloader, CommandRunner
 ├── UI/
 │   ├── SettingsView.swift      # tab bar + selected tab (see "Settings layout"); `showSettingsTab` in the environment switches tabs
 │   ├── SettingsTab / SettingsTabBar / SettingsTabRow / SettingsTabButton / SettingsTabContent .swift
@@ -107,7 +112,8 @@ BindAll/
 │   ├── ShortcutRecorder.swift / HotkeyFormatter.swift # click-to-record shortcut field, glyph formatting
 │   ├── DarkFieldStyle / ClearFocusOnAppear / DeferredWrite .swift # input box style, no auto-focus on
 │   │                           # tab appear, deferred settings writes from text fields
-│   ├── LanguageToolConnectionSection.swift # LT mode/URL/credentials block on the Proofread tab
+│   ├── LanguageToolConnectionSection.swift # LT mode/target/URL/credentials block on the Proofread tab
+│   ├── LocalServerSection.swift        # install/run/update/remove block (Self-hosted mode) + its Status/Port/Update/Progress rows
 │   ├── PopupKit.swift          # shared popup metrics/panel/placement/tile measuring (AppKit geometry, not views)
 │   ├── PopupPresenter.swift    # owns a popup's non-activating panel; generic present(view), no AnyView
 │   ├── PopupChrome.swift       # material panel + hairline border modifier (reads Reduce Transparency from the environment)
@@ -326,6 +332,28 @@ dimmed while Proofread is off.
   wire for Premium only; `LanguageToolEngine.authParams` is a final guard that never sends a
   lone username or apiKey. The Premium token lives in the Keychain. The URL is pre-filled per mode
   but stays editable; there is no settings migration (mode defaults to Free).
+  **Self-hosted has two targets** (`LanguageToolTarget`), kept side by side so switching loses
+  nothing: **Local server** (installed by BindAll, address derived from `localServerPort`) and
+  **Custom URL** (`languageToolBaseURL`). `Settings.usesLocalServer` says which is live.
+- **Google Docs** is not supported: it renders to a canvas, so there is no AX text or word geometry.
+  Only extensions Google allowlists (Grammarly, LanguageTool) get its text; the README points users
+  to the LanguageTool extension configured with BindAll's server (`http://127.0.0.1:<port>/v2`).
+- **Local LanguageTool server** (`LocalServer/`, opt-in from Settings -> Proofread -> Self-hosted):
+  the user clicks Install and BindAll downloads Temurin 21 JRE (Adoptium API, SHA-256 verified) and
+  `LanguageTool-stable.zip` (no published checksum: only unpacking success is checked) into
+  `~/Library/Application Support/BindAll/LanguageTool/` (`AppPaths.supportDirectory`, so the E2E build has
+  its own; `jre/`, `server/`, `install.json`,
+  `server.log`, `server.pid`). Nothing else on disk, no system Java, ~540 MB. Downloads are prepared
+  in `.staging` and swapped in atomically, so a failed update keeps the old files. The server
+  (`java -cp languagetool-server.jar ...HTTPServer --port N`, loopback only) is started by
+  `LocalServerManager.sync()` whenever the local target is selected (also at launch, driven by
+  `AppState`'s settings sink) and stopped on target/mode change, Stop, Remove and quit
+  (`stopForTermination`). A busy port moves the server to the next free one, saves it and shows a
+  notice. A crashed run's leftover java is reaped from `server.pid` (only if its command line is inside
+  our folder). Updates are never automatic: a weekly passive check (HEAD on the zip + Adoptium
+  metadata) sets `manifest.available`, the user presses Update; JRE stays on Java 21. Remove deletes the
+  whole folder and falls back via `Settings.localServerRemoved()`. Dragging the app to the Trash does
+  not remove the folder (documented in the info hint).
 - **Slack text, measured on a live composer:** Slack's `AXValue` has a newline after every list item,
   soft line break (Shift+Enter) and emoji, and a numbered or bulleted item's marker glued to its text
   ("1.Buy", "\u{E506}Buy" -- U+E506 is Slack's bullet glyph). Its own string -- what
@@ -523,7 +551,10 @@ dimmed while Proofread is off.
   the on-device model phrases things its own way. A failed precondition is reported as
   "setup: ..." and still counts as a failure. The `say` recording is made once and reused while it
   lasts at least a second. `E2E_LT_URL=http://host:port` points the test build at a self-hosted
-  LanguageTool (mode Self-hosted).
+  LanguageTool (mode Self-hosted). `E2E_LOCAL_SERVER=1 E2E_ONLY=localServer` runs the local server's whole chain
+  (`LocalServerScenario.swift`: install, loopback-only java from the test build's own folder, checking
+  through it, Custom URL and back, a busy port, update check, quit and relaunch, Remove); it downloads
+  ~300 MB, so it runs only when named, and `e2e.sh` kills its java and deletes its folder on exit.
 
 
 ```bash

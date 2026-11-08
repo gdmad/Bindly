@@ -37,6 +37,10 @@ lt_url = os.environ.get("E2E_LT_URL", "")
 if lt_url:
     settings["languageToolMode"] = "selfHosted"
     settings["languageToolBaseURL"] = lt_url
+# E2E_LOCAL_SERVER=1: self-hosted with the server BindAll installs (the localServer group).
+if os.environ.get("E2E_LOCAL_SERVER"):
+    settings["languageToolMode"] = "selfHosted"
+    settings["languageToolTarget"] = "local"
 data = json.dumps(settings).encode().hex()
 subprocess.run(["defaults", "write", "com.evgeny.bindall.e2e", "BindAll.settings.v1", "-data", data], check=True)
 PY
@@ -63,5 +67,8 @@ STATUS=$?
 set -e
 
 pkill -f "BindAll E2E.app" 2>/dev/null || true
+# A run stopped half-way must not leave the test build's server behind.
+pkill -f "BindAll E2E/LanguageTool" 2>/dev/null || true
+rm -rf "$HOME/Library/Application Support/BindAll E2E/LanguageTool"
 echo "==> Report: $OUT/report.md"
 exit $STATUS

@@ -406,7 +406,7 @@ final class HotkeyCoordinator {
                     result = try await self.removeTells(from: text, settings: settings)
                 case .textTool(let tool):
                     result = tool.apply(to: text)
-                case .fix, .actionKey, .prompt, .translate, .translateInPlace, .reading, .textTool:
+                case .fix, .actionKey, .prompt, .translate, .translateInPlace, .reading:
                     let instruction: String = switch action {
                     case .actionKey(let key): key.prompt
                     case .prompt(let prompt, _): prompt
