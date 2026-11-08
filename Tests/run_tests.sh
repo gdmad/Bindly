@@ -46,6 +46,7 @@ swiftc -O \
     BindAll/Engines/LanguagePair.swift \
     BindAll/Store/AppLanguages.swift \
     BindAll/Engines/OCRParagraphs.swift \
+    BindAll/Engines/DocumentLayout.swift \
     BindAll/UI/PopupTilePacker.swift \
     BindAll/Engines/LanguageToolEngine.swift \
     BindAll/LocalServer/LocalServerLayout.swift \

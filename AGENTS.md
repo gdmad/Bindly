@@ -40,8 +40,9 @@ BindAll/
 │   ├── TranslationService.swift      # Apple Translation framework + NL language detection
 │   ├── TranslationLayout.swift # pure: puts the source's line breaks back into a translation
 │   ├── LanguagePair.swift      # pure: which way a translation goes, for every entry point
+│   ├── DocumentLayout.swift    # pure: a recognized document (paragraphs, lists, tables) as text, in reading order
 │   ├── OCRParagraphs.swift     # pure: joins wrapped OCR lines back into paragraphs
-│   └── OCRService.swift        # screencapture region + Vision text recognition
+│   └── OCRService.swift        # screencapture region + Vision document recognition (lines as fallback)
 ├── Voice/                      # Push to Talk (off by default)
 │   ├── HoldKeyPolicy.swift            # pure: hold / quick tap / used as a modifier / Esc
 │   ├── HoldKeyMonitor.swift           # key tap on its own thread (right Option or a custom key)
@@ -420,8 +421,10 @@ dimmed while Proofread is off.
   (UserDefaults, set only by scripts/e2e.sh) feeds a `say` recording instead of the microphone.
 - **Translation layout:** Apple's model (macOS 27) translates each line as its own segment and
   joins the output with blank lines. The whole text still goes in one request (context matters);
-  `TranslationLayout.restore` then swaps the output's newline runs for the source's. OCR lines are
-  first joined into paragraphs (`OCRParagraphs`: small vertical gap and aligned left edge = same
+  `TranslationLayout.restore` then swaps the output's newline runs for the source's. OCR reads the capture as a document
+  (`RecognizeDocumentsRequest`, macOS 26: paragraphs, lists as "• item" lines, tables as rows with Tab
+  between cells, in reading order, a paragraph inside a list or table not repeated -- `DocumentLayout`,
+  pure); when that fails or finds nothing, the lines are joined into paragraphs as before (`OCRParagraphs`: small vertical gap and aligned left edge = same
   paragraph; a hyphenated wrap is rejoined), since screen line breaks cut sentences in half.
 - **Popup keys (Safari / macOS inline predictions model):** a suggestion list or the fixes popup
   takes no navigation keys until the user goes into it with Down. `AutocompleteKeyPolicy` and

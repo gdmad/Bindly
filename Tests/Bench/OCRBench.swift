@@ -88,6 +88,11 @@ func runOCRBench() async -> String {
     } catch {
         report += "| RecognizeDocumentsRequest | failed: \(error.localizedDescription) | | | |\n"
     }
+    // What BindAll now hands to translation: each item and cell once, in reading order.
+    let rendered = (try? await OCRService.recognizeDocument(image)) ?? ""
+    func count(_ needle: String) -> Int { rendered.components(separatedBy: needle).count - 1 }
+    let once = (items + cells).filter { count($0) == 1 }.count
+    report += "\nBindAll's text from the document (each list item and cell exactly once: \(once)/\(items.count + cells.count)):\n\n```\n\(rendered)\n```\n"
     return report + "\n"
 }
 

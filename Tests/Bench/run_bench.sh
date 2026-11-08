@@ -4,5 +4,5 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 mkdir -p .build/bench
-swiftc -O Tests/Bench/*.swift BindAll/Engines/OCRParagraphs.swift -o .build/bench/bench 2>&1 | grep -v warning || true
+swiftc -O Tests/Bench/*.swift BindAll/Engines/OCRParagraphs.swift BindAll/Engines/OCRService.swift BindAll/Engines/DocumentLayout.swift -o .build/bench/bench 2>&1 | grep -v warning || true
 .build/bench/bench .build/bench/report.md

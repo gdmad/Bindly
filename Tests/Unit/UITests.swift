@@ -3,6 +3,18 @@ import CoreGraphics
 import Foundation
 
 func runUITests() {
+    print("DocumentLayout")
+    do {
+        let para = DocumentLayout.Block(content: .paragraph("Первый абзац."), box: CGRect(x: 0, y: 0.8, width: 1, height: 0.1))
+        let list = DocumentLayout.Block(content: .list(["• Один", "2. Два"]), box: CGRect(x: 0, y: 0.5, width: 1, height: 0.2))
+        let table = DocumentLayout.Block(content: .table([["Name", "Status"], ["Login", "Done"]]), box: CGRect(x: 0, y: 0.1, width: 1, height: 0.2))
+        let inTable = DocumentLayout.Block(content: .paragraph("Login Done"), box: CGRect(x: 0.1, y: 0.12, width: 0.5, height: 0.05))
+        let text = DocumentLayout.render([table, inTable, list, para])
+        check(text == "Первый абзац.\n\n• Один\n• Два\n\nName\tStatus\nLogin\tDone", "top to bottom, list and table laid out, nothing twice (\(text.debugDescription))")
+        check(DocumentLayout.strippedMarker("12) Пункт") == "Пункт" && DocumentLayout.strippedMarker("2024 год") == "2024 год",
+              "a list marker is dropped, a number in the text is not")
+    }
+
     print("LanguagePair")
     let auto = LanguagePair.resolve(detected: "ru", source: "auto", target: "en")
     check(auto == .init(from: "ru", to: "en") && !auto.isAlreadyThere, "auto: into the target")

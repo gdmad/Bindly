@@ -16,22 +16,15 @@ enum OCRService {
         }
     }
 
-    /// Interactively asks the user to drag-select a screen region, then OCRs it.
-    /// Runs the blocking capture/recognition off the main thread.
+    /// Interactively asks the user to drag-select a screen region, then reads its text: as a
+    /// document (paragraphs, lists, tables kept apart) where Vision can, as joined lines otherwise.
     static func captureAndRecognize() async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let text = try captureAndRecognizeSync()
-                    continuation.resume(returning: text)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let image = try await Task.detached(priority: .userInitiated) { try capture() }.value
+        if let text = try? await recognizeDocument(image), !text.isEmpty { return text }
+        return try await Task.detached(priority: .userInitiated) { try recognizeLines(image) }.value
     }
 
-    private static func captureAndRecognizeSync() throws -> String {
+    private static func capture() throws -> CGImage {
         let tmp = (NSTemporaryDirectory() as NSString).appendingPathComponent("bindall_ocr_\(UUID().uuidString).png")
         defer { try? FileManager.default.removeItem(atPath: tmp) }
 
@@ -49,7 +42,29 @@ enum OCRService {
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             throw OCRError.noImage
         }
+        return cgImage
+    }
 
+    /// `RecognizeDocumentsRequest` (macOS 26): the structure comes with the text, so a list or a
+    /// table is not flattened into run-on lines before it is translated.
+    static func recognizeDocument(_ image: CGImage) async throws -> String {
+        guard let document = try await RecognizeDocumentsRequest().perform(on: image).first?.document else { return "" }
+        var blocks: [DocumentLayout.Block] = []
+        blocks += document.paragraphs.map {
+            DocumentLayout.Block(content: .paragraph($0.transcript), box: $0.boundingRegion.boundingBox.cgRect)
+        }
+        blocks += document.lists.map {
+            DocumentLayout.Block(content: .list($0.items.map(\.itemString)), box: $0.boundingRegion.boundingBox.cgRect)
+        }
+        blocks += document.tables.map { table in
+            DocumentLayout.Block(content: .table(table.rows.map { $0.map { $0.content.text.transcript } }),
+                                 box: table.boundingRegion.boundingBox.cgRect)
+        }
+        return DocumentLayout.render(blocks).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The earlier path, kept for when the document request fails or finds nothing.
+    static func recognizeLines(_ cgImage: CGImage) throws -> String {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
