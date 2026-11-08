@@ -9,6 +9,30 @@ struct StarButton: View {
     let action: () -> Void
 
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
+
+    /// Issues in the field: a small dot in the most serious one's color by the upper right ray, as
+    /// the underlines are colored; with "Differentiate Without Color", that kind's symbol.
+    @ViewBuilder private var issueMark: some View {
+        if !activity.busy, activity.count > 0, let kind = activity.worstIssue {
+            Group {
+                if differentiateWithoutColor {
+                    Image(systemName: IssueKindStyle.symbolName(kind))
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(IssueKindStyle.color(kind))
+                } else {
+                    Circle()
+                        .fill(IssueKindStyle.color(kind))
+                        .frame(width: 5, height: 5)
+                        .padding(1)
+                        .background(Color(nsColor: .windowBackgroundColor), in: .circle)
+                }
+            }
+            .offset(x: starSize * 0.42, y: -starSize * 0.42)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
 
     var body: some View {
         Button(action: action) {
@@ -18,20 +42,10 @@ struct StarButton: View {
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .overlay(alignment: .topTrailing) {
-            if !activity.busy, let badge = FieldStarPolicy.badge(activity.count) {
-                Text(badge)
-                    .font(.system(size: 8, weight: .bold).monospacedDigit())
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 3)
-                    .frame(minWidth: 11, minHeight: 11)
-                    .background(Color.brand, in: .capsule)
-                    .allowsHitTesting(false)
-            }
-        }
+        .overlay { issueMark }
         .accessibilityLabel(label)
         .accessibilityValue(activity.busy ? "Working" : activity.count > 0 ? "\(activity.count) issues" : "")
-        .help(label)
+        .help(activity.count > 0 ? "\(label) — \(activity.count == 1 ? "1 issue" : "\(activity.count) issues")" : label)
     }
 
     @ViewBuilder private var star: some View {

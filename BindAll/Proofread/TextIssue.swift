@@ -9,6 +9,15 @@ enum IssueKind: String, Codable, CaseIterable {
     case style
 }
 
+extension IssueKind {
+    /// The kind a single mark stands for, when there are several: spelling, then grammar,
+    /// punctuation, style.
+    static func mostSevere(_ kinds: [IssueKind]) -> IssueKind? {
+        let order: [IssueKind] = [.spelling, .grammar, .punctuation, .style]
+        return order.first(where: kinds.contains)
+    }
+}
+
 /// Which provider produced an issue: LanguageTool, or the Mac's spell checker while it is offline.
 enum IssueSource: String, Codable {
     case languageTool

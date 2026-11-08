@@ -5,6 +5,8 @@ import Observation
 @Observable
 final class StarActivity {
     var busy = false
-    /// Issues found in the field, shown on the field star; 0 shows none.
+    /// Issues found in the field: the field star's dot, tooltip and VoiceOver value; 0 shows none.
     var count = 0
+    /// The most serious of them, which colors the dot.
+    var worstIssue: IssueKind?
 }

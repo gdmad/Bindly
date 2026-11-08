@@ -474,8 +474,10 @@ dimmed while Proofread is off.
   leaf. `ProofreadAX.cachingLeaves { }` walks each field once per pass (the underline pass and the
   visual-break filter), and the overlay logs at `.notice` how many issues could not be found or
   measured.
-- **Field star counts the issues.** Without a selection the star shows in the field and carries the
-  number of issues Proofread found there (`StarActivity.count`, "9+" past nine); its menu then starts
+- **Field star marks the issues.** Without a selection the star shows in the field; while Proofread
+  found issues there a 5 pt dot by its upper right ray takes the most serious one's color
+  (`IssueKind.mostSevere`, `ProofreadController.issueSummary`, `StarActivity.worstIssue`; the kind's
+  symbol with Differentiate Without Color), and the tooltip and VoiceOver give the count; its menu then starts
   with "N issues: show the first". `starFieldOnlyWithIssues` (General: Always / Only when there are
   issues / Never, the last = `starFieldEnabled` off) hides it while there are none
   (`FieldStarPolicy.shows`, pure). `ProofreadController.onIssuesChange` refreshes it. Usage logs

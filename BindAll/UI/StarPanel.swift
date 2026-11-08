@@ -13,8 +13,10 @@ final class StarPanel {
 
     /// `origin` is the star's bottom-left corner in AppKit screen coordinates.
     /// `count`: issues to show on the star (the field star); 0 for none.
-    func show(at origin: NSPoint, label: String, count: Int = 0, onClick: @escaping (NSView) -> Void) {
+    func show(at origin: NSPoint, label: String, count: Int = 0, worst: IssueKind? = nil,
+              onClick: @escaping (NSView) -> Void) {
         activity.count = count
+        activity.worstIssue = worst
         let panel = self.panel ?? makePanel()
         center = NSPoint(x: origin.x + StarButton.size / 2, y: origin.y + StarButton.size / 2)
         place()

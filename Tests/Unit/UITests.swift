@@ -7,7 +7,8 @@ func runUITests() {
     check(FieldStarPolicy.shows(onlyWithIssues: false, issues: 0), "by default: shown with no issues too")
     check(FieldStarPolicy.shows(onlyWithIssues: true, issues: 3), "only with issues: shown with them")
     check(!FieldStarPolicy.shows(onlyWithIssues: true, issues: 0), "only with issues: hidden without")
-    check(FieldStarPolicy.badge(0) == nil && FieldStarPolicy.badge(3) == "3" && FieldStarPolicy.badge(12) == "9+", "the count")
+    check(IssueKind.mostSevere([.style, .grammar, .spelling]) == .spelling, "spelling is the most serious")
+    check(IssueKind.mostSevere([.style, .punctuation]) == .punctuation && IssueKind.mostSevere([]) == nil, "then punctuation over style; none for none")
 
     print("DocumentLayout")
     do {

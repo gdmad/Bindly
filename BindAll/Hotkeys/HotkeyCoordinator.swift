@@ -169,7 +169,7 @@ final class HotkeyCoordinator {
         stars.appAllowed = { [weak self] in self?.starAppAllowed() ?? false }
         stars.onOpen = { [weak self] context, view in self?.openStarMenu(context, at: view) }
         // The field star counts the issues proofreading found, and follows them as they change.
-        stars.issueCount = { [weak self] element in self?.proofread.issueCount(in: element) ?? 0 }
+        stars.issueSummary = { [weak self] element in self?.proofread.issueSummary(in: element) ?? (0, nil) }
         proofread.onIssuesChange = { [weak self] in self?.stars.refresh() }
         updateStars()
     }

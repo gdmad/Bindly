@@ -14,7 +14,7 @@ final class FieldStarController {
     }
 
     /// Issues proofreading found in a field, for the field star's count.
-    var issueCount: (AXUIElement) -> Int = { _ in 0 }
+    var issueSummary: (AXUIElement) -> (count: Int, worst: IssueKind?) = { _ in (0, nil) }
 
     /// Looks again now: proofreading found or cleared issues.
     func refresh() { if enabled { schedule(delay: .milliseconds(50)) } }
@@ -125,11 +125,11 @@ final class FieldStarController {
             }
             show(target, kind: "selection", origin: origin, label: "Actions for the selection")
         } else if config.fieldEnabled, target.selection.length == 0, target.isEditable,
-                  case let issues = issueCount(target.element),
-                  FieldStarPolicy.shows(onlyWithIssues: config.fieldOnlyWithIssues, issues: issues) {
+                  case let summary = issueSummary(target.element),
+                  FieldStarPolicy.shows(onlyWithIssues: config.fieldOnlyWithIssues, issues: summary.count) {
             let field = UnderlineGeometry.appKitRect(fromQuartz: fieldQuartz, primaryScreenHeight: screenHeight)
             let origin = NSPoint(x: field.maxX - size - 6, y: field.minY + 6)
-            show(target, kind: "field", origin: origin, label: "Actions for this text", issues: issues)
+            show(target, kind: "field", origin: origin, label: "Actions for this text", issues: summary.count, worst: summary.worst)
         } else {
             hide()
         }
@@ -172,7 +172,8 @@ final class FieldStarController {
         return UnderlineGeometry.appKitRect(fromQuartz: quartz, primaryScreenHeight: screenHeight)
     }
 
-    private func show(_ target: ProofTarget, kind: String, origin: NSPoint, label: String, issues: Int = 0) {
+    private func show(_ target: ProofTarget, kind: String, origin: NSPoint, label: String, issues: Int = 0,
+                      worst: IssueKind? = nil) {
         let context = StarContext(element: target.element, pid: target.pid, text: target.text,
                                   selection: kind == "selection" ? target.selection : NSRange(location: 0, length: 0),
                                   offsetMap: target.offsetMap,
@@ -184,7 +185,7 @@ final class FieldStarController {
         if !(sameField && shownKind == kind) { UsageLog.record(.star, .shown, detail: detail) }
         shownKind = kind
         shownElement = target.element
-        panel.show(at: origin, label: label, count: issues) { [weak self] view in
+        panel.show(at: origin, label: label, count: issues, worst: worst) { [weak self] view in
             UsageLog.record(.star, .accepted, detail: "open:\(detail)")
             self?.onOpen?(context, view)
         }

@@ -6,9 +6,4 @@ enum FieldStarPolicy {
     static func shows(onlyWithIssues: Bool, issues: Int) -> Bool {
         !onlyWithIssues || issues > 0
     }
-
-    /// The count on the star: "9+" past nine.
-    static func badge(_ issues: Int) -> String? {
-        issues <= 0 ? nil : issues > 9 ? "9+" : "\(issues)"
-    }
 }

@@ -744,6 +744,9 @@ func starScenarios() {
     let star = E2E.wait(12) { starValue().hasSuffix("issues") }
     record("with issues the field star shows their number", star, "value \(starValue().debugDescription)")
     if let starAt = E2E.window("BindAll Star")?.bounds {
+        E2E.snapshot(starAt.insetBy(dx: -40, dy: -14), to: outDir.appending(path: "star-issues.png"))
+    }
+    if let starAt = E2E.window("BindAll Star")?.bounds {
         E2E.click(CGPoint(x: starAt.midX, y: starAt.midY))
         E2E.pause(0.6)
         // The issues come first in its menu.

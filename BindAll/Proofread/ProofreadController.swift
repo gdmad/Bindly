@@ -149,9 +149,12 @@ final class ProofreadController {
     var isSessionActive: Bool { !issues.isEmpty && target != nil }
 
     /// Issues found in `element` by the last check, for the star menu.
-    func issueCount(in element: AXUIElement) -> Int {
-        guard let target, CFEqual(target.element, element) else { return 0 }
-        return issues.count
+    func issueCount(in element: AXUIElement) -> Int { issueSummary(in: element).count }
+
+    /// How many issues `element` has and the most serious kind among them, for the field star.
+    func issueSummary(in element: AXUIElement) -> (count: Int, worst: IssueKind?) {
+        guard let target, CFEqual(target.element, element) else { return (0, nil) }
+        return (issues.count, IssueKind.mostSevere(issues.map(\.kind)))
     }
 
     /// Opens the fixes popup on the first issue (from the star menu).
