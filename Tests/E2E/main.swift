@@ -300,10 +300,13 @@ func fixAllScenario() {
         record("the preview's buttons are inside its window", inside, "window \(window)")
     }
     if let window = E2E.window("BindAll Preview")?.bounds {
-        E2E.drag(from: CGPoint(x: window.maxX - 9, y: window.maxY - 9), to: CGPoint(x: window.maxX + 101, y: window.maxY + 61))
+        E2E.drag(from: CGPoint(x: window.maxX - 12, y: window.maxY - 12), to: CGPoint(x: window.maxX + 98, y: window.maxY + 58))
         E2E.pause(0.6)
         let resized = E2E.window("BindAll Preview")?.bounds ?? window
-        record("the preview can be sized by hand", resized.width - window.width > 60 && resized.height - window.height > 30, "\(window) → \(resized)")
+        var hit: AXUIElement?
+        AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(window.maxX - 9), Float(window.maxY - 9), &hit)
+        let under = hit.map { "\(E2E.attr($0, kAXRoleAttribute) as? String ?? "?") \(E2E.attr($0, kAXTitleAttribute) as? String ?? "")" } ?? "nothing"
+        record("the preview can be sized by hand", resized.width - window.width > 60 && resized.height - window.height > 30, "\(window) → \(resized); under the corner: \(under)")
     }
     E2E.allowBareReturn = true
     E2E.key(kVK_Return)

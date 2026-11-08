@@ -44,7 +44,7 @@ struct PreviewView: View {
         }
         .modifier(PanelRootSizing(width: model.width, isManual: isManual))
         .panelChrome()
-        .overlay(alignment: .bottomTrailing) { ResizeGrip().frame(width: 14, height: 14).padding(3) }
+        .overlay(alignment: .bottomTrailing) { ResizeGrip().padding(2) }
         .onExitCommand(perform: model.onClose)
     }
 }

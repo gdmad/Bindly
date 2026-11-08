@@ -502,8 +502,11 @@ dimmed while Proofread is off.
   measured as one line and the window came out shorter than its content, hiding its header and
   buttons; the body scrolls past 60% of the screen height; one `setContentSize` after the first
   layout corrects a window that still differs from its content). The result and preview windows
-  (`resizable: true`) can be sized by hand -- edges and the corner `ResizeGrip`; from the first manual
-  resize the host stops following the content (`sizingOptions = []`, `PanelSizing.isManual`) and the
+  (`resizable: true`) can be sized by hand -- edges and the corner (`ResizeGrip` draws it; `KeyablePanel.sendEvent` takes
+  the drag in its `gripSize` square, since a SwiftUI gesture there never saw it); from the first manual
+  resize the host stops following the content (`sizingOptions = []` on the controller and its hosting
+  view, and the hosting view's fixed width/height constraints -- priority 501, above the window
+  frame's 500 -- are deactivated, or every resize is clamped back; `PanelSizing.isManual`) and the
   content fills the window, its text areas scrolling. The translation and its original share one
   height budget (55/45 of `maxBodyHeight`), so showing the original never pushes the window off
   screen; a window still taller than the screen is shrunk to fit and switched to manual. Result text goes through

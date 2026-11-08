@@ -25,12 +25,27 @@ final class FloatingPanelHost {
         self.sizing = sizing
         let hosting = NSHostingController(rootView: PanelContent(content: content, sizing: sizing))
         hosting.sizingOptions = [.preferredContentSize]
-        stopFollowingContent = { [weak hosting] in hosting?.sizingOptions = [] }
+        stopFollowingContent = { [weak hosting] in
+            hosting?.sizingOptions = []
+            // The hosting view also pins the window to its content (its min and max size); lift that
+            // too, or every resize is clamped straight back.
+            (hosting?.view as? NSHostingView<PanelContent<Content>>)?.sizingOptions = []
+            // What actually held the size: the hosting view's own fixed width and height, ranked just
+            // above the window frame's (501 vs 500), and left in place when sizing stops.
+            if let view = hosting?.view {
+                NSLayoutConstraint.deactivate(view.constraints.filter { c in
+                    (c.firstItem as? NSView) === view && c.secondItem == nil && c.relation == .equal
+                        && (c.firstAttribute == .width || c.firstAttribute == .height)
+                        && c.priority.rawValue > NSLayoutConstraint.Priority.windowSizeStayPut.rawValue
+                })
+            }
+        }
         let panel = KeyablePanel(contentViewController: hosting)
         panel.styleMask = resizable ? [.borderless, .resizable] : [.borderless]
         if resizable {
             panel.minSize = NSSize(width: 380, height: 160)
             panel.onManualResize = { [weak self] in self?.becomeManual() }
+            panel.gripResize = { [weak self] phase in self?.gripResize(phase) }
             liveResizeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willStartLiveResizeNotification,
                                                                         object: panel, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.becomeManual() }
@@ -75,7 +90,34 @@ final class FloatingPanelHost {
     private func becomeManual() {
         guard !sizing.isManual else { return }
         stopFollowingContent?()
+        // The hosting controller pinned the window to its content's size; lift that, or every
+        // resize is clamped straight back.
+        if let panel {
+            panel.contentMinSize = panel.minSize
+            panel.contentMaxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+            panel.maxSize = panel.contentMaxSize
+        }
         sizing.isManual = true
+    }
+
+    private var gripStart: (mouse: NSPoint, frame: NSRect)?
+
+    /// The corner grip: the top-left corner stays, the window follows the pointer.
+    private func gripResize(_ phase: PanelSizing.ResizePhase) {
+        guard let panel else { return }
+        switch phase {
+        case .began:
+            becomeManual()
+            gripStart = (NSEvent.mouseLocation, panel.frame)
+        case .moved:
+            guard let start = gripStart else { return }
+            let now = NSEvent.mouseLocation
+            let width = max(panel.minSize.width, start.frame.width + now.x - start.mouse.x)
+            let height = max(panel.minSize.height, start.frame.height - (now.y - start.mouse.y))
+            panel.setFrame(NSRect(x: start.frame.minX, y: start.frame.maxY - height, width: width, height: height), display: true)
+        case .ended:
+            gripStart = nil
+        }
     }
 
     func close() {

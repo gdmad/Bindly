@@ -6,6 +6,9 @@ import SwiftUI
 @MainActor @Observable
 final class PanelSizing {
     var isManual = false
+
+    /// The corner grip's drag, as `KeyablePanel` reports it (the host reads the pointer).
+    enum ResizePhase { case began, moved, ended }
 }
 
 /// A scrolling text area: as tall as its text up to `maxHeight` while the window follows its
