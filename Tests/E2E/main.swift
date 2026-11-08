@@ -102,7 +102,7 @@ func wordRect(_ word: String) -> CGRect? {
     return E2E.bounds(range, in: el)
 }
 
-func suggestionsVisible() -> Bool { E2E.window("BindAll Suggestions") != nil || E2E.window("BindAll Inline") != nil }
+func suggestionsVisible() -> Bool { E2E.window("Bindly Suggestions") != nil || E2E.window("Bindly Inline") != nil }
 
 func switchInputSourceAndBack() -> Bool {
     guard let current = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
@@ -126,8 +126,8 @@ func autocompleteScenarios() {
     let shown = E2E.wait(3) { suggestionsVisible() }
     record("a suggestion appears while typing", shown,
            shown ? "" : "no suggestion window; events: \(E2E.events(since: since).map { "\($0.feature).\($0.kind)" })")
-    record("at the end of a line it is inline gray text", E2E.window("BindAll Inline") != nil,
-           E2E.window("BindAll Inline") == nil ? "shown as \(E2E.windows().map(\.name))" : "")
+    record("at the end of a line it is inline gray text", E2E.window("Bindly Inline") != nil,
+           E2E.window("Bindly Inline") == nil ? "shown as \(E2E.windows().map(\.name))" : "")
     let before = fieldText()
     E2E.key(kVK_Tab)
     let accepted = E2E.wait(2) { fieldText().count > before.count }
@@ -147,7 +147,7 @@ func autocompleteScenarios() {
     E2E.type("е")
     _ = E2E.wait(3) { suggestionsVisible() }
     E2E.key(kVK_DownArrow)
-    let listOpened = E2E.wait(1.5) { E2E.window("BindAll Suggestions") != nil && E2E.window("BindAll Inline") == nil }
+    let listOpened = E2E.wait(1.5) { E2E.window("Bindly Suggestions") != nil && E2E.window("Bindly Inline") == nil }
     record("↓ opens the list from inline text", listOpened, listOpened ? "" : "windows: \(E2E.windows().map(\.name))")
     E2E.key(kVK_Escape)
     E2E.pause(0.3)
@@ -168,10 +168,10 @@ func autocompleteScenarios() {
     // Several lines: the gray text still follows the caret on the last one, with no gap.
     clearField()
     E2E.type("Первая строка текста.\nВторая строка.\nСегодня мы обсуждали прив")
-    let multi = E2E.wait(4) { E2E.window("BindAll Inline") != nil }
+    let multi = E2E.wait(4) { E2E.window("Bindly Inline") != nil }
     var note = "windows \(E2E.windows().map(\.name))"
     var tight = false
-    if let inline = E2E.window("BindAll Inline")?.bounds, let el = textEditField() {
+    if let inline = E2E.window("Bindly Inline")?.bounds, let el = textEditField() {
         let ns = E2E.value(el) as NSString
         let r = ns.range(of: "прив", options: .backwards)
         if let word = E2E.bounds(r, in: el) {
@@ -186,8 +186,8 @@ func autocompleteScenarios() {
     E2E.type(" конец")
     for _ in 0..<5 { E2E.key(kVK_LeftArrow) }
     E2E.type("прив")
-    let midLine = E2E.wait(3) { E2E.window("BindAll Suggestions") != nil }
-    record("in the middle of a line the list is shown", midLine && E2E.window("BindAll Inline") == nil,
+    let midLine = E2E.wait(3) { E2E.window("Bindly Suggestions") != nil }
+    record("in the middle of a line the list is shown", midLine && E2E.window("Bindly Inline") == nil,
            midLine ? "" : "windows: \(E2E.windows().map(\.name))")
     E2E.key(kVK_Escape)
 }
@@ -202,15 +202,15 @@ func proofreadScenarios() {
 
     guard let milk = wordRect("малако") else { record("setup: TextEdit gives the word's geometry", false); return }
     E2E.click(CGPoint(x: milk.midX, y: milk.midY))
-    var popup = E2E.wait(4) { E2E.window("BindAll Fixes") != nil }
+    var popup = E2E.wait(4) { E2E.window("Bindly Fixes") != nil }
     record("clicking an underlined word opens the fixes", popup)
-    if let fixes = E2E.window("BindAll Fixes") { E2E.snapshot(fixes.bounds, to: outDir.appending(path: "fixes.png")) }
+    if let fixes = E2E.window("Bindly Fixes") { E2E.snapshot(fixes.bounds, to: outDir.appending(path: "fixes.png")) }
     if popup {
         let text = fieldText()
         E2E.key(kVK_LeftArrow)
-        record("← moves the caret and closes the fixes", E2E.wait(1.5) { E2E.window("BindAll Fixes") == nil } && fieldText() == text)
+        record("← moves the caret and closes the fixes", E2E.wait(1.5) { E2E.window("Bindly Fixes") == nil } && fieldText() == text)
         E2E.click(CGPoint(x: milk.midX, y: milk.midY))
-        popup = E2E.wait(4) { E2E.window("BindAll Fixes") != nil }
+        popup = E2E.wait(4) { E2E.window("Bindly Fixes") != nil }
         E2E.allowBareReturn = true
         E2E.key(kVK_Return)
         E2E.allowBareReturn = false
@@ -223,13 +223,13 @@ func proofreadScenarios() {
     if let typo = wordRect("ощибка") {
         let count = E2E.underlineCount()
         E2E.click(CGPoint(x: typo.midX, y: typo.midY))
-        if E2E.wait(4, { E2E.window("BindAll Fixes") != nil }), let popupRect = E2E.window("BindAll Fixes")?.bounds {
+        if E2E.wait(4, { E2E.window("Bindly Fixes") != nil }), let popupRect = E2E.window("Bindly Fixes")?.bounds {
             // The popup above the word is entered with ↑, below it with ↓; the farthest choice is Skip.
             let above = popupRect.maxY <= typo.minY + 2
             let way = above ? kVK_UpArrow : kVK_DownArrow
             let since = Date()
             for _ in 0..<8 { E2E.key(way); E2E.pause(0.08) }
-            if let shown = E2E.window("BindAll Fixes") { E2E.snapshot(shown.bounds, to: outDir.appending(path: "fixes-selected.png")) }
+            if let shown = E2E.window("Bindly Fixes") { E2E.snapshot(shown.bounds, to: outDir.appending(path: "fixes-selected.png")) }
             E2E.allowBareReturn = true
             E2E.key(kVK_Return)
             E2E.allowBareReturn = false
@@ -243,24 +243,24 @@ func proofreadScenarios() {
 
     // Skip moves the open popup on to the next issue; close it so the click lands on the word.
     E2E.key(kVK_Escape)
-    E2E.wait(2) { E2E.window("BindAll Fixes") == nil }
+    E2E.wait(2) { E2E.window("Bindly Fixes") == nil }
     if let grammar = wordRect("граматика") {
         E2E.click(CGPoint(x: grammar.midX, y: grammar.midY))
-        if E2E.wait(4, { E2E.window("BindAll Fixes") != nil }),
-           let close = E2E.testElement(window: "BindAll Fixes", E2E.named("Close")),
+        if E2E.wait(4, { E2E.window("Bindly Fixes") != nil }),
+           let close = E2E.testElement(window: "Bindly Fixes", E2E.named("Close")),
            let frame = E2E.frame(close) {
-            let panel = E2E.window("BindAll Fixes")?.bounds ?? .zero
+            let panel = E2E.window("Bindly Fixes")?.bounds ?? .zero
             E2E.hoverThenClick(CGPoint(x: frame.midX, y: frame.midY))
-            let first = E2E.wait(2) { E2E.window("BindAll Fixes") == nil }
+            let first = E2E.wait(2) { E2E.window("Bindly Fixes") == nil }
             if !first {
                 E2E.click(CGPoint(x: frame.midX, y: frame.midY))
-                print("    cross: first click ignored, second \(E2E.wait(2) { E2E.window("BindAll Fixes") == nil } ? "worked" : "ignored too")")
+                print("    cross: first click ignored, second \(E2E.wait(2) { E2E.window("Bindly Fixes") == nil } ? "worked" : "ignored too")")
             }
             record("the cross closes the fixes", first,
                    "button \(frame), panel \(panel)")
         } else {
             record("the cross closes the fixes", false, "popup or its Close button not found")
-            try? E2E.dumpTestWindows("BindAll Fixes").write(to: outDir.appending(path: "fixes-tree.txt"), atomically: true, encoding: .utf8)
+            try? E2E.dumpTestWindows("Bindly Fixes").write(to: outDir.appending(path: "fixes-tree.txt"), atomically: true, encoding: .utf8)
         }
     }
 }
@@ -273,36 +273,36 @@ func fixAllScenario() {
         record("setup: the typos are underlined", false, "underlines \(E2E.underlineCount())"); return
     }
     E2E.click(CGPoint(x: word.midX, y: word.midY))
-    guard E2E.wait(4, { E2E.window("BindAll Fixes") != nil }) else { record("setup: the fixes popup opens", false); return }
-    let button = E2E.testElement(window: "BindAll Fixes") {
+    guard E2E.wait(4, { E2E.window("Bindly Fixes") != nil }) else { record("setup: the fixes popup opens", false); return }
+    let button = E2E.testElement(window: "Bindly Fixes") {
         ((E2E.attr($0, kAXDescriptionAttribute) as? String) ?? (E2E.attr($0, kAXTitleAttribute) as? String) ?? "").hasPrefix("Fix all")
     }
     record("the popup offers Fix all", button != nil)
     guard let button, let frame = E2E.frame(button) else { E2E.key(kVK_Escape); return }
-    if let popup = E2E.window("BindAll Fixes")?.bounds {
+    if let popup = E2E.window("Bindly Fixes")?.bounds {
         E2E.snapshot(popup, to: outDir.appending(path: "fixes-popup.png"))
-        let skip = E2E.testElement(window: "BindAll Fixes", E2E.named("Skip this issue")).flatMap(E2E.frame)
-        let close = E2E.testElement(window: "BindAll Fixes", E2E.named("Close")).flatMap(E2E.frame)
+        let skip = E2E.testElement(window: "Bindly Fixes", E2E.named("Skip this issue")).flatMap(E2E.frame)
+        let close = E2E.testElement(window: "Bindly Fixes", E2E.named("Close")).flatMap(E2E.frame)
         record("Fix all sits in the header row", skip.map { abs($0.midY - frame.midY) < 3 && frame.maxX <= $0.minX + 1 } ?? false
                && close.map { abs($0.midY - frame.midY) < 3 } ?? false && frame.minY - popup.minY < 40,
                "button \(frame), skip \(skip.map { "\($0)" } ?? "none"), popup \(popup)")
     }
     E2E.click(CGPoint(x: frame.midX, y: frame.midY))
-    let preview = E2E.wait(4) { E2E.window("BindAll Preview") != nil }
+    let preview = E2E.wait(4) { E2E.window("Bindly Preview") != nil }
     record("Fix all shows a preview", preview)
     guard preview else { return }
     E2E.pause(0.5)
-    if let window = E2E.window("BindAll Preview")?.bounds {
+    if let window = E2E.window("Bindly Preview")?.bounds {
         let inside = ["Apply", "Copy"].allSatisfy { button in
-            E2E.testElement(window: "BindAll Preview", E2E.named(button)).flatMap(E2E.frame)
+            E2E.testElement(window: "Bindly Preview", E2E.named(button)).flatMap(E2E.frame)
                 .map { window.insetBy(dx: -1, dy: -1).contains($0) } ?? false
         }
         record("the preview's buttons are inside its window", inside, "window \(window)")
     }
-    if let window = E2E.window("BindAll Preview")?.bounds {
+    if let window = E2E.window("Bindly Preview")?.bounds {
         E2E.drag(from: CGPoint(x: window.maxX - 12, y: window.maxY - 12), to: CGPoint(x: window.maxX + 98, y: window.maxY + 58))
         E2E.pause(0.6)
-        let resized = E2E.window("BindAll Preview")?.bounds ?? window
+        let resized = E2E.window("Bindly Preview")?.bounds ?? window
         var hit: AXUIElement?
         AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(window.maxX - 9), Float(window.maxY - 9), &hit)
         let under = hit.map { "\(E2E.attr($0, kAXRoleAttribute) as? String ?? "?") \(E2E.attr($0, kAXTitleAttribute) as? String ?? "")" } ?? "nothing"
@@ -320,18 +320,18 @@ func fixAllScenario() {
     E2E.type("Опять малако и ощибка здесь. ")
     if E2E.wait(12, { E2E.underlineCount() >= 2 }), let typo = wordRect("ощибка") {
         E2E.click(CGPoint(x: typo.midX, y: typo.midY))
-        if E2E.wait(4, { E2E.window("BindAll Fixes") != nil }) {
+        if E2E.wait(4, { E2E.window("Bindly Fixes") != nil }) {
             E2E.key(kVK_Return, .maskCommand)
-            record("⌘Return in the popup opens the Fix all preview", E2E.wait(4) { E2E.window("BindAll Preview") != nil })
-            if let close = (E2E.testElement(window: "BindAll Preview", E2E.named("Cancel")) ?? E2E.testElement(window: "BindAll Preview", E2E.named("Close"))).flatMap(E2E.frame) {
+            record("⌘Return in the popup opens the Fix all preview", E2E.wait(4) { E2E.window("Bindly Preview") != nil })
+            if let close = (E2E.testElement(window: "Bindly Preview", E2E.named("Cancel")) ?? E2E.testElement(window: "Bindly Preview", E2E.named("Close"))).flatMap(E2E.frame) {
                 // A real click on the window's own button, the path that used to free the window mid-click.
                 E2E.hoverThenClick(CGPoint(x: close.midX, y: close.midY))
             } else {
                 E2E.key(kVK_Escape)
             }
-            let closed = E2E.wait(2) { E2E.window("BindAll Preview") == nil }
+            let closed = E2E.wait(2) { E2E.window("Bindly Preview") == nil }
             E2E.pause(0.8)
-            record("the preview's Close button closes it and BindAll keeps running", closed && !(E2E.testApp?.isTerminated ?? true))
+            record("the preview's Close button closes it and Bindly keeps running", closed && !(E2E.testApp?.isTerminated ?? true))
         }
     }
 }
@@ -346,8 +346,8 @@ func dictionaryScenario() {
     }
     record("the made-up word is underlined", true, "underlines \(E2E.underlineCount())")
     E2E.click(CGPoint(x: word.midX, y: word.midY))
-    guard E2E.wait(4, { E2E.window("BindAll Fixes") != nil }),
-          let add = E2E.testElement(window: "BindAll Fixes", E2E.named("Add to dictionary")), let frame = E2E.frame(add) else {
+    guard E2E.wait(4, { E2E.window("Bindly Fixes") != nil }),
+          let add = E2E.testElement(window: "Bindly Fixes", E2E.named("Add to dictionary")), let frame = E2E.frame(add) else {
         record("the popup offers Add to dictionary", false); E2E.key(kVK_Escape); return
     }
     record("the popup offers Add to dictionary", true)
@@ -369,7 +369,7 @@ func dictionaryScenario() {
     let stored = Process()
     let pipe = Pipe()
     stored.executableURL = URL(fileURLWithPath: "/bin/sh")
-    stored.arguments = ["-c", "defaults export com.evgeny.bindall.e2e - | python3 -c 'import plistlib,sys; sys.stdout.buffer.write(plistlib.loads(sys.stdin.buffer.read())[\"BindAll.settings.v1\"])'"]
+    stored.arguments = ["-c", "defaults export com.evgeny.bindly.e2e - | python3 -c 'import plistlib,sys; sys.stdout.buffer.write(plistlib.loads(sys.stdin.buffer.read())[\"Bindly.settings.v1\"])'"]
     stored.standardOutput = pipe
     try? stored.run(); stored.waitUntilExit()
     let saved = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
@@ -384,7 +384,7 @@ func historyScenario() {
         E2E.key(kVK_ANSI_A, .maskCommand)
         // The field star moves to the selection a moment after ⌘A; read its place once it settled.
         E2E.pause(1.2)
-        guard E2E.wait(4, { E2E.window("BindAll Star") != nil }), let star = E2E.window("BindAll Star")?.bounds else {
+        guard E2E.wait(4, { E2E.window("Bindly Star") != nil }), let star = E2E.window("Bindly Star")?.bounds else {
             print("    no star; windows \(E2E.windows().map(\.name)), text \(fieldText())")
             return false
         }
@@ -401,7 +401,7 @@ func historyScenario() {
         return hit
     }
     func applyPreview() -> Bool {
-        guard E2E.wait(15, { E2E.window("BindAll Preview") != nil }) else { return false }
+        guard E2E.wait(15, { E2E.window("Bindly Preview") != nil }) else { return false }
         E2E.allowBareReturn = true
         E2E.key(kVK_Return)
         E2E.allowBareReturn = false
@@ -438,7 +438,7 @@ func historyScenario() {
     let draft = "Черновик остаётся. "
     E2E.type(draft)
     E2E.pause(1.5)
-    guard E2E.wait(12, { E2E.window("BindAll Star") != nil }), let star = E2E.window("BindAll Star")?.bounds else {
+    guard E2E.wait(12, { E2E.window("Bindly Star") != nil }), let star = E2E.window("Bindly Star")?.bounds else {
         record("the field star's History inserts at the caret", false, "no field star"); return
     }
     E2E.click(CGPoint(x: star.midX, y: star.midY))
@@ -480,8 +480,8 @@ func explainScenario() {
         }
         record("the star menu has no Explain or Summarize", listed.isEmpty, "listed \(listed)")
     }
-    if E2E.wait(15, { E2E.window("BindAll Preview") != nil }) { E2E.key(kVK_Escape) }
-    E2E.wait(2) { E2E.window("BindAll Preview") == nil }
+    if E2E.wait(15, { E2E.window("Bindly Preview") != nil }) { E2E.key(kVK_Escape) }
+    E2E.wait(2) { E2E.window("Bindly Preview") == nil }
     focusTextEdit()
     for name in ["Explain", "Summarize"] {
         clearField()
@@ -492,22 +492,22 @@ func explainScenario() {
         E2E.pause(1.2)
         guard pressTrayItem("\(name) selection") else { record("setup: \(name) selection is in the menu bar", false); continue }
         let app = AXUIElementCreateApplication(pid)
-        let shown = E2E.wait(40) { E2E.window("BindAll Translation") != nil }
+        let shown = E2E.wait(40) { E2E.window("Bindly Translation") != nil }
         var body = ""
-        if shown, let panel = E2E.find(in: app, depth: 2, { (E2E.attr($0, kAXTitleAttribute) as? String) == "BindAll Translation" }) {
+        if shown, let panel = E2E.find(in: app, depth: 2, { (E2E.attr($0, kAXTitleAttribute) as? String) == "Bindly Translation" }) {
             body = E2E.dump(panel, depth: 12)
-            E2E.snapshot(E2E.window("BindAll Translation")!.bounds, to: outDir.appending(path: "\(name.lowercased()).png"))
+            E2E.snapshot(E2E.window("Bindly Translation")!.bounds, to: outDir.appending(path: "\(name.lowercased()).png"))
         }
         record("\(name) shows its result in a popup", shown && !body.contains("Error"), shown ? "" : "no popup")
-        if shown, let window = E2E.window("BindAll Translation")?.bounds {
+        if shown, let window = E2E.window("Bindly Translation")?.bounds {
             let inside = ["Close", "Copy"].allSatisfy { button in
-                E2E.testElement(window: "BindAll Translation", E2E.named(button)).flatMap(E2E.frame)
+                E2E.testElement(window: "Bindly Translation", E2E.named(button)).flatMap(E2E.frame)
                     .map { window.insetBy(dx: -1, dy: -1).contains($0) } ?? false
             }
             record("\(name): Close and Copy are inside the window", inside, "window \(window)")
             record("\(name): no Markdown asterisks in the window", !body.contains("**"))
         }
-        if let popup = E2E.window("BindAll Translation")?.bounds, let fieldFrame = textEditField().flatMap(E2E.frame) {
+        if let popup = E2E.window("Bindly Translation")?.bounds, let fieldFrame = textEditField().flatMap(E2E.frame) {
             let near = popup.minY >= fieldFrame.minY - 40 && popup.minY <= fieldFrame.maxY + 40
                 || popup.maxY >= fieldFrame.minY - 40 && popup.maxY <= fieldFrame.minY + 40
                 || fieldFrame.insetBy(dx: -10, dy: -10).contains(CGPoint(x: popup.midX, y: popup.midY))
@@ -517,32 +517,32 @@ func explainScenario() {
         record("\(name) leaves the text alone", fieldText() == text, "now: \(fieldText())")
         if name == "Explain" {
             E2E.key(kVK_Escape)
-            let closed = E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+            let closed = E2E.wait(2) { E2E.window("Bindly Translation") == nil }
             record("\(name): Esc closes the window", closed, "front \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
             if !closed { E2E.key(kVK_Escape) }
         } else {
             // Show Original keeps the window on screen with its buttons; the corner sizes it by hand,
             // and the size then stays when the original is toggled.
-            if let toggle = E2E.testElement(window: "BindAll Translation", E2E.named("Show Original")) {
+            if let toggle = E2E.testElement(window: "Bindly Translation", E2E.named("Show Original")) {
                 E2E.press(toggle)
                 E2E.pause(0.8)
-                if let shown = E2E.window("BindAll Translation")?.bounds {
+                if let shown = E2E.window("Bindly Translation")?.bounds {
                     let inside = ["Close", "Copy"].allSatisfy { button in
-                        E2E.testElement(window: "BindAll Translation", E2E.named(button)).flatMap(E2E.frame)
+                        E2E.testElement(window: "Bindly Translation", E2E.named(button)).flatMap(E2E.frame)
                             .map { shown.insetBy(dx: -1, dy: -1).contains($0) } ?? false
                     }
                     record("\(name): with the original shown the window stays on screen, buttons inside",
                            E2E.isOnScreen(shown) && inside, "window \(shown)")
                     E2E.drag(from: CGPoint(x: shown.maxX - 9, y: shown.maxY - 9), to: CGPoint(x: shown.maxX + 111, y: shown.maxY + 91))
                     E2E.pause(0.6)
-                    let resized = E2E.window("BindAll Translation")?.bounds ?? shown
+                    let resized = E2E.window("Bindly Translation")?.bounds ?? shown
                     record("\(name): the corner sizes the window by hand",
                            resized.width - shown.width > 60 && resized.height - shown.height > 40, "\(shown) → \(resized)")
                     E2E.press(toggle)
                     E2E.pause(0.8)
-                    let after = E2E.window("BindAll Translation")?.bounds ?? resized
+                    let after = E2E.window("Bindly Translation")?.bounds ?? resized
                     let buttonsIn = ["Close", "Copy"].allSatisfy { button in
-                        E2E.testElement(window: "BindAll Translation", E2E.named(button)).flatMap(E2E.frame)
+                        E2E.testElement(window: "Bindly Translation", E2E.named(button)).flatMap(E2E.frame)
                             .map { after.insetBy(dx: -1, dy: -1).contains($0) } ?? false
                     }
                     record("\(name): a hand-sized window keeps its size when the original is hidden",
@@ -553,24 +553,24 @@ func explainScenario() {
             }
             // Copy, then the window's own Close button: the click that used to free the window
             // while it was still handling it.
-            if let copy = E2E.testElement(window: "BindAll Translation", E2E.named("Copy")).flatMap(E2E.frame) {
+            if let copy = E2E.testElement(window: "Bindly Translation", E2E.named("Copy")).flatMap(E2E.frame) {
                 E2E.hoverThenClick(CGPoint(x: copy.midX, y: copy.midY))
                 E2E.pause(0.4)
             }
-            guard let close = E2E.testElement(window: "BindAll Translation", E2E.named("Close")).flatMap(E2E.frame) else {
+            guard let close = E2E.testElement(window: "Bindly Translation", E2E.named("Close")).flatMap(E2E.frame) else {
                 record("\(name): Close closes the window", false, "no Close button"); E2E.key(kVK_Escape); continue
             }
             E2E.hoverThenClick(CGPoint(x: close.midX, y: close.midY))
-            let closed = E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+            let closed = E2E.wait(2) { E2E.window("Bindly Translation") == nil }
             E2E.pause(1.0)
             let alive = !(E2E.testApp?.isTerminated ?? true)
-            record("\(name): Close closes the window and BindAll keeps running", closed && alive,
+            record("\(name): Close closes the window and Bindly keeps running", closed && alive,
                    "closed \(closed), running \(alive)")
             guard alive else { return }
             focusTextEdit()
             E2E.key(kVK_ANSI_A, .maskCommand)
             E2E.pause(1.2)
-            record("\(name): the star still works after Close", E2E.wait(3) { E2E.window("BindAll Star") != nil })
+            record("\(name): the star still works after Close", E2E.wait(3) { E2E.window("Bindly Star") != nil })
             E2E.key(kVK_RightArrow)
         }
     }
@@ -579,7 +579,7 @@ func explainScenario() {
 func preSendScenario() {
     group = "Before sending"
     func warningUp() -> Bool {
-        E2E.window("BindAll Fixes") != nil && E2E.dumpTestWindows("BindAll Fixes").contains("Return sends anyway")
+        E2E.window("Bindly Fixes") != nil && E2E.dumpTestWindows("Bindly Fixes").contains("Return sends anyway")
     }
     func press(_ code: Int, _ flags: CGEventFlags = []) {
         E2E.allowBareReturn = true
@@ -606,9 +606,9 @@ func preSendScenario() {
     press(kVK_Return)
     _ = E2E.wait(2) { warningUp() }
     E2E.key(kVK_Tab)
-    record("Tab opens the first issue", E2E.wait(3) { E2E.window("BindAll Fixes") != nil && !warningUp() } && fieldText() == text)
+    record("Tab opens the first issue", E2E.wait(3) { E2E.window("Bindly Fixes") != nil && !warningUp() } && fieldText() == text)
     press(kVK_Escape)
-    E2E.wait(2) { E2E.window("BindAll Fixes") == nil }
+    E2E.wait(2) { E2E.window("Bindly Fixes") == nil }
 
     press(kVK_Return)
     _ = E2E.wait(2) { warningUp() }
@@ -627,7 +627,7 @@ func translateInPlaceScenario() {
     E2E.type("Добрый день, коллеги")
     E2E.pause(1.0)
     guard runStarItem("Replace with translation", downs: 4) else { record("setup: the selection star shows", false); return }
-    let preview = E2E.wait(20) { E2E.window("BindAll Preview") != nil }
+    let preview = E2E.wait(20) { E2E.window("Bindly Preview") != nil }
     record("it shows the translation in the preview", preview, preview ? "" : "windows \(E2E.windows().map(\.name))")
     record("nothing changes before Apply", fieldText() == "Добрый день, коллеги")
     guard preview else { return }
@@ -647,35 +647,35 @@ func voiceScenario() {
     E2E.pause(0.1)
     E2E.rightOption(down: false)
     E2E.pause(1.5)
-    record("a quick tap does nothing", fieldText().isEmpty && E2E.window("BindAll Voice") == nil)
+    record("a quick tap does nothing", fieldText().isEmpty && E2E.window("Bindly Voice") == nil)
 
     E2E.rightOption(down: true)
     E2E.key(kVK_ANSI_J)
     E2E.pause(0.6)
     E2E.rightOption(down: false)
     E2E.pause(1.0)
-    record("Option with another key never records", E2E.window("BindAll Voice") == nil,
+    record("Option with another key never records", E2E.window("Bindly Voice") == nil,
            "windows \(E2E.windows().map(\.name))")
     clearField()
     E2E.key(kVK_RightArrow)
 
     E2E.rightOption(down: true)
-    let listening = E2E.wait(3) { E2E.window("BindAll Voice") != nil }
+    let listening = E2E.wait(3) { E2E.window("Bindly Voice") != nil }
     record("holding the key shows the note", listening)
     E2E.pause(2.5)
-    if let note = E2E.window("BindAll Voice") { E2E.snapshot(note.bounds.insetBy(dx: -4, dy: -4), to: outDir.appending(path: "voice.png")) }
-    let tree = E2E.dumpTestWindows("BindAll Voice")
+    if let note = E2E.window("Bindly Voice") { E2E.snapshot(note.bounds.insetBy(dx: -4, dy: -4), to: outDir.appending(path: "voice.png")) }
+    let tree = E2E.dumpTestWindows("Bindly Voice")
     record("the note shows the microphone, not the silent warning", tree.contains("Recording") && !tree.contains("silent"),
            tree.split(separator: "\n").prefix(8).joined(separator: " / "))
     E2E.rightOption(down: false)
     let typed = E2E.wait(15) { fieldText().lowercased().contains("проверка голосового ввода") }
     record("releasing types what was said", typed, "now: \(fieldText())")
-    record("the note goes away", E2E.wait(3) { E2E.window("BindAll Voice") == nil })
+    record("the note goes away", E2E.wait(3) { E2E.window("Bindly Voice") == nil })
 
     clearField()
     E2E.key(kVK_RightArrow)
     E2E.rightOption(down: true)
-    _ = E2E.wait(3) { E2E.window("BindAll Voice") != nil }
+    _ = E2E.wait(3) { E2E.window("Bindly Voice") != nil }
     E2E.pause(2.5)
     E2E.rightOption(down: false, shift: true)
     let english = E2E.wait(20) {
@@ -688,7 +688,7 @@ func voiceScenario() {
     clearField()
     E2E.key(kVK_RightArrow)
     E2E.rightCommand(down: true)
-    _ = E2E.wait(3) { E2E.window("BindAll Voice") != nil }
+    _ = E2E.wait(3) { E2E.window("Bindly Voice") != nil }
     E2E.pause(2.5)
     E2E.rightCommand(down: false)
     let translated = E2E.wait(20) {
@@ -728,25 +728,25 @@ func starScenarios() {
     clearField()
     E2E.type("Всё в порядке, текст без ошибок. ")
     E2E.pause(3.0)
-    let cleanValue = E2E.testElement(window: "BindAll Star") { (E2E.attr($0, kAXRoleAttribute) as? String) == "AXButton" }
+    let cleanValue = E2E.testElement(window: "Bindly Star") { (E2E.attr($0, kAXRoleAttribute) as? String) == "AXButton" }
         .flatMap { E2E.attr($0, kAXValueAttribute) as? String } ?? "-"
-    record("clean text still gets the field star, without a number", E2E.window("BindAll Star") != nil && !cleanValue.hasSuffix("issues"),
+    record("clean text still gets the field star, without a number", E2E.window("Bindly Star") != nil && !cleanValue.hasSuffix("issues"),
            "value \(cleanValue.debugDescription)")
 
     clearField()
     E2E.type("Этот текст для звёздачки и ощибка. ")
     guard let field = textEditField().flatMap(E2E.frame) else { record("setup: the field's frame is known", false); return }
     func starValue() -> String {
-        E2E.testElement(window: "BindAll Star") { (E2E.attr($0, kAXRoleAttribute) as? String) == "AXButton" }
+        E2E.testElement(window: "Bindly Star") { (E2E.attr($0, kAXRoleAttribute) as? String) == "AXButton" }
             .flatMap { E2E.attr($0, kAXValueAttribute) as? String } ?? ""
     }
     // The star is there at once; its number comes with the check.
     let star = E2E.wait(12) { starValue().hasSuffix("issues") }
     record("with issues the field star shows their number", star, "value \(starValue().debugDescription)")
-    if let starAt = E2E.window("BindAll Star")?.bounds {
+    if let starAt = E2E.window("Bindly Star")?.bounds {
         E2E.snapshot(starAt.insetBy(dx: -40, dy: -14), to: outDir.appending(path: "star-issues.png"))
     }
-    if let starAt = E2E.window("BindAll Star")?.bounds {
+    if let starAt = E2E.window("Bindly Star")?.bounds {
         E2E.click(CGPoint(x: starAt.midX, y: starAt.midY))
         E2E.pause(0.6)
         // The issues come first in its menu.
@@ -756,24 +756,24 @@ func starScenarios() {
             return title.hasSuffix("show the first") || title.hasSuffix("show it")
         }
         if let issuesItem { E2E.press(issuesItem) } else { pickMenuItem(downs: 1) }
-        record("its first item opens the fixes", E2E.wait(4) { E2E.window("BindAll Fixes") != nil },
+        record("its first item opens the fixes", E2E.wait(4) { E2E.window("Bindly Fixes") != nil },
                issuesItem == nil ? "item not in the AX menu" : "")
         E2E.key(kVK_Escape)
         E2E.pause(0.5)
     }
     E2E.pause(1.0)
-    let starRect = E2E.window("BindAll Star")?.bounds ?? .zero
+    let starRect = E2E.window("Bindly Star")?.bounds ?? .zero
     record("the field star sits in the field's corner", star && field.insetBy(dx: -4, dy: -4).contains(starRect)
            && starRect.maxX > field.maxX - 60 && starRect.maxY > field.maxY - 60, "star \(starRect), field \(field)")
 
     E2E.key(kVK_ANSI_A, .maskCommand)
     E2E.pause(1.2)
-    let stars = E2E.windows().filter { $0.name == "BindAll Star" }
+    let stars = E2E.windows().filter { $0.name == "Bindly Star" }
     let moved = (stars.first?.bounds).map { !$0.equalTo(starRect) } ?? false
     record("a selection moves the star to it (one star only)", stars.count == 1 && moved, "stars \(stars.count)")
     snapshotField("star-selection")
 
-    guard let starNow = E2E.window("BindAll Star")?.bounds else { return }
+    guard let starNow = E2E.window("Bindly Star")?.bounds else { return }
     E2E.click(CGPoint(x: starNow.midX, y: starNow.midY))
     E2E.pause(0.6)
     let pid = E2E.testApp!.processIdentifier
@@ -783,8 +783,8 @@ func starScenarios() {
     if menuUp {
         if let item { E2E.press(item) } else { pickMenuItem(downs: 2) }
         // While the action runs the star works in a larger panel, so its orbiting stars fit.
-        let grew = E2E.wait(4, step: 0.02) { (E2E.window("BindAll Star")?.bounds.width ?? 0) > 26 || E2E.window("BindAll Preview") != nil }
-        let busyStar = E2E.window("BindAll Star")?.bounds
+        let grew = E2E.wait(4, step: 0.02) { (E2E.window("Bindly Star")?.bounds.width ?? 0) > 26 || E2E.window("Bindly Preview") != nil }
+        let busyStar = E2E.window("Bindly Star")?.bounds
         if let busyStar, busyStar.width > 26 {
             E2E.snapshot(busyStar.insetBy(dx: -6, dy: -6), to: outDir.appending(path: "star-busy.png"))
         }
@@ -804,23 +804,23 @@ func starScenarios() {
         record("the working star grows around its center", grew && (busyStar?.width ?? 0) > 26
                && abs((busyStar?.midX ?? 0) - starNow.midX) < 1.5 && abs((busyStar?.midY ?? 0) - starNow.midY) < 1.5,
                "idle \(starNow), busy \(busyStar.map { "\($0)" } ?? "none")")
-        let preview = E2E.wait(15) { E2E.window("BindAll Preview") != nil }
+        let preview = E2E.wait(15) { E2E.window("Bindly Preview") != nil }
         if !preview {
             E2E.snapshot(CGRect(x: 100, y: 60, width: 900, height: 600), to: outDir.appending(path: "star-no-preview.png"))
             print("    windows: \(E2E.windows().map { "\($0.name) \($0.bounds)" }); used \(item == nil ? "keys" : "AX")")
         }
         record("Fix spelling shows a preview", preview)
-        if let shown = E2E.window("BindAll Preview")?.bounds {
+        if let shown = E2E.window("Bindly Preview")?.bounds {
             record("the preview is on screen and at least 380 wide", E2E.isOnScreen(shown) && shown.width >= 380, "\(shown)")
         }
         if preview {
-            E2E.snapshot(E2E.window("BindAll Preview")!.bounds, to: outDir.appending(path: "preview.png"))
+            E2E.snapshot(E2E.window("Bindly Preview")!.bounds, to: outDir.appending(path: "preview.png"))
             E2E.allowBareReturn = true
             E2E.key(kVK_Return)
             E2E.allowBareReturn = false
             record("Apply replaces the text", E2E.wait(5) { !fieldText().contains("звёздачки") }, "now: \(fieldText())")
             E2E.pause(1.2)
-            let after = E2E.window("BindAll Star")?.bounds.width ?? 0
+            let after = E2E.window("Bindly Star")?.bounds.width ?? 0
             record("the star is back to its idle size after the action", after == 0 || after < 26, "width \(after)")
         }
     }
@@ -829,13 +829,13 @@ func starScenarios() {
     focusTextEdit()
     E2E.key(kVK_RightArrow)
     E2E.pause(1.2)
-    if let corner = E2E.window("BindAll Star")?.bounds {
+    if let corner = E2E.window("Bindly Star")?.bounds {
         E2E.click(CGPoint(x: corner.midX, y: corner.midY))
         E2E.pause(0.6)
         if let custom = E2E.find(in: AXUIElementCreateApplication(pid), depth: 8, E2E.named("Custom prompt…")) {
             E2E.press(custom)
-            let shown = E2E.wait(3) { E2E.window("BindAll Prompt") != nil }
-            let rect = E2E.window("BindAll Prompt")?.bounds ?? .zero
+            let shown = E2E.wait(3) { E2E.window("Bindly Prompt") != nil }
+            let rect = E2E.window("Bindly Prompt")?.bounds ?? .zero
             record("the custom prompt panel opens fully on screen", shown && E2E.isOnScreen(rect), "panel \(rect)")
             // A long prompt makes the window taller instead of scrolling inside two lines.
             let promptApp = AXUIElementCreateApplication(pid)
@@ -845,12 +845,12 @@ func starScenarios() {
                 AXUIElementSetAttributeValue(field, kAXValueAttribute as CFString, long as CFString)
                 E2E.type(" ", toPid: pid)
                 E2E.pause(0.8)
-                let grown = E2E.window("BindAll Prompt")?.bounds ?? .zero
+                let grown = E2E.window("Bindly Prompt")?.bounds ?? .zero
                 record("the prompt window grows with the text", grown.height > rect.height + 20 && E2E.isOnScreen(grown),
                        "\(rect.height) → \(grown.height)")
             }
             E2E.key(kVK_Escape)
-            E2E.wait(2) { E2E.window("BindAll Prompt") == nil }
+            E2E.wait(2) { E2E.window("Bindly Prompt") == nil }
         } else {
             record("the custom prompt panel opens fully on screen", false, "menu item not found")
             try? E2E.dump(AXUIElementCreateApplication(pid), depth: 8).write(to: outDir.appending(path: "menu-tree.txt"), atomically: true, encoding: .utf8)
@@ -867,7 +867,7 @@ func removeTellsScenario() {
     E2E.type("Это — **важно** “очень”.\nLet me know if you have any questions!")
     E2E.key(kVK_ANSI_A, .maskCommand)
     E2E.pause(1.2)
-    guard let star = E2E.window("BindAll Star")?.bounds else { record("setup: the selection star shows", false); return }
+    guard let star = E2E.window("Bindly Star")?.bounds else { record("setup: the selection star shows", false); return }
     E2E.click(CGPoint(x: star.midX, y: star.midY))
     E2E.pause(0.6)
     let pid = E2E.testApp!.processIdentifier
@@ -875,7 +875,7 @@ func removeTellsScenario() {
         record("setup: the menu has Remove AI tells", false); E2E.key(kVK_Escape); return
     }
     E2E.press(item)
-    let preview = E2E.wait(5) { E2E.window("BindAll Preview") != nil }
+    let preview = E2E.wait(5) { E2E.window("Bindly Preview") != nil }
     record("a preview opens", preview)
     guard preview else { return }
     E2E.allowBareReturn = true
@@ -899,7 +899,7 @@ func quickTranslateScenario() {
         pasteboard.writeObjects(items)
     }
     E2E.key(kVK_ANSI_E, [.maskCommand, .maskShift])
-    let opened = E2E.wait(4) { E2E.window("BindAll Quick Translate") != nil }
+    let opened = E2E.wait(4) { E2E.window("Bindly Quick Translate") != nil }
     record("the shortcut opens Quick Translate", opened)
     guard opened else { return }
     E2E.pause(0.8)
@@ -923,13 +923,13 @@ func quickTranslateScenario() {
     E2E.pause(0.3)
     let typedQT = E2E.find(in: AXUIElementCreateApplication(pidQT), depth: 16, { (E2E.attr($0, kAXRoleAttribute) as? String) == "AXTextField" }).map(E2E.value) ?? "?"
     print("    quick translate input after typing: \(typedQT.debugDescription)")
-    if let w = E2E.window("BindAll Quick Translate") { E2E.snapshot(w.bounds, to: outDir.appending(path: "quick.png")) }
+    if let w = E2E.window("Bindly Quick Translate") { E2E.snapshot(w.bounds, to: outDir.appending(path: "quick.png")) }
     print("    quick translate focus before typing: \(focusNote); TextEdit now: \(fieldText().debugDescription)")
     E2E.allowBareReturn = true
     E2E.key(kVK_Return)
     E2E.allowBareReturn = false
     E2E.pause(3)
-    try? E2E.dumpTestWindows("BindAll Quick Translate").write(to: outDir.appending(path: "quick-tree.txt"), atomically: true, encoding: .utf8)
+    try? E2E.dumpTestWindows("Bindly Quick Translate").write(to: outDir.appending(path: "quick-tree.txt"), atomically: true, encoding: .utf8)
     let before = pasteboard.changeCount
     E2E.key(kVK_ANSI_C, .maskCommand)
     E2E.pause(0.5)
@@ -946,14 +946,14 @@ func quickTranslateScenario() {
         record("Clear empties the input", false, "Clear button not found")
     }
     E2E.key(kVK_Escape)
-    record("Esc closes it", E2E.wait(2) { E2E.window("BindAll Quick Translate") == nil })
+    record("Esc closes it", E2E.wait(2) { E2E.window("Bindly Quick Translate") == nil })
 }
 
 func trayScenario() {
     group = "Tray menu"
     focusTextEdit()
     E2E.pause(1.2)
-    guard E2E.window("BindAll Star") != nil else { skip("Stars item", "no star visible to toggle"); return }
+    guard E2E.window("Bindly Star") != nil else { skip("Stars item", "no star visible to toggle"); return }
     let pid = E2E.testApp!.processIdentifier
     func pressStars() -> Bool {
         guard let bar = E2E.attr(AXUIElementCreateApplication(pid), "AXExtrasMenuBar"),
@@ -968,16 +968,16 @@ func trayScenario() {
         return true
     }
     guard pressStars() else { record("setup: the status menu's Stars item is found", false); return }
-    record("Stars off hides the star", E2E.wait(2) { E2E.window("BindAll Star") == nil })
+    record("Stars off hides the star", E2E.wait(2) { E2E.window("Bindly Star") == nil })
     _ = pressStars()
     focusTextEdit()
     E2E.type(" ")
-    record("Stars on brings it back", E2E.wait(3) { E2E.window("BindAll Star") != nil })
+    record("Stars on brings it back", E2E.wait(3) { E2E.window("Bindly Star") != nil })
 }
 
 // MARK: - Run
 
-guard E2E.testApp != nil else { print("BindAll E2E is not running"); exit(2) }
+guard E2E.testApp != nil else { print("Bindly E2E is not running"); exit(2) }
 let only = Set((ProcessInfo.processInfo.environment["E2E_ONLY"] ?? "").split(separator: ",").map(String.init))
 let textEditGroups = ["autocomplete", "proofread", "fixAll", "dictionary", "history", "explain", "preSend", "translateInPlace", "voice", "stars", "removeTells", "quick", "tray", "hotkeys", "starActions", "cancel", "master", "drag", "plainStar", "localServer", "offline"]
 let needsTextEdit = only.isEmpty || !only.isDisjoint(with: textEditGroups)
@@ -990,7 +990,7 @@ if needsTextEdit {
     let probeStart = Date()
     E2E.type("Проверка доступа прив")
     if !E2E.wait(4, { !E2E.events(since: probeStart).isEmpty }) {
-        print("BindAll E2E does not react: grant it Accessibility (System Settings → Privacy & Security → Accessibility) and run again.")
+        print("Bindly E2E does not react: grant it Accessibility (System Settings → Privacy & Security → Accessibility) and run again.")
         exit(3)
     }
     run("autocomplete", autocompleteScenarios)
@@ -1027,7 +1027,7 @@ run("settings", settingsScenario)
 run("slack") { electronScenarios(slackTarget) }
 run("claude") { electronScenarios(claudeTarget) }
 
-var report = "# BindAll E2E\n\n| Group | Scenario | Result | Note |\n|---|---|---|---|\n"
+var report = "# Bindly E2E\n\n| Group | Scenario | Result | Note |\n|---|---|---|---|\n"
 for row in rows { report += "| \(row.group) | \(row.name) | \(row.status) | \(row.note.replacingOccurrences(of: "|", with: "/")) |\n" }
 let failed = rows.filter { $0.status == "FAIL" }.count
 report += "\n\(rows.count - failed) of \(rows.count) passed.\n"

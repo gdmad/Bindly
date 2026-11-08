@@ -161,7 +161,7 @@ func runActionsTests() {
           "stock phrases are found in both languages")
 
     print("UsageLog")
-    let usageDir = FileManager.default.temporaryDirectory.appendingPathComponent("bindall-usage-\(UUID().uuidString)")
+    let usageDir = FileManager.default.temporaryDirectory.appendingPathComponent("bindly-usage-\(UUID().uuidString)")
     let usageLog = UsageLog(directory: usageDir)
     let usageSemaphore = DispatchSemaphore(value: 0)
     nonisolated(unsafe) var usageRead: [UsageEvent] = []

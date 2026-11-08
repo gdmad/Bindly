@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>BindAll</string>
+	<string>Bindly</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconName</key>
@@ -19,9 +19,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.10.10</string>
+	<string>0.11.0</string>
 	<key>CFBundleVersion</key>
-	<string>137</string>
+	<string>138</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
@@ -29,9 +29,9 @@
 	<key>NSAccentColorName</key>
 	<string>AccentColor</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>BindAll needs to send keystrokes to paste processed text back into the active app.</string>
+	<string>Bindly needs to send keystrokes to paste processed text back into the active app.</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>BindAll</string>
+	<string>Bindly</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Push to Talk listens while you hold its key and turns your speech into text on this Mac.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

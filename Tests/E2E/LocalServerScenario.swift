@@ -7,7 +7,7 @@ import Carbon.HIToolbox
 // Run only on request (E2E_ONLY=localServer, with E2E_LOCAL_SERVER=1): it downloads about 300 MB.
 // Everything goes into the test build's own folder and is removed at the end.
 
-private let serverRoot = URL.applicationSupportDirectory.appending(path: "BindAll E2E/LanguageTool", directoryHint: .isDirectory)
+private let serverRoot = URL.applicationSupportDirectory.appending(path: "Bindly E2E/LanguageTool", directoryHint: .isDirectory)
 
 private func shell(_ path: String, _ args: [String]) -> String {
     let p = Process()
@@ -23,11 +23,11 @@ private func shell(_ path: String, _ args: [String]) -> String {
 
 /// The java the test build started, if any.
 private func serverPid() -> Int32? {
-    shell("/usr/bin/pgrep", ["-f", "BindAll E2E/LanguageTool"]).split(separator: "\n").compactMap { Int32($0) }.first
+    shell("/usr/bin/pgrep", ["-f", "Bindly E2E/LanguageTool"]).split(separator: "\n").compactMap { Int32($0) }.first
 }
 
 private func testSettings() -> [String: Any] {
-    guard let data = UserDefaults(suiteName: "com.evgeny.bindall.e2e")?.data(forKey: "BindAll.settings.v1"),
+    guard let data = UserDefaults(suiteName: "com.evgeny.bindly.e2e")?.data(forKey: "Bindly.settings.v1"),
           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
     return json
 }
@@ -43,7 +43,7 @@ private func serverAnswers(_ port: Int) -> Bool {
 private func settingsWindow() -> AXUIElement? {
     guard let pid = E2E.testApp?.processIdentifier else { return nil }
     let app = AXUIElementCreateApplication(pid)
-    return ((E2E.attr(app, kAXWindowsAttribute) as? [AXUIElement]) ?? []).first { (E2E.attr($0, kAXTitleAttribute) as? String) == "BindAll Settings" }
+    return ((E2E.attr(app, kAXWindowsAttribute) as? [AXUIElement]) ?? []).first { (E2E.attr($0, kAXTitleAttribute) as? String) == "Bindly Settings" }
 }
 
 /// Opens Settings on the Proofread tab.
@@ -139,15 +139,15 @@ func localServerScenario() {
            FileManager.default.fileExists(atPath: serverRoot.appending(path: "server/languagetool-server.jar").path) && serverPid() != nil)
     closeSettings()
 
-    // 6. Quitting BindAll stops java; launching it starts java again.
+    // 6. Quitting Bindly stops java; launching it starts java again.
     let bundle = E2E.testApp?.bundleURL
-    _ = pressTrayItem("Quit BindAll")
+    _ = pressTrayItem("Quit Bindly")
     let quit = E2E.wait(15) { E2E.testApp == nil && serverPid() == nil }
-    record("quitting BindAll stops the server", quit, "java \(serverPid().map(String.init) ?? "none")")
+    record("quitting Bindly stops the server", quit, "java \(serverPid().map(String.init) ?? "none")")
     if let bundle { NSWorkspace.shared.openApplication(at: bundle, configuration: .init()) }
     _ = E2E.wait(15) { E2E.testApp != nil }
     E2E.pause(3)
-    record("launching BindAll starts it again", E2E.wait(120, step: 2) { serverPid() != nil && serverAnswers(serverPort()) })
+    record("launching Bindly starts it again", E2E.wait(120, step: 2) { serverPid() != nil && serverAnswers(serverPort()) })
 
     // 7. Remove: everything goes, the setting falls back.
     guard openProofreadSettings() != nil, pressInSettings("Remove…") else { record("Remove is offered", false); return }

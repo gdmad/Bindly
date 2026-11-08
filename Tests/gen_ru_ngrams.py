@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds the Russian n-gram seed files for BindAll's autocomplete from a sentence corpus.
+"""Builds the Russian n-gram seed files for Bindly's autocomplete from a sentence corpus.
 
 Usage: gen_ru_ngrams.py <sentences.txt> <outdir> [--top-bigrams N] [--top-trigrams N]
 

@@ -1,7 +1,7 @@
 import Foundation
 
-// Compares Apple's built-in text features with what BindAll uses now. Not part of the app.
-var report = "# Apple built-ins vs BindAll today\n\n"
+// Compares Apple's built-in text features with what Bindly uses now. Not part of the app.
+var report = "# Apple built-ins vs Bindly today\n\n"
 report += await runSpellBench()
 report += await runOCRBench()
 report += runSpeechBench()

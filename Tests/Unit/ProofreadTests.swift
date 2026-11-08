@@ -569,13 +569,13 @@ func runProofreadTests() {
 
     print("PersonalDictionary")
     do {
-        let words = PersonalDictionary.set(["Ёжик", " BindAll "])
-        check(words == ["ежик", "bindall"], "words are trimmed, lowercased and ё folds into е")
+        let words = PersonalDictionary.set(["Ёжик", " Bindly "])
+        check(words == ["ежик", "bindly"], "words are trimmed, lowercased and ё folds into е")
         let spelled = issue(0, 5, kind: .spelling, original: "ежик")
-        let grammar = issue(6, 7, kind: .grammar, original: "bindall")
+        let grammar = issue(6, 7, kind: .grammar, original: "bindly")
         let other = issue(14, 4, kind: .spelling, original: "тест")
         let kept = PersonalDictionary.filter([spelled, grammar, other], words: words)
-        check(kept.map(\.original) == ["bindall", "тест"], "only spelling issues on dictionary words are dropped")
+        check(kept.map(\.original) == ["bindly", "тест"], "only spelling issues on dictionary words are dropped")
         eqArr(PersonalDictionary.adding("ЁЖИК", to: ["Ёжик"]), ["Ёжик"], "a word already there is not added twice")
         eqArr(PersonalDictionary.adding("Swearl,", to: ["Ёжик"]), ["Ёжик", "Swearl"], "punctuation is stripped on add")
         eqArr(PersonalDictionary.adding("  ", to: []), [], "a blank word is ignored")

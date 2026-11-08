@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build and package BindAll as a distributable .dmg.
+# Build and package Bindly as a distributable .dmg.
 #
 # Modes:
 #   ./scripts/release.sh            local build (default): signed with the dev certificate,
@@ -18,8 +18,8 @@ cd "$(dirname "$0")/.."
 MODE="local"
 [[ "${1:-}" == "--notarize" ]] && MODE="notarize"
 
-SCHEME="BindAll"
-APP_NAME="BindAll"
+SCHEME="Bindly"
+APP_NAME="Bindly"
 TEAM_ID="RR8844N29J"
 NOTARY_PROFILE="BindAllNotary"
 BUILD_DIR="$(pwd)/.release"

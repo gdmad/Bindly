@@ -1,4 +1,4 @@
-# Minimal image with the GitHub CLI, used to cut GitHub releases for BindAll.
+# Minimal image with the GitHub CLI, used to cut GitHub releases for Bindly.
 # The macOS app itself is built on the host (Xcode); this container only runs `gh`.
 FROM alpine:3.20
 
