@@ -520,3 +520,35 @@ func plainTextStarScenario() {
     if E2E.window("BindAll Translation") != nil { clickButton("Close", in: "BindAll Translation") }
     if E2E.window("BindAll Preview") != nil { E2E.key(kVK_Escape) }
 }
+
+// MARK: - LanguageTool unreachable
+
+/// Run with E2E_LT_URL pointing at nothing (http://127.0.0.1:9): the Mac's spell checker steps in.
+func offlineScenario() {
+    group = "Offline"
+    clearField()
+    E2E.type("Вчера малако было свежее. ")
+    let underlined = E2E.wait(15) { E2E.underlineCount() >= 1 }
+    record("with LanguageTool unreachable, a typo is still underlined", underlined, "count \(E2E.underlineCount())")
+    guard underlined, let milk = wordRect("малако") else { return }
+    E2E.click(CGPoint(x: milk.midX, y: milk.midY))
+    let popup = E2E.wait(4) { E2E.window("BindAll Fixes") != nil }
+    let tree = popup ? E2E.dumpTestWindows("BindAll Fixes") : ""
+    // The guesses are macOS's own, often not the word meant ("малако": "малого", "макало").
+    record("the fixes say they are offline", tree.contains("Offline"),
+           popup ? String(tree.prefix(300)) : "no popup")
+    E2E.key(kVK_Escape)
+
+    // Fix spelling from the star works offline too, and says so.
+    clearField()
+    E2E.type("Вчера малако было свежее. ")
+    E2E.pause(1.0)
+    if runStarItem("Fix spelling (LanguageTool)", downs: 2), E2E.wait(15, { E2E.window("BindAll Preview") != nil }) {
+        let preview = E2E.dumpTestWindows("BindAll Preview")
+        record("Fix spelling offline changes the word and notes it", preview.contains("LanguageTo") && preview.contains("малого"),
+               String(preview.prefix(300)))
+        E2E.key(kVK_Escape)
+    } else {
+        record("Fix spelling offline shows a preview", false)
+    }
+}

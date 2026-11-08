@@ -30,6 +30,7 @@ swiftc -O \
     BindAll/Proofread/ProofreadSkips.swift \
     BindAll/Proofread/FixAll.swift \
     BindAll/Proofread/PersonalDictionary.swift \
+    BindAll/Proofread/OfflineSpelling.swift \
     BindAll/Proofread/PreSendPolicy.swift \
     BindAll/Voice/HoldKeyPolicy.swift \
     BindAll/App/StatusIconTwinkle.swift \

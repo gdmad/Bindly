@@ -235,7 +235,7 @@ struct LanguageToolEngine: Equatable {
         guard let http = response as? HTTPURLResponse else { return }
         guard (200..<300).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
-            throw EngineError.network("HTTP \(http.statusCode): \(body.prefix(300))")
+            throw EngineError.server(status: http.statusCode, message: String(body.prefix(300)))
         }
     }
 }

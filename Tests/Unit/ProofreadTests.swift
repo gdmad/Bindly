@@ -3,6 +3,20 @@ import CoreGraphics
 import Foundation
 
 func runProofreadTests() {
+    print("OfflineSpelling")
+    check(OfflineSpelling.shouldFallBack(after: URLError(.notConnectedToInternet)), "no network: offline")
+    check(OfflineSpelling.shouldFallBack(after: URLError(.timedOut)) && OfflineSpelling.shouldFallBack(after: URLError(.cannotConnectToHost)),
+          "a dead or slow server: offline")
+    check(OfflineSpelling.shouldFallBack(after: EngineError.server(status: 429, message: "")), "rate limited: offline")
+    check(OfflineSpelling.shouldFallBack(after: EngineError.server(status: 503, message: "")), "a server error: offline")
+    check(!OfflineSpelling.shouldFallBack(after: EngineError.server(status: 400, message: "")), "a rejected request is not")
+    check(!OfflineSpelling.shouldFallBack(after: URLError(.cancelled)), "a cancelled request is not")
+    check(!OfflineSpelling.shouldFallBack(after: EngineError.network("Invalid LanguageTool URL")), "a wrong URL is not")
+    check(OfflineSpelling.similar("Прувет", ["Прусте", "Пруте", "Привет"]) == ["Привет"], "far-off guesses are dropped")
+    check(OfflineSpelling.similar("малако", ["молоко", "маска"]) == ["молоко"], "a close guess stays")
+    check(OfflineSpelling.similar("teh", ["the", "tech", "ten"]).count <= 3, "at most three")
+    check(OfflineSpelling.distance(Array("kitten"), Array("sitting")) == 3, "edit distance")
+
     print("LanguageTool applyMatches")
     func ltMatch(_ offset: Int, _ length: Int, _ replacement: String) -> [String: Any] {
         ["offset": offset, "length": length, "replacements": [["value": replacement]]]

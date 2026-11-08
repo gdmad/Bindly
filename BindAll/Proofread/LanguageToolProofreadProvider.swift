@@ -40,9 +40,17 @@ actor LanguageToolProofreadProvider {
             if let cached = cache.issues(for: paragraph) {
                 local = cached
             } else {
-                let matches = try await engine.check(paragraph.text, languageOverride: resolved(paragraph.text))
-                local = LanguageToolEngine.issues(from: matches, text: paragraph.text)
-                cache.store(local, for: paragraph)
+                let language = resolved(paragraph.text)
+                do {
+                    let matches = try await engine.check(paragraph.text, languageOverride: language)
+                    local = LanguageToolEngine.issues(from: matches, text: paragraph.text)
+                    cache.store(local, for: paragraph)
+                } catch where OfflineSpelling.shouldFallBack(after: error) {
+                    // Not cached: once the server answers again, it checks this paragraph properly.
+                    UsageLog.record(.proofread, .shown, detail: "offline")
+                    let text = paragraph.text
+                    local = await MainActor.run { OfflineSpellCheck.issues(in: text, language: language) }
+                }
             }
             out += ProofreadCache.rebase(local, to: paragraph.range.location)
         }

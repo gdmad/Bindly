@@ -398,10 +398,17 @@ final class HotkeyCoordinator {
             defer { self.endBusy() }
             do {
                 var result: String
+                var spellingOffline = false
                 switch action {
                 case .spelling:
-                    result = try await EngineFactory.makeLanguageTool(appState: self.appState)
-                        .correct(text, dictionary: PersonalDictionary.set(settings.personalDictionary))
+                    let dictionary = PersonalDictionary.set(settings.personalDictionary)
+                    do {
+                        result = try await EngineFactory.makeLanguageTool(appState: self.appState)
+                            .correct(text, dictionary: dictionary)
+                    } catch where OfflineSpelling.shouldFallBack(after: error) {
+                        result = OfflineSpellCheck.corrected(text, dictionary: dictionary)
+                        spellingOffline = true
+                    }
                 case .removeTells:
                     result = try await self.removeTells(from: text, settings: settings)
                 case .textTool(let tool):
@@ -452,6 +459,9 @@ final class HotkeyCoordinator {
                 if listsPhrases {
                     let left = MaskAISlop.stockPhrases(in: result)
                     if !left.isEmpty { note = "Stock phrases left: " + left.joined(separator: ", ") }
+                }
+                if spellingOffline {
+                    note = "LanguageTool cannot be reached: checked on this Mac, for spelling only."
                 }
                 // Said once: with the Apple engine chosen, nothing else here leaves the Mac.
                 if case .spelling = action, settings.previewFromMenu, settings.languageToolMode == .free, !settings.spellingNoticeShown {

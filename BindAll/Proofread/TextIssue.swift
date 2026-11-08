@@ -9,11 +9,12 @@ enum IssueKind: String, Codable, CaseIterable {
     case style
 }
 
-/// Which provider produced an issue. LanguageTool is the only source today; the case exists so the
-/// model does not have to change if an LLM-backed style pass is added later.
+/// Which provider produced an issue: LanguageTool, or the Mac's spell checker while it is offline.
 enum IssueSource: String, Codable {
     case languageTool
     case llm
+    /// The macOS spell checker, while LanguageTool cannot be reached.
+    case spellChecker
 }
 
 /// One problem found in the checked text, in a form both the panel and the overlay can render and

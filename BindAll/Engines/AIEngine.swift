@@ -3,6 +3,8 @@ import Foundation
 enum EngineError: LocalizedError {
     case unavailable(String)
     case network(String)
+    /// The server answered with an error status.
+    case server(status: Int, message: String)
     case emptyResponse
     case missingAPIKey
 
@@ -10,6 +12,7 @@ enum EngineError: LocalizedError {
         switch self {
         case .unavailable(let reason): return reason
         case .network(let message): return message
+        case .server(let status, let message): return "HTTP \(status): \(message)"
         case .emptyResponse: return "The model returned an empty response."
         case .missingAPIKey: return "No API key configured for this provider."
         }

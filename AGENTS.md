@@ -319,9 +319,14 @@ dimmed while Proofread is off.
 - **Proofread (LanguageTool)** is a separate, optional action (not in the engine dropdown), enabled on
   General. LanguageTool is the only issue source: it is the one engine with real Russian grammar, and
   it reads the sentence, so it finds agreement and punctuation rather than just unknown words.
-  (`NSSpellChecker` was tried as an offline layer and dropped -- its Russian guesses are poor: for
-  "Прувет" it offers "Прусте"/"Пруте", never "Привет". Harper is English-only and Apple's
-  FoundationModels does not support Russian at all, so neither is an option here.) The same settings
+  `NSSpellChecker` is only the fallback while LanguageTool cannot be reached (`OfflineSpelling.
+  shouldFallBack`: a URLError other than cancelled/bad URL, HTTP 429 or 5xx): `OfflineSpellCheck`
+  checks that paragraph for spelling only, its issues carry `IssueSource.spellChecker` and the title
+  "Offline: spelling only", are not cached (the next check after the server is back is a real one),
+  and keep only macOS's closest guesses (`OfflineSpelling.similar`: edit distance <= 1-2, the
+  minimum only). Its Russian guesses are weak -- "малако" gets "малого"/"макало", never "молоко" --
+  which is why it is not a layer of its own. Fix spelling falls back the same way and says so in its
+  preview. (Harper is English-only.) The same settings
   drive it and the legacy `correct()` path. Text is sent one paragraph at a time and cached by
   paragraph text, so editing one sentence costs one request and re-checking costs none.
   The connection is configured on the Proofread tab via an explicit **connection mode**
@@ -554,7 +559,7 @@ dimmed while Proofread is off.
   the on-device model phrases things its own way. A failed precondition is reported as
   "setup: ..." and still counts as a failure. The `say` recording is made once and reused while it
   lasts at least a second. `E2E_LT_URL=http://host:port` points the test build at a self-hosted
-  LanguageTool (mode Self-hosted). `E2E_LOCAL_SERVER=1 E2E_ONLY=localServer` runs the local server's whole chain
+  LanguageTool (mode Self-hosted). `E2E_LT_URL=http://127.0.0.1:9 E2E_ONLY=offline` checks the offline spell checker. `E2E_LOCAL_SERVER=1 E2E_ONLY=localServer` runs the local server's whole chain
   (`LocalServerScenario.swift`: install, loopback-only java from the test build's own folder, checking
   through it, Custom URL and back, a busy port, update check, quit and relaunch, Remove); it downloads
   ~300 MB, so it runs only when named, and `e2e.sh` kills its java and deletes its folder on exit.
