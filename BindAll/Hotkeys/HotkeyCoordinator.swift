@@ -211,8 +211,7 @@ final class HotkeyCoordinator {
         let on = s.enabled && AccessibilityPermission.isGranted
         stars.apply(FieldStarController.Config(fieldEnabled: on && s.starFieldEnabled,
                                                selectionEnabled: on && s.starSelectionEnabled,
-                                               fieldAlways: s.starFieldAlways,
-                                               minLength: s.proofreadMinLength))
+                                               fieldOnlyWithIssues: s.starFieldOnlyWithIssues))
     }
 
     /// Stars have their own app list (Settings > General > Stars).

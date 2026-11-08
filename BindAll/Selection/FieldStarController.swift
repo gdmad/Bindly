@@ -9,10 +9,8 @@ final class FieldStarController {
     struct Config: Equatable {
         var fieldEnabled = true
         var selectionEnabled = true
-        /// The field star in every long enough field, not only while issues are found.
-        var fieldAlways = false
-        /// Fields shorter than this get no field star (Proofread's own minimum).
-        var minLength = 5
+        /// The field star only while issues are found, not in every field.
+        var fieldOnlyWithIssues = false
     }
 
     /// Issues proofreading found in a field, for the field star's count.
@@ -128,9 +126,7 @@ final class FieldStarController {
             show(target, kind: "selection", origin: origin, label: "Actions for the selection")
         } else if config.fieldEnabled, target.selection.length == 0, target.isEditable,
                   case let issues = issueCount(target.element),
-                  FieldStarPolicy.shows(always: config.fieldAlways,
-                                        textLength: target.text.trimmingCharacters(in: .whitespacesAndNewlines).count,
-                                        minLength: config.minLength, issues: issues) {
+                  FieldStarPolicy.shows(onlyWithIssues: config.fieldOnlyWithIssues, issues: issues) {
             let field = UnderlineGeometry.appKitRect(fromQuartz: fieldQuartz, primaryScreenHeight: screenHeight)
             let origin = NSPoint(x: field.maxX - size - 6, y: field.minY + 6)
             show(target, kind: "field", origin: origin, label: "Actions for this text", issues: issues)

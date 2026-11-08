@@ -474,11 +474,11 @@ dimmed while Proofread is off.
   leaf. `ProofreadAX.cachingLeaves { }` walks each field once per pass (the underline pass and the
   visual-break filter), and the overlay logs at `.notice` how many issues could not be found or
   measured.
-- **Field star = issue counter.** Without a selection the star shows only while Proofread found
-  issues in the field (`FieldStarPolicy.shows`, pure; `starFieldAlways` shows it in every field; Never =
-  `starFieldEnabled` off, one Picker on General), never in a field shorter than `proofreadMinLength`;
-  it carries their number (`StarActivity.count`, "9+" past nine) and its menu starts with "N issues:
-  show the first". `ProofreadController.onIssuesChange` (the count changed) refreshes it. Usage logs
+- **Field star counts the issues.** Without a selection the star shows in the field and carries the
+  number of issues Proofread found there (`StarActivity.count`, "9+" past nine); its menu then starts
+  with "N issues: show the first". `starFieldOnlyWithIssues` (General: Always / Only when there are
+  issues / Never, the last = `starFieldEnabled` off) hides it while there are none
+  (`FieldStarPolicy.shows`, pure). `ProofreadController.onIssuesChange` refreshes it. Usage logs
   `star shown field:issues:N` and `open:field:issues:N`.
 - **Stars** (`Selection/FieldStarController.swift`): one violet four-point star (`StarShape`, a vector
   path with thin rays (`waist` 0.18), 12 pt in a 24 pt target, 13 px at 1x; `Color.brand`, the icon's violet; the panel frame is

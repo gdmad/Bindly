@@ -435,8 +435,7 @@ func historyScenario() {
 
     // From the field star (nothing selected) the entry goes in at the caret; the draft stays.
     clearField()
-    // With an issue in it: the field star only shows while there are some.
-    let draft = "Черновик с ощибкой остаётся. "
+    let draft = "Черновик остаётся. "
     E2E.type(draft)
     E2E.pause(1.5)
     guard E2E.wait(12, { E2E.window("BindAll Star") != nil }), let star = E2E.window("BindAll Star")?.bounds else {
@@ -725,23 +724,25 @@ func captureExact(_ rect: CGRect, to file: URL) {
 
 func starScenarios() {
     group = "Stars"
-    // The field star is the issue counter: none on clean text, none in a short field.
+    // The field star is always there; it counts the issues when there are some.
     clearField()
     E2E.type("Всё в порядке, текст без ошибок. ")
     E2E.pause(3.0)
-    record("clean text gets no field star", E2E.window("BindAll Star") == nil, "windows \(E2E.windows().map(\.name))")
-    clearField()
-    E2E.type("ощб")
-    E2E.pause(3.0)
-    record("a short field gets no field star", E2E.window("BindAll Star") == nil)
+    let cleanValue = E2E.testElement(window: "BindAll Star") { (E2E.attr($0, kAXRoleAttribute) as? String) == "AXButton" }
+        .flatMap { E2E.attr($0, kAXValueAttribute) as? String } ?? "-"
+    record("clean text still gets the field star, without a number", E2E.window("BindAll Star") != nil && !cleanValue.hasSuffix("issues"),
+           "value \(cleanValue.debugDescription)")
 
     clearField()
     E2E.type("Этот текст для звёздачки и ощибка. ")
     guard let field = textEditField().flatMap(E2E.frame) else { record("setup: the field's frame is known", false); return }
-    let star = E2E.wait(12) { E2E.window("BindAll Star") != nil }
-    let starValue = E2E.testElement(window: "BindAll Star") { (E2E.attr($0, kAXRoleAttribute) as? String) == "AXButton" }
-        .flatMap { E2E.attr($0, kAXValueAttribute) as? String } ?? ""
-    record("with issues the field star shows their number", star && starValue.hasSuffix("issues"), "value \(starValue.debugDescription)")
+    func starValue() -> String {
+        E2E.testElement(window: "BindAll Star") { (E2E.attr($0, kAXRoleAttribute) as? String) == "AXButton" }
+            .flatMap { E2E.attr($0, kAXValueAttribute) as? String } ?? ""
+    }
+    // The star is there at once; its number comes with the check.
+    let star = E2E.wait(12) { starValue().hasSuffix("issues") }
+    record("with issues the field star shows their number", star, "value \(starValue().debugDescription)")
     if let starAt = E2E.window("BindAll Star")?.bounds {
         E2E.click(CGPoint(x: starAt.midX, y: starAt.midY))
         E2E.pause(0.6)

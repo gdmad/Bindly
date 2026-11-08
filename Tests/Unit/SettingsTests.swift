@@ -61,7 +61,7 @@ func runSettingsTests() {
     allChanged.autocompleteAcceptReturn = false
     allChanged.autocompleteInline = false
     allChanged.starFieldEnabled = false
-    allChanged.starFieldAlways = true
+    allChanged.starFieldOnlyWithIssues = true
     allChanged.starSelectionEnabled = false
     allChanged.previewFromMenu = false
     allChanged.previewFromHotkeys = true

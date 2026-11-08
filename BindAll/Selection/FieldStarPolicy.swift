@@ -1,12 +1,10 @@
 import Foundation
 
-/// Whether the star in a text field (nothing selected) shows. It is the proofreading indicator:
-/// by default only while issues are found, and never in a field too short to be checked (a search
-/// box, an address, one word).
+/// Whether the star in a text field (nothing selected) shows: always by default, carrying the
+/// number of issues Proofread found; or, when the user chose so, only while there are some.
 enum FieldStarPolicy {
-    static func shows(always: Bool, textLength: Int, minLength: Int, issues: Int) -> Bool {
-        guard textLength >= max(1, minLength) else { return false }
-        return always || issues > 0
+    static func shows(onlyWithIssues: Bool, issues: Int) -> Bool {
+        !onlyWithIssues || issues > 0
     }
 
     /// The count on the star: "9+" past nine.
