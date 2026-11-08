@@ -5,10 +5,9 @@ struct ActionsSettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.showSettingsTab) private var showSettingsTab
 
-    /// Providers that can take over: a key is set, or none is needed (Ollama).
-    private var fallbackProviders: [ProviderKind] {
-        ProviderKind.allCases.filter { $0 != .apple && (!$0.requiresAPIKey || !appState.apiKey(for: $0).isEmpty) }
-    }
+    /// Providers that can take over: a key is set, or none is needed (Ollama). Read once when the tab
+    /// appears, not on every redraw: each read is a Keychain query.
+    @State private var fallbackProviders: [ProviderKind] = []
 
     var body: some View {
         @Bindable var appState = appState
@@ -55,6 +54,12 @@ struct ActionsSettingsView: View {
         }
         .formStyle(.grouped)
         .clearFocusOnAppear()
+        .task {
+            fallbackProviders = ProviderKind.allCases.filter { kind in
+                kind != .apple && (!kind.requiresAPIKey || !appState.apiKey(for: kind).isEmpty
+                                   || appState.settings.appleFallbackProvider == kind)
+            }
+        }
     }
 
     private func restoreDefaultPrompt() {
