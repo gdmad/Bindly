@@ -4,6 +4,17 @@ struct GeneralSettingsView: View {
     @Environment(AppState.self) private var appState
     @State private var launchAtLogin = LoginItemManager.isEnabled
 
+    /// The field star's three modes over its two settings: off, or on and always / only with issues.
+    private var fieldStarMode: Binding<Int> {
+        Binding(
+            get: { !appState.settings.starFieldEnabled ? 2 : appState.settings.starFieldAlways ? 1 : 0 },
+            set: { mode in
+                appState.settings.starFieldEnabled = mode != 2
+                if mode != 2 { appState.settings.starFieldAlways = mode == 1 }
+            }
+        )
+    }
+
     var body: some View {
         @Bindable var appState = appState
         Form {
@@ -42,8 +53,13 @@ struct GeneralSettingsView: View {
             }
 
             Section {
-                HelpToggleRow("Star in text fields", "A violet star in the bottom-right corner of the text field you are in. Click it for actions on the whole text: Fix, Fix spelling, Translate, your action keys, a custom prompt, and the issues Proofread found.",
-                              isOn: $appState.settings.starFieldEnabled)
+                Picker(selection: fieldStarMode) {
+                    Text("Only when there are issues").tag(0)
+                    Text("Always").tag(1)
+                    Text("Never").tag(2)
+                } label: {
+                    HelpHeader("Star in text fields", "A violet star in the bottom-right corner of the text field you are in, with the number of issues Proofread found; its menu opens on them, then the actions on the whole text. By default it shows only while there are issues (so only with Proofread on). Never in fields shorter than Proofread's minimum length -- a search box, an address.")
+                }
                 HelpToggleRow("Star at a selection", "A violet star at the end of selected text, with the same actions for just the selection. While something is selected, the field's star steps aside, so there is only ever one. On text you cannot edit -- a web page, a PDF, a terminal -- it offers reading only: Show translation, Explain, Summarize and Copy.",
                               isOn: $appState.settings.starSelectionEnabled)
             } header: {

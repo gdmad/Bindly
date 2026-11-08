@@ -3,6 +3,14 @@ import CoreGraphics
 import Foundation
 
 func runUITests() {
+    print("FieldStarPolicy")
+    check(!FieldStarPolicy.shows(always: true, textLength: 3, minLength: 5, issues: 2), "a short field: never")
+    check(FieldStarPolicy.shows(always: true, textLength: 40, minLength: 5, issues: 0), "Always: with no issues too")
+    check(FieldStarPolicy.shows(always: false, textLength: 40, minLength: 5, issues: 3), "only with issues: shown with them")
+    check(!FieldStarPolicy.shows(always: false, textLength: 40, minLength: 5, issues: 0), "only with issues: hidden without")
+    check(!FieldStarPolicy.shows(always: false, textLength: 0, minLength: 0, issues: 1), "an empty field: never")
+    check(FieldStarPolicy.badge(0) == nil && FieldStarPolicy.badge(3) == "3" && FieldStarPolicy.badge(12) == "9+", "the count")
+
     print("DocumentLayout")
     do {
         let para = DocumentLayout.Block(content: .paragraph("Первый абзац."), box: CGRect(x: 0, y: 0.8, width: 1, height: 0.1))

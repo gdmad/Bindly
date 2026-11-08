@@ -9,7 +9,17 @@ final class FieldStarController {
     struct Config: Equatable {
         var fieldEnabled = true
         var selectionEnabled = true
+        /// The field star in every long enough field, not only while issues are found.
+        var fieldAlways = false
+        /// Fields shorter than this get no field star (Proofread's own minimum).
+        var minLength = 5
     }
+
+    /// Issues proofreading found in a field, for the field star's count.
+    var issueCount: (AXUIElement) -> Int = { _ in 0 }
+
+    /// Looks again now: proofreading found or cleared issues.
+    func refresh() { if enabled { schedule(delay: .milliseconds(50)) } }
 
     var config = Config()
     /// Whether stars may show in the frontmost app (the Proofread app filter).
@@ -116,10 +126,14 @@ final class FieldStarController {
                 origin = NSPoint(x: field.maxX - size - 6, y: field.minY + 6)
             }
             show(target, kind: "selection", origin: origin, label: "Actions for the selection")
-        } else if config.fieldEnabled, target.selection.length == 0, target.isEditable {
+        } else if config.fieldEnabled, target.selection.length == 0, target.isEditable,
+                  case let issues = issueCount(target.element),
+                  FieldStarPolicy.shows(always: config.fieldAlways,
+                                        textLength: target.text.trimmingCharacters(in: .whitespacesAndNewlines).count,
+                                        minLength: config.minLength, issues: issues) {
             let field = UnderlineGeometry.appKitRect(fromQuartz: fieldQuartz, primaryScreenHeight: screenHeight)
             let origin = NSPoint(x: field.maxX - size - 6, y: field.minY + 6)
-            show(target, kind: "field", origin: origin, label: "Actions for this text")
+            show(target, kind: "field", origin: origin, label: "Actions for this text", issues: issues)
         } else {
             hide()
         }
@@ -162,7 +176,7 @@ final class FieldStarController {
         return UnderlineGeometry.appKitRect(fromQuartz: quartz, primaryScreenHeight: screenHeight)
     }
 
-    private func show(_ target: ProofTarget, kind: String, origin: NSPoint, label: String) {
+    private func show(_ target: ProofTarget, kind: String, origin: NSPoint, label: String, issues: Int = 0) {
         let context = StarContext(element: target.element, pid: target.pid, text: target.text,
                                   selection: kind == "selection" ? target.selection : NSRange(location: 0, length: 0),
                                   offsetMap: target.offsetMap,
@@ -170,11 +184,12 @@ final class FieldStarController {
                                   isEditable: target.isEditable, caret: target.caret)
         // Counted once per field and kind, not on every re-show after typing or scrolling.
         let sameField = shownElement.map { CFEqual($0, target.element) } ?? false
-        if !(sameField && shownKind == kind) { UsageLog.record(.star, .shown, detail: kind) }
+        let detail = kind == "field" ? "field:issues:\(issues)" : kind
+        if !(sameField && shownKind == kind) { UsageLog.record(.star, .shown, detail: detail) }
         shownKind = kind
         shownElement = target.element
-        panel.show(at: origin, label: label) { [weak self] view in
-            UsageLog.record(.star, .accepted, detail: "open:\(kind)")
+        panel.show(at: origin, label: label, count: issues) { [weak self] view in
+            UsageLog.record(.star, .accepted, detail: "open:\(detail)")
             self?.onOpen?(context, view)
         }
     }

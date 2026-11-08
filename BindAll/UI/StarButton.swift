@@ -18,8 +18,19 @@ struct StarButton: View {
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .topTrailing) {
+            if !activity.busy, let badge = FieldStarPolicy.badge(activity.count) {
+                Text(badge)
+                    .font(.system(size: 8, weight: .bold).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 3)
+                    .frame(minWidth: 11, minHeight: 11)
+                    .background(Color.brand, in: .capsule)
+                    .allowsHitTesting(false)
+            }
+        }
         .accessibilityLabel(label)
-        .accessibilityValue(activity.busy ? "Working" : "")
+        .accessibilityValue(activity.busy ? "Working" : activity.count > 0 ? "\(activity.count) issues" : "")
         .help(label)
     }
 

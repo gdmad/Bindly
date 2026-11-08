@@ -168,6 +168,9 @@ final class HotkeyCoordinator {
     private func setupStars() {
         stars.appAllowed = { [weak self] in self?.starAppAllowed() ?? false }
         stars.onOpen = { [weak self] context, view in self?.openStarMenu(context, at: view) }
+        // The field star counts the issues proofreading found, and follows them as they change.
+        stars.issueCount = { [weak self] element in self?.proofread.issueCount(in: element) ?? 0 }
+        proofread.onIssuesChange = { [weak self] in self?.stars.refresh() }
         updateStars()
     }
 
@@ -207,7 +210,9 @@ final class HotkeyCoordinator {
         let s = appState.settings
         let on = s.enabled && AccessibilityPermission.isGranted
         stars.apply(FieldStarController.Config(fieldEnabled: on && s.starFieldEnabled,
-                                               selectionEnabled: on && s.starSelectionEnabled))
+                                               selectionEnabled: on && s.starSelectionEnabled,
+                                               fieldAlways: s.starFieldAlways,
+                                               minLength: s.proofreadMinLength))
     }
 
     /// Stars have their own app list (Settings > General > Stars).
@@ -249,6 +254,15 @@ final class HotkeyCoordinator {
             popUp(menu, under: view)
             return
         }
+        // The field star is the issue counter: its issues come first.
+        let issueCount = context.isSelection ? 0 : proofread.issueCount(in: context.element)
+        if issueCount > 0 {
+            add(issueCount == 1 ? "1 issue: show it" : "\(issueCount) issues: show the first", "text.magnifyingglass") { [weak self] in
+                UsageLog.record(.star, .accepted, detail: "proofread")
+                self?.proofread.showFirstIssue()
+            }
+            menu.addItem(.separator())
+        }
         add("Fix", "wand.and.stars") { [weak self] in self?.runStarAction(.fix, context) }
         add(SelectionCommand.spelling.title, "textformat.abc") { [weak self] in self?.runStarAction(.spelling, context) }
         add("Show translation", "globe") { [weak self] in self?.runStarAction(.translate, context) }
@@ -283,16 +297,6 @@ final class HotkeyCoordinator {
         menu.addItem(.separator())
         add("Custom prompt…", "text.bubble") { [weak self] in self?.askForPrompt(context) }
         if let history = historyMenu(for: context) { menu.addItem(history) }
-        if !context.isSelection {
-            let count = proofread.issueCount(in: context.element)
-            if count > 0 {
-                menu.addItem(.separator())
-                add(count == 1 ? "1 issue: show it" : "\(count) issues: show the first", "text.magnifyingglass") { [weak self] in
-                    UsageLog.record(.star, .accepted, detail: "proofread")
-                    self?.proofread.showFirstIssue()
-                }
-            }
-        }
         popUp(menu, under: view)
     }
 

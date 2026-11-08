@@ -16,6 +16,9 @@ No Dock icon: BindAll lives in the menu bar (`LSUIElement`); the icon pulses whi
 
 - **Fix / transform text** — select text, press the shortcut, and the corrected result replaces it in
   place. Uses the Apple on-device model by default, or a cloud provider.
+- **Stars** — a violet star at a selection opens the actions for it; the star in a text field
+  shows how many issues Proofread found there and opens on them (Settings → General: only with issues,
+  always, or never).
 - **Action keys** — saved, named instructions, run from the star menu or **their own global
   shortcut**. Built in: Formal tone, Polite request.
 - **Text tools** — UPPERCASE, lowercase and Fix keyboard layout, done without AI and exactly; in the

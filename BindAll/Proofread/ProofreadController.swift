@@ -55,7 +55,15 @@ final class ProofreadController {
     // Live state: what was found in the focused field. Outlives the popup -- the underlines stay up
     // while the user reads, and a click can open the fixes without another round trip.
     private var target: ProofTarget?
-    private var issues: [TextIssue] = []
+    private var issues: [TextIssue] = [] {
+        didSet {
+            guard issues.count != oldValue.count else { return }
+            // After the change settles: the field star shows the count.
+            DispatchQueue.main.async { [weak self] in self?.onIssuesChange?() }
+        }
+    }
+    /// The number of issues changed (found, fixed, skipped, cleared).
+    var onIssuesChange: (() -> Void)?
     /// The field text the current `issues` were found in; a re-check is pointless while it matches.
     private var lastCheckedText = ""
     // Navigation state: which issue the popup is on.

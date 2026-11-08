@@ -248,6 +248,8 @@ struct Settings: Codable, Equatable {
 
     // Stars: the violet star in a text field's corner (whole text) and at a selection's end.
     var starFieldEnabled: Bool = true
+    /// The field star shows in every long enough field, not only while issues are found.
+    var starFieldAlways: Bool = false
     var starSelectionEnabled: Bool = true
     /// Where stars show, on their own: they used to follow Proofread's list, so hiding stars in one
     /// app stopped checking there too. Stored settings from then start from that list.
@@ -353,7 +355,7 @@ extension Settings {
              proofreadMinLength, proofreadAppMode, proofreadApps, personalDictionary, preSendCheck,
              historyEnabled, pushToTalkEnabled, pushToTalkKey, pushToTalkLanguage, pushToTalkTranslate,
              pushToTalkTargetLanguage, voiceTranslateEnabled, voiceTranslateKey, sourceLanguage, targetLanguage,
-             correctEnabled, starFieldEnabled, starSelectionEnabled, starAppMode, starApps, previewFromMenu, previewFromHotkeys,
+             correctEnabled, starFieldEnabled, starFieldAlways, starSelectionEnabled, starAppMode, starApps, previewFromMenu, previewFromHotkeys,
              recentPrompts, maskAISlopRules, removeTellsWithAI, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
              languageToolTarget, localServerPort,
              openRouterFreeOnly, providers, defaultActionHotkey, translateHotkey,
@@ -417,6 +419,7 @@ extension Settings {
         if let v = try c.decodeIfPresent(String.self, forKey: .targetLanguage) { targetLanguage = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .correctEnabled) { correctEnabled = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .starFieldEnabled) { starFieldEnabled = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .starFieldAlways) { starFieldAlways = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .starSelectionEnabled) { starSelectionEnabled = v }
         starAppMode = try c.decodeIfPresent(String.self, forKey: .starAppMode) ?? proofreadAppMode
         starApps = try c.decodeIfPresent([String].self, forKey: .starApps) ?? proofreadApps

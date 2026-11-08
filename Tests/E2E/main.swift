@@ -435,10 +435,11 @@ func historyScenario() {
 
     // From the field star (nothing selected) the entry goes in at the caret; the draft stays.
     clearField()
-    let draft = "Черновик остаётся. "
+    // With an issue in it: the field star only shows while there are some.
+    let draft = "Черновик с ощибкой остаётся. "
     E2E.type(draft)
     E2E.pause(1.5)
-    guard E2E.wait(4, { E2E.window("BindAll Star") != nil }), let star = E2E.window("BindAll Star")?.bounds else {
+    guard E2E.wait(12, { E2E.window("BindAll Star") != nil }), let star = E2E.window("BindAll Star")?.bounds else {
         record("the field star's History inserts at the caret", false, "no field star"); return
     }
     E2E.click(CGPoint(x: star.midX, y: star.midY))
@@ -724,11 +725,39 @@ func captureExact(_ rect: CGRect, to file: URL) {
 
 func starScenarios() {
     group = "Stars"
+    // The field star is the issue counter: none on clean text, none in a short field.
     clearField()
-    E2E.type("Этот текст для звёздачки. ")
-    E2E.pause(1.2)
+    E2E.type("Всё в порядке, текст без ошибок. ")
+    E2E.pause(3.0)
+    record("clean text gets no field star", E2E.window("BindAll Star") == nil, "windows \(E2E.windows().map(\.name))")
+    clearField()
+    E2E.type("ощб")
+    E2E.pause(3.0)
+    record("a short field gets no field star", E2E.window("BindAll Star") == nil)
+
+    clearField()
+    E2E.type("Этот текст для звёздачки и ощибка. ")
     guard let field = textEditField().flatMap(E2E.frame) else { record("setup: the field's frame is known", false); return }
-    let star = E2E.wait(3) { E2E.window("BindAll Star") != nil }
+    let star = E2E.wait(12) { E2E.window("BindAll Star") != nil }
+    let starValue = E2E.testElement(window: "BindAll Star") { (E2E.attr($0, kAXRoleAttribute) as? String) == "AXButton" }
+        .flatMap { E2E.attr($0, kAXValueAttribute) as? String } ?? ""
+    record("with issues the field star shows their number", star && starValue.hasSuffix("issues"), "value \(starValue.debugDescription)")
+    if let starAt = E2E.window("BindAll Star")?.bounds {
+        E2E.click(CGPoint(x: starAt.midX, y: starAt.midY))
+        E2E.pause(0.6)
+        // The issues come first in its menu.
+        let app = AXUIElementCreateApplication(E2E.testApp!.processIdentifier)
+        let issuesItem = E2E.find(in: app, depth: 6) { el in
+            let title = E2E.attr(el, kAXTitleAttribute) as? String ?? ""
+            return title.hasSuffix("show the first") || title.hasSuffix("show it")
+        }
+        if let issuesItem { E2E.press(issuesItem) } else { pickMenuItem(downs: 1) }
+        record("its first item opens the fixes", E2E.wait(4) { E2E.window("BindAll Fixes") != nil },
+               issuesItem == nil ? "item not in the AX menu" : "")
+        E2E.key(kVK_Escape)
+        E2E.pause(0.5)
+    }
+    E2E.pause(1.0)
     let starRect = E2E.window("BindAll Star")?.bounds ?? .zero
     record("the field star sits in the field's corner", star && field.insetBy(dx: -4, dy: -4).contains(starRect)
            && starRect.maxX > field.maxX - 60 && starRect.maxY > field.maxY - 60, "star \(starRect), field \(field)")

@@ -5,4 +5,6 @@ import Observation
 @Observable
 final class StarActivity {
     var busy = false
+    /// Issues found in the field, shown on the field star; 0 shows none.
+    var count = 0
 }
