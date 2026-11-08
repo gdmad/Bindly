@@ -18,6 +18,8 @@ swiftc -O \
     BindAll/Store/HistoryMenuTitle.swift \
     BindAll/Store/UsageLog.swift \
     BindAll/Engines/AIEngine.swift \
+    BindAll/Engines/FallbackEngine.swift \
+    BindAll/Engines/LanguageMatch.swift \
     BindAll/Proofread/TextIssue.swift \
     BindAll/Proofread/WordBoundary.swift \
     BindAll/Proofread/UnderlineGeometry.swift \

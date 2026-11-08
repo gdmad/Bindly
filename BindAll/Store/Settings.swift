@@ -330,6 +330,8 @@ struct Settings: Codable, Equatable {
     var spellingNoticeShown = false
     /// Optional shortcuts of the `TextTool`s, by raw value.
     var textToolHotkeys: [String: HotkeyConfig] = [:]
+    /// When the Apple model cannot do an action, this provider does it instead; nil = show the error.
+    var appleFallbackProvider: ProviderKind?
 
     func provider(_ kind: ProviderKind) -> ProviderConfig {
         providers.first(where: { $0.kind == kind }) ?? .makeDefault(kind)
@@ -355,7 +357,7 @@ extension Settings {
              recentPrompts, maskAISlopRules, removeTellsWithAI, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
              languageToolTarget, localServerPort,
              openRouterFreeOnly, providers, defaultActionHotkey, translateHotkey,
-             screenTranslateHotkey, quickTranslateHotkey, explainHotkey, summarizeHotkey, commandHotkeys, spellingNoticeShown, textToolHotkeys
+             screenTranslateHotkey, quickTranslateHotkey, explainHotkey, summarizeHotkey, commandHotkeys, spellingNoticeShown, textToolHotkeys, appleFallbackProvider
     }
 
     /// Old key names still honoured on decode (never written back).
@@ -440,6 +442,7 @@ extension Settings {
         if let v = try c.decodeIfPresent([String: HotkeyConfig].self, forKey: .commandHotkeys) { commandHotkeys = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .spellingNoticeShown) { spellingNoticeShown = v }
         if let v = try c.decodeIfPresent([String: HotkeyConfig].self, forKey: .textToolHotkeys) { textToolHotkeys = v }
+        appleFallbackProvider = try c.decodeIfPresent(ProviderKind.self, forKey: .appleFallbackProvider)
         (actionKeys, textToolHotkeys) = TextToolMigration.migrate(actionKeys, hotkeys: textToolHotkeys)
     }
 }

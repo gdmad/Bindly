@@ -40,6 +40,7 @@ BindAll/
 │   ├── TranslationService.swift      # Apple Translation framework + NL language detection
 │   ├── TranslationLayout.swift # pure: puts the source's line breaks back into a translation
 │   ├── LanguagePair.swift      # pure: which way a translation goes, for every entry point
+│   ├── FallbackEngine.swift / LanguageMatch.swift # Apple model first, a chosen provider when it cannot
 │   ├── DocumentLayout.swift    # pure: a recognized document (paragraphs, lists, tables) as text, in reading order
 │   ├── OCRParagraphs.swift     # pure: joins wrapped OCR lines back into paragraphs
 │   └── OCRService.swift        # screencapture region + Vision document recognition (lines as fallback)
@@ -327,7 +328,15 @@ dimmed while Proofread is off.
   and keep only macOS's closest guesses (`OfflineSpelling.similar`: edit distance <= 1-2, the
   minimum only). Its Russian guesses are weak -- "малако" gets "малого"/"макало", never "молоко" --
   which is why it is not a layer of its own. Fix spelling falls back the same way and says so in its
-  preview. (Harper is English-only.) The same settings
+  preview. (Harper is English-only.)
+- **Apple model fallback** (`appleFallbackProvider`, off by default; AI Actions, shown with the Apple
+  engine): `EngineFactory.make` wraps the Apple engine in `FallbackEngine`, which reruns the action on
+  that provider when the Apple model throws (not on cancel) or -- for Fix, Explain, Summarize and
+  Remove AI tells (`checksLanguage`) -- answers in another language than the text
+  (`LanguageMatch.differs`, NaturalLanguage, both sides at >= 0.8 confidence). `AIEngine.answer` reports
+  who answered; the preview notes it and a result window's title names it. Measured with
+  `Tests/Bench`: the Apple model does not list Russian, yet fixed every Russian test sentence and
+  answered Explain/Summarize in Russian, so it stays the default engine. The same settings
   drive it and the legacy `correct()` path. Text is sent one paragraph at a time and cached by
   paragraph text, so editing one sentence costs one request and re-checking costs none.
   The connection is configured on the Proofread tab via an explicit **connection mode**

@@ -3,10 +3,13 @@ import Foundation
 /// Builds an `AIEngine` for a given provider from the current settings + Keychain.
 @MainActor
 enum EngineFactory {
-    static func make(kind: ProviderKind, appState: AppState) -> AIEngine {
+    /// `checksLanguage`: the action keeps the text's language (see `FallbackEngine`).
+    static func make(kind: ProviderKind, appState: AppState, checksLanguage: Bool = false) -> AIEngine {
         switch kind {
         case .apple:
-            return AppleFoundationEngine()
+            guard let backup = appState.settings.appleFallbackProvider, backup != .apple else { return AppleFoundationEngine() }
+            return FallbackEngine(primary: AppleFoundationEngine(), secondary: make(kind: backup, appState: appState),
+                                  secondaryName: backup.displayName, checksLanguage: checksLanguage)
         case .deepseek, .openrouter, .openai, .ollama:
             let config = appState.settings.provider(kind)
             return OpenAICompatibleEngine(

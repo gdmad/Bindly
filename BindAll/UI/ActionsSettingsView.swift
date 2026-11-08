@@ -5,6 +5,11 @@ struct ActionsSettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.showSettingsTab) private var showSettingsTab
 
+    /// Providers that can take over: a key is set, or none is needed (Ollama).
+    private var fallbackProviders: [ProviderKind] {
+        ProviderKind.allCases.filter { $0 != .apple && (!$0.requiresAPIKey || !appState.apiKey(for: $0).isEmpty) }
+    }
+
     var body: some View {
         @Bindable var appState = appState
         Form {
@@ -14,9 +19,17 @@ struct ActionsSettingsView: View {
                         Text(kind.displayName).tag(kind)
                     }
                 }
+                if appState.settings.defaultEngine == .apple {
+                    Picker("If the Apple model cannot do it", selection: $appState.settings.appleFallbackProvider) {
+                        Text("Show the error").tag(ProviderKind?.none)
+                        ForEach(fallbackProviders) { kind in
+                            Text(kind.displayName).tag(ProviderKind?.some(kind))
+                        }
+                    }
+                }
                 Button("Configure providers…") { showSettingsTab(.providers) }
             } header: {
-                HelpHeader("Engine", "Runs Fix, the action keys, Explain, Summarize and custom prompts. Translation always runs on-device via Apple's Translation framework, and proofreading always uses LanguageTool.")
+                HelpHeader("Engine", "Runs Fix, the action keys, Explain, Summarize and custom prompts. Translation always runs on-device via Apple's Translation framework, and proofreading always uses LanguageTool.\n\nThe Apple model officially covers fewer languages than it handles in practice (Russian works). When it refuses, fails, or answers Fix, Explain or Summarize in another language than the text, the action can be run again by a provider you have set up -- the text is then sent to that provider. Off by default.")
             }
 
             Section {

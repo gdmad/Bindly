@@ -7,6 +7,7 @@ runSettingsTests()
 runUITests()
 runVoiceTests()
 runLocalServerTests()
+runEngineTests()
 
 if failures == 0 {
     print("ALL TESTS PASSED")

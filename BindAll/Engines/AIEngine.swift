@@ -24,6 +24,9 @@ protocol AIEngine {
     /// Runs `instruction` over `text` and returns the processed result.
     func process(text: String, instruction: String) async throws -> String
 
+    /// `process`, with who answered when it was not the engine asked (`FallbackEngine`).
+    func answer(text: String, instruction: String) async throws -> EngineAnswer
+
     /// Quick connectivity / availability check. Returns a short status string on success.
     func testConnection() async throws -> String
 }

@@ -89,6 +89,7 @@ func runSettingsTests() {
     allChanged.localServerPort = 9090
     allChanged.starAppMode = "deny"
     allChanged.spellingNoticeShown = true
+    allChanged.appleFallbackProvider = .ollama
     allChanged.textToolHotkeys = ["lowercase": HotkeyConfig(keyCode: 37, modifiers: HotkeyModifiers(command: true, control: true), repeatCount: 1)]
     allChanged.commandHotkeys = ["spelling": HotkeyConfig(keyCode: 1, modifiers: HotkeyModifiers(command: true, control: true), repeatCount: 1)]
     allChanged.starApps = ["com.example.stars"]

@@ -399,6 +399,7 @@ final class HotkeyCoordinator {
             do {
                 var result: String
                 var spellingOffline = false
+                var answeredBy: String?
                 switch action {
                 case .spelling:
                     let dictionary = PersonalDictionary.set(settings.personalDictionary)
@@ -420,8 +421,11 @@ final class HotkeyCoordinator {
                     case .reading(let reading): reading.prompt
                     default: settings.defaultPrompt
                     }
-                    let engine = EngineFactory.make(kind: settings.defaultEngine, appState: self.appState)
-                    result = try await engine.process(text: text, instruction: instruction)
+                    let keepsLanguage = switch action { case .fix, .reading: true; default: false }
+                    let engine = EngineFactory.make(kind: settings.defaultEngine, appState: self.appState, checksLanguage: keepsLanguage)
+                    let answer = try await engine.answer(text: text, instruction: instruction)
+                    result = answer.text
+                    answeredBy = answer.answeredBy
                     if settings.maskAISlop { result = MaskAISlop.apply(to: result, rules: settings.maskRules, keeping: text) }
                 }
                 if Task.isCancelled { return }
@@ -430,7 +434,7 @@ final class HotkeyCoordinator {
                 case .spelling: "LanguageTool"
                 case .textTool: "Text tools"
                 case .removeTells: settings.removeTellsWithAI ? settings.defaultEngine.displayName : "Rules"
-                default: settings.defaultEngine.displayName
+                default: answeredBy ?? settings.defaultEngine.displayName
                 }
                 // Kept either way; only an applied one is offered by the star's History.
                 let entry = self.recordHistory(kind: .action, input: text, output: result, engine: engineName)
@@ -442,7 +446,7 @@ final class HotkeyCoordinator {
                         self?.markApplied(entry)
                         self?.replace(context, with: result)
                     } : nil
-                    self.popup.show(title: title, text: result, original: text, onReplace: replace)
+                    self.popup.show(title: Self.titled(title, answeredBy: answeredBy), text: result, original: text, onReplace: replace)
                     return
                 }
                 let apply = { [weak self] in
@@ -463,6 +467,7 @@ final class HotkeyCoordinator {
                 if spellingOffline {
                     note = "LanguageTool cannot be reached: checked on this Mac, for spelling only."
                 }
+                if let answeredBy { note = Self.fallbackNote(answeredBy) }
                 // Said once: with the Apple engine chosen, nothing else here leaves the Mac.
                 if case .spelling = action, settings.previewFromMenu, settings.languageToolMode == .free, !settings.spellingNoticeShown {
                     note = "Fix spelling checks the text on languagetool.org (the free public server). Another server: Proofread > LanguageTool."
@@ -487,7 +492,7 @@ final class HotkeyCoordinator {
     private func removeTells(from text: String, settings: Settings) async throws -> String {
         var result = MaskAISlop.apply(to: text, rules: Self.removeTellsRules(settings))
         if settings.removeTellsWithAI {
-            let engine = EngineFactory.make(kind: settings.defaultEngine, appState: appState)
+            let engine = EngineFactory.make(kind: settings.defaultEngine, appState: appState, checksLanguage: true)
             result = try await engine.process(text: result, instruction: Self.removeTellsPrompt)
             result = MaskAISlop.apply(to: result, rules: Self.removeTellsRules(settings))
         }
@@ -553,6 +558,15 @@ final class HotkeyCoordinator {
     private static func sameText(_ a: String, _ b: String) -> Bool {
         func squeezed(_ s: String) -> String { s.filter { !$0.isWhitespace && !$0.isNewline } }
         return squeezed(a) == squeezed(b)
+    }
+
+    /// A result window's title, naming the fallback provider when it answered.
+    static func titled(_ title: String, answeredBy: String?) -> String {
+        answeredBy.map { "\(title) · \($0)" } ?? title
+    }
+
+    static func fallbackNote(_ provider: String) -> String {
+        "Answered by \(provider): the Apple model could not."
     }
 
     private func showUnplaced(_ result: String) {
@@ -767,7 +781,8 @@ final class HotkeyCoordinator {
         let feature: UsageFeature = reading?.feature ?? (actionKey == nil ? .fix : .actionKey)
         let source = forceCopy ? "source:menu" : "source:hotkey"
         let started = ContinuousClock.now
-        let engine = EngineFactory.make(kind: settings.defaultEngine, appState: appState)
+        // The default Fix and Explain/Summarize keep the text's language; an action key may not.
+        let engine = EngineFactory.make(kind: settings.defaultEngine, appState: appState, checksLanguage: key == nil)
         beginBusy()
         // Capture where the result must land before the (possibly slow) engine call.
         let target = TextInjector.FocusTarget.capture()
@@ -799,8 +814,11 @@ final class HotkeyCoordinator {
             do {
                 let local = textTool
                 var result: String
+                var answeredBy: String?
                 if let local { result = local.apply(to: content) } else {
-                    result = try await engine.process(text: content, instruction: instruction)
+                    let answer = try await engine.answer(text: content, instruction: instruction)
+                    result = answer.text
+                    answeredBy = answer.answeredBy
                 }
                 if Task.isCancelled { return }
                 if settings.maskAISlop, local == nil {
@@ -810,7 +828,7 @@ final class HotkeyCoordinator {
                                                engine: settings.defaultEngine.displayName)
                 if showOnly {
                     UsageLog.record(feature, .shown, detail: actionKey ?? source, ms: UsageLog.elapsed(since: started))
-                    self.popup.show(title: actionTitle ?? "Result", text: result, original: content)
+                    self.popup.show(title: Self.titled(actionTitle ?? "Result", answeredBy: answeredBy), text: result, original: content)
                     return
                 }
                 let original = content
@@ -827,7 +845,7 @@ final class HotkeyCoordinator {
                 }
                 if settings.previewFromHotkeys {
                     self.preview.show(title: actionTitle ?? "Fix", original: original,
-                                      result: result, onApply: replace)
+                                      result: result, note: answeredBy.map(Self.fallbackNote), onApply: replace)
                 } else {
                     replace()
                 }
