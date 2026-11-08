@@ -44,7 +44,7 @@ struct GeneralSettingsView: View {
             Section {
                 HelpToggleRow("Star in text fields", "A violet star in the bottom-right corner of the text field you are in. Click it for actions on the whole text: Fix, Fix spelling, Translate, your action keys, a custom prompt, and the issues Proofread found.",
                               isOn: $appState.settings.starFieldEnabled)
-                HelpToggleRow("Star at a selection", "A violet star at the end of selected text, with the same actions for just the selection. While something is selected, the field's star steps aside, so there is only ever one.",
+                HelpToggleRow("Star at a selection", "A violet star at the end of selected text, with the same actions for just the selection. While something is selected, the field's star steps aside, so there is only ever one. On text you cannot edit -- a web page, a PDF, a terminal -- it offers reading only: Show translation, Explain, Summarize and Copy.",
                               isOn: $appState.settings.starSelectionEnabled)
             } header: {
                 HelpHeader("Stars", "Stars never show in password fields or very small fields. On text that cannot be edited (a terminal, a log) only the selection star shows, with the reading actions.")

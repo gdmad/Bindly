@@ -253,7 +253,10 @@ a burst that copied nothing (no selection, a field that refuses copying) never u
 clipboard -- only the AX selected text, else "No text selected.". Key auto-repeat and BindAll's own
 marked keystrokes (`InjectedEvents`) are not presses. Read-only text (`ProofTarget.isEditable`: neither
 the value nor the selected text is settable, e.g. Terminal) gets no field star, no proofreading, and
-a selection star with only Show translation, Explain, Summarize and Copy. `replace()` puts a result
+a selection star with only Show translation, Explain, Summarize and Copy. Selected text outside any field (a web
+page, a PDF; `ProofSource.selectionOnly`, read through `AXSelectedText` or, in Safari and Chromium,
+`AXSelectedTextMarkerRange` + `AXStringForTextMarkerRange`) gets that reading star too, where the
+mouse let go (`FieldStarController.showForPlainSelection`). `replace()` puts a result
 back only where its text still is (`ReplaceTarget`: unchanged, or found again near its old place
 when there is no offset map), checks the select and the selected text, and otherwise shows the
 result to copy ("Not replaced"); the hotkey preview captures its selection (`selectionContext`) and
@@ -509,7 +512,7 @@ dimmed while Proofread is off.
   proofread, fixAll, dictionary, history, explain, preSend, translateInPlace, voice, stars,
   removeTells, quick, tray, hotkeys (⌘C ⌘C in place, ⌘C ⌘C ⌘C translation window, Restore
   clipboard), starActions (Show translation, an action key, a custom prompt to its result), cancel
-  (Esc while an action runs), master (the Enabled switch), settings (every tab of the window), drag (result, preview, prompt and Quick Translate windows move by their header),
+  (Esc while an action runs), master (the Enabled switch), settings (every tab of the window), drag (result, preview, prompt and Quick Translate windows move by their header), plainStar (a reading star on text selected in a Safari page),
   slack, claude. Explain and Summarize run from the menu bar (`pressTrayItem`), and explain checks
   the star menu no longer lists them. Star items go through `runStarItem`, which waits for the star to move to the
   selection before clicking it. Checks on model output test its shape (`isShouting`), not its words:

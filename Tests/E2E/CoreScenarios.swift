@@ -456,3 +456,54 @@ func dragScenario() {
     }
     focusTextEdit()
 }
+
+// MARK: - The star on text outside any field
+
+/// A page in Safari: selected text there is not in a field, so the star offers reading only.
+func plainTextStarScenario() {
+    group = "Plain text star"
+    guard let pid = E2E.testApp?.processIdentifier else { return }
+    let page = outDir.appending(path: "plain-text.html")
+    let html = "<html><head><meta charset='utf-8'></head><body style='font-size:28px;margin:60px'><p id='p'>Совещание переносится на четверг, потому что заказчик не успел прислать документы.</p></body></html>"
+    try? html.write(to: page, atomically: true, encoding: .utf8)
+    let open = Process()
+    open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    open.arguments = ["-a", "Safari", page.path]
+    try? open.run(); open.waitUntilExit()
+    defer {
+        let close = Process()
+        close.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        close.arguments = ["-e", "tell application \"Safari\" to close (every document whose URL contains \"plain-text.html\")"]
+        try? close.run(); close.waitUntilExit()
+        focusTextEdit()
+    }
+    guard let safari = E2E.wait(10, { NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Safari").first != nil })
+            ? NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Safari").first : nil else {
+        record("setup: Safari opens the page", false); return
+    }
+    safari.activate()
+    let app = AXUIElementCreateApplication(safari.processIdentifier)
+    var word: CGRect?
+    E2E.wait(10) {
+        word = E2E.find(in: app, depth: 30, { (E2E.attr($0, kAXValueAttribute) as? String)?.contains("заказчик") == true
+            && (E2E.attr($0, kAXRoleAttribute) as? String) == "AXStaticText" }).flatMap(E2E.frame)
+        return word != nil
+    }
+    guard let text = word else { record("setup: the page's text is found", false); return }
+    E2E.pause(0.5)
+    E2E.doubleClick(CGPoint(x: text.minX + 30, y: text.midY))
+    let shown = E2E.wait(4) { E2E.window("BindAll Star") != nil }
+    record("a star shows on text selected in a web page", shown, "windows \(E2E.windows().map(\.name))")
+    guard shown, let star = E2E.window("BindAll Star")?.bounds else { return }
+    E2E.click(CGPoint(x: star.midX, y: star.midY))
+    E2E.pause(0.6)
+    // The star's menu is not always in the AX tree: its first item tells the two menus apart --
+    // Show translation (a window) in the reading one, Fix (a preview) in the editing one.
+    _ = pid
+    pickMenuItem(downs: 1)
+    let window = E2E.wait(20) { E2E.window("BindAll Translation") != nil || E2E.window("BindAll Preview") != nil }
+    record("its menu is the reading one: Show translation comes first", window && E2E.window("BindAll Translation") != nil,
+           "windows \(E2E.windows().map(\.name))")
+    if E2E.window("BindAll Translation") != nil { clickButton("Close", in: "BindAll Translation") }
+    if E2E.window("BindAll Preview") != nil { E2E.key(kVK_Escape) }
+}

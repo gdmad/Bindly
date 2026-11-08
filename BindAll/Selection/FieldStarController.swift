@@ -86,8 +86,16 @@ final class FieldStarController {
 
     private func evaluate() {
         guard enabled, appAllowed(),
-              NSWorkspace.shared.frontmostApplication?.bundleIdentifier != Bundle.main.bundleIdentifier,
-              case .axField(let target) = ProofreadAX.focus(analyze: false),
+              NSWorkspace.shared.frontmostApplication?.bundleIdentifier != Bundle.main.bundleIdentifier else {
+            hide()
+            return
+        }
+        let source = ProofreadAX.focus(analyze: false)
+        if case .selectionOnly(let selected) = source {
+            showForPlainSelection(selected)
+            return
+        }
+        guard case .axField(let target) = source,
               let fieldQuartz = ProofreadAX.frame(of: target.element),
               fieldQuartz.width >= 140, fieldQuartz.height >= 20 else {
             hide()
@@ -115,6 +123,35 @@ final class FieldStarController {
         } else {
             hide()
         }
+    }
+
+    /// Selected text outside any field (a web page, a PDF, a mail being read): a selection star
+    /// with the reading actions, where the mouse let go -- there is no field to measure.
+    private func showForPlainSelection(_ selected: String) {
+        guard config.selectionEnabled,
+              !selected.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let element = ProofreadAX.focusedElement() else {
+            hide()
+            return
+        }
+        let size = StarButton.size
+        let origin: NSPoint
+        if let mouse = lastMouseUp {
+            origin = NSPoint(x: mouse.x + 4, y: mouse.y - size - 4)
+        } else if let quartz = ProofreadAX.frame(of: element) {
+            let screenHeight = NSScreen.screens.first?.frame.height ?? quartz.maxY
+            let frame = UnderlineGeometry.appKitRect(fromQuartz: quartz, primaryScreenHeight: screenHeight)
+            origin = NSPoint(x: frame.maxX - size - 6, y: frame.minY + 6)
+        } else {
+            hide()
+            return
+        }
+        var pid: pid_t = 0
+        AXUIElementGetPid(element, &pid)
+        let target = ProofTarget(element: element, pid: pid, text: selected, caret: 0,
+                                 selection: NSRange(location: 0, length: (selected as NSString).length),
+                                 isEditable: false)
+        show(target, kind: "selection", origin: origin, label: "Actions for the selection")
     }
 
     private func selectionEndRect(_ target: ProofTarget, screenHeight: CGFloat) -> CGRect? {

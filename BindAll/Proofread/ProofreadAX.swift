@@ -86,7 +86,7 @@ enum ProofreadAX {
         }
 
         // No readable field text, but the app may still expose the selection (many web views do).
-        if let selected = selectedText(of: focused),
+        if let selected = selectedText(of: focused) ?? selectedMarkerText(of: focused),
            !selected.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return .selectionOnly(selected)
         }
@@ -181,7 +181,6 @@ enum ProofreadAX {
         return role == (kAXTextAreaRole as String) || role == (kAXTextFieldRole as String)
     }
 
-    /// Never proofread a password field.
     /// Either the value or the selected text can be set. Terminal's text area allows neither; every
     /// editor tried allows at least one.
     static func isEditable(_ element: AXUIElement) -> Bool {
@@ -194,6 +193,7 @@ enum ProofreadAX {
         return false
     }
 
+    /// Never proofread a password field.
     private static func isSecure(_ element: AXUIElement) -> Bool {
         subrole(of: element) == (kAXSecureTextFieldSubrole as String)
     }
@@ -228,6 +228,19 @@ enum ProofreadAX {
     }
 
     /// The element's current selected text, or nil when the attribute is unreadable.
+    /// Web pages in Safari and Chromium report a selection only as a text-marker range, read back
+    /// as a string through a parameterized attribute.
+    static func selectedMarkerText(of element: AXUIElement) -> String? {
+        var rangeRef: AnyObject?
+        guard AXUIElementCopyAttributeValue(element, "AXSelectedTextMarkerRange" as CFString, &rangeRef) == .success,
+              let range = rangeRef else { return nil }
+        var textRef: AnyObject?
+        guard AXUIElementCopyParameterizedAttributeValue(element, "AXStringForTextMarkerRange" as CFString, range, &textRef) == .success else {
+            return nil
+        }
+        return textRef as? String
+    }
+
     static func selectedText(of element: AXUIElement) -> String? {
         var textRef: AnyObject?
         guard AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &textRef) == .success else {
