@@ -67,6 +67,7 @@ BindAll/
 │   ├── ProofreadSkips.swift           # pure: places the user skipped (rule + text + context keys)
 │   ├── FixAll.swift                   # pure: every issue's first fix applied at once
 │   ├── PersonalDictionary.swift       # pure: words never flagged as misspellings
+│   ├── OfflineSpelling.swift / OfflineSpellCheck.swift # when LanguageTool is unreachable: macOS spell checker, spelling only
 │   ├── PreSendPolicy.swift            # pure: what a key does for the check before sending
 │   ├── PreSendGuard.swift             # its Return tap (own thread, on only while armed)
 │   ├── ListMarkers.swift              # pure: list numbers/bullets glued to their item ("1.Buy")
