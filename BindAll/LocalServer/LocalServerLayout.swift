@@ -5,10 +5,10 @@ import Foundation
 struct LocalServerLayout: Equatable {
     let root: URL
 
-    /// `~/Library/Application Support/BindAll/LanguageTool`
+    /// `~/Library/Application Support/BindAll/LanguageTool` -- the test build's own folder for it, so a
+    /// test install never touches the real one.
     static var standard: LocalServerLayout {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return LocalServerLayout(root: base.appendingPathComponent("BindAll/LanguageTool", isDirectory: true))
+        LocalServerLayout(root: AppPaths.supportDirectory.appendingPathComponent("LanguageTool", isDirectory: true))
     }
 
     var jreDir: URL { root.appendingPathComponent("jre", isDirectory: true) }

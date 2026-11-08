@@ -3,7 +3,7 @@ import SwiftUI
 /// The port is a setting. It commits on Return or when the field loses focus, so typing "8082"
 /// does not restart the server at "808".
 struct LocalServerPortRow: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) private var appState
     let server: LocalServerManager
 
     @State private var draft = LocalServerPort.defaultPort

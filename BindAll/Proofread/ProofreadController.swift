@@ -28,10 +28,26 @@ final class ProofreadController {
         var restoreClipboard = false
         var appMode = AppFilterMode.all
         var apps: Set<String> = []
+        /// `PersonalDictionary.set` of the user's words.
+        var dictionary: Set<String> = []
+        /// "Check before sending" in chat apps (`PreSendPolicy.chatApps`).
+        var preSend = false
     }
 
     private var config = Config()
+    /// "Fix all": the field (as a star context), the corrected text and how many fixes it holds.
+    /// The coordinator shows the preview and writes the result, the way the star's actions do.
+    var onFixAll: ((StarContext, String, Int) -> Void)?
+    /// "Add to dictionary": the coordinator stores the word; `configure` then brings the new set back.
+    var onAddWord: ((String) -> Void)?
     private var provider: LanguageToolProofreadProvider?
+    /// Places the user skipped; see `ProofreadSkips`.
+    private var skips = ProofreadSkips()
+    /// Whether the fixes popup is open, for the usage log's shown/dismissed pairs.
+    private var popupShown = false
+    /// Went into the fixes with ↓: only then do the arrows choose among them.
+    private var browsing = false
+    private var inputSourceObserver: NSObjectProtocol?
     private let popover = ProofreadPopover()
     private let underlines = UnderlineOverlay()
     private static let log = Logger(subsystem: "com.evgeny.bindall", category: "proofread")
@@ -77,10 +93,20 @@ final class ProofreadController {
 
     /// Written on main, read on the tap thread, guarded by its own lock.
     private final class SharedState: @unchecked Sendable {
-        private var lock = os_unfair_lock()
-        private var value = false
+        struct Snapshot {
+            var isActive = false
+            /// Went into the fixes with ↓ (see `ProofreadKeyPolicy`).
+            var browsing = false
+            var atFirst = true
+            var layout = PopupLayout.column
+            /// The popup sits above the word: ↑ goes into the fixes.
+            var opensUpward = true
+        }
 
-        var isActive: Bool {
+        private var lock = os_unfair_lock()
+        private var value = Snapshot()
+
+        var snapshot: Snapshot {
             get {
                 os_unfair_lock_lock(&lock)
                 defer { os_unfair_lock_unlock(&lock) }
@@ -92,7 +118,13 @@ final class ProofreadController {
                 os_unfair_lock_unlock(&lock)
             }
         }
+
+        var isActive: Bool {
+            get { snapshot.isActive }
+            set { var s = snapshot; s.isActive = newValue; snapshot = s }
+        }
     }
+
 
     // Auto-popup on click.
     private var mouseMonitor: Any?
@@ -101,13 +133,35 @@ final class ProofreadController {
 
     /// Set by the coordinator so a proofread session can silence autocomplete: both features eat Tab.
     var onSessionChange: ((Bool) -> Void)?
+    private let preSend = PreSendGuard()
+    /// An autocomplete suggestion is up: its Return wins over the pre-send check.
+    private var suggestionVisible = false
+    private var menuOpen = false
 
     var isSessionActive: Bool { !issues.isEmpty && target != nil }
+
+    /// Issues found in `element` by the last check, for the star menu.
+    func issueCount(in element: AXUIElement) -> Int {
+        guard let target, CFEqual(target.element, element) else { return 0 }
+        return issues.count
+    }
+
+    /// Opens the fixes popup on the first issue (from the star menu).
+    func showFirstIssue() {
+        guard !issues.isEmpty else { return }
+        focusIssue(0)
+    }
 
     // MARK: - Lifecycle
 
     func configure(_ config: Config, engine: LanguageToolEngine, language: String) {
+        if preSend.onAction == nil { preSend.onAction = { [weak self] in self?.handlePreSend($0) } }
+        let dictionaryChanged = config.dictionary != self.config.dictionary
         self.config = config
+        if dictionaryChanged, !issues.isEmpty {
+            issues = PersonalDictionary.filter(issues, words: config.dictionary)
+            redrawUnderlines()
+        }
         let provider = self.provider ?? LanguageToolProofreadProvider(engine: engine, language: language)
         self.provider = provider
         Task { await provider.configure(engine: engine, language: language) }
@@ -138,6 +192,7 @@ final class ProofreadController {
     }
 
     func stop() {
+        preSend.stop()
         end()
         stopClickMonitor()
         stopTypingMonitor()
@@ -152,7 +207,7 @@ final class ProofreadController {
     /// the popup opens instantly; otherwise the click doubles as a check request.
     private func clickedInText() {
         guard config.enabled, AccessibilityPermission.isGranted, appAllowed() else { return }
-        guard case .axField(let found) = ProofreadAX.focus() else { return }
+        guard case .axField(let found) = ProofreadAX.focus(), found.isEditable else { return }
         guard found.text.trimmingCharacters(in: .whitespacesAndNewlines).count >= config.minLength else { return }
 
         var probe: NSRange
@@ -167,9 +222,11 @@ final class ProofreadController {
             probe = word
             // The caret comes from the app's selection, which in Chromium is indexed differently
             // from the value we measured the word in. Translate it back into our offsets, so the
-            // popup belongs to the word actually clicked.
+            // popup belongs to the word actually clicked. With an offset map `focus()` has already
+            // done that exactly.
             let clicked = (found.text as NSString).substring(with: word)
-            if let appRange = ProofreadAX.alignedRange(word, expecting: clicked, in: found.element),
+            if found.offsetMap == nil,
+               let appRange = ProofreadAX.alignedRange(word, expecting: clicked, in: found.element),
                appRange != word,
                let ourRange = WordBoundary.wordRange(at: word.location - (appRange.location - word.location),
                                                      in: found.text) {
@@ -198,7 +255,7 @@ final class ProofreadController {
     /// fresh result to reopen the popup on the issue now sitting at that position -- see `check`.
     private func typingPaused(resumeIndex: Int? = nil) {
         guard config.enabled, AccessibilityPermission.isGranted, appAllowed() else { return }
-        guard case .axField(let found) = ProofreadAX.focus() else { clearLive(); return }
+        guard case .axField(let found) = ProofreadAX.focus(), found.isEditable else { clearLive(); return }
         guard found.text.trimmingCharacters(in: .whitespacesAndNewlines).count >= config.minLength else {
             clearLive()
             return
@@ -229,13 +286,23 @@ final class ProofreadController {
         let gen = generation
         checkTask?.cancel()
         pendingSelectionCheck = selection != nil
+        // Glued list markers ("1.Buy") get a space for the check in any app; it only matters where an
+        // app reports them that way.
+        let breaks = (target?.breaks ?? .none).addingSpaces(ListMarkers.markerEnds(in: text))
+        let chromiumElement = target.flatMap { ProofreadAX.isChromium(pid: $0.pid) ? $0.element : nil }
+        let offsetMap = target?.offsetMap
 
         checkTask = Task { [weak self] in
             guard let self else { return }
             defer { if gen == self.generation { self.pendingSelectionCheck = false } }
             do {
-                let found = try await provider.check(text)
+                var found = breaks.mapBack(try await provider.check(breaks.checkText(text)), to: text)
                 guard !Task.isCancelled, gen == self.generation else { return }
+                if let element = chromiumElement {
+                    ProofreadAX.cachingLeaves {
+                        found.removeAll { ProofreadAX.crossesVisualBreak($0, text: text, in: element, map: offsetMap) }
+                    }
+                }
                 let rebased = offset == 0 ? found : ProofreadCache.rebase(found, to: offset)
                 self.lastError = nil
                 self.applyResults(rebased, selection: selection, announceMiss: announceMiss, resumeIndex: resumeIndex)
@@ -254,7 +321,8 @@ final class ProofreadController {
     private func applyResults(_ found: [TextIssue], selection: NSRange?, announceMiss: Bool = false,
                               resumeIndex: Int? = nil) {
         // Cap once at the door so the popup, arrow navigation and accept all see the same list.
-        issues = IssueMerger.capReplacements(found, limit: config.maxReplacements)
+        issues = IssueMerger.capReplacements(PersonalDictionary.filter(skips.filter(found), words: config.dictionary),
+                                             limit: config.maxReplacements)
         lastCheckedText = target?.text ?? ""
         redrawUnderlines()
 
@@ -293,22 +361,86 @@ final class ProofreadController {
         return true
     }
 
+    /// BindAll's own menu (the star's) is tracking: its Return picks an item, never "send".
+    func setMenuOpen(_ open: Bool) {
+        menuOpen = open
+        syncPreSend()
+    }
+
+    func setSuggestionVisible(_ visible: Bool) {
+        suggestionVisible = visible
+        syncPreSend()
+    }
+
+    /// Arms the pre-send check while a chat app's field shows issues and nothing else wants Return.
+    private func syncPreSend() {
+        let pid = target?.pid
+        let inChat = pid.flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }
+            .map { PreSendPolicy.chatApps.contains($0) || Self.extraChatApps.contains($0) } ?? false
+        let armed = config.enabled && config.preSend && inChat && !issues.isEmpty && !popupShown && !suggestionVisible && !menuOpen
+            && NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
+        preSend.update { state in
+            state.armed = armed
+            state.pid = pid ?? 0
+            if !armed && !inChat { state.warning = false }
+        }
+    }
+
+    /// Only the E2E build sets this (scripts/e2e.sh): TextEdit stands in for a chat app there, where
+    /// a Return that gets through is a visible newline instead of a sent message.
+    private static let extraChatApps = Set(UserDefaults.standard.stringArray(forKey: "PreSendExtraApps") ?? [])
+
+    private func handlePreSend(_ action: PreSendPolicy.Action) {
+        switch action {
+        case .warn:
+            UsageLog.record(.proofread, .shown, detail: "presend")
+            popover.showMessage(PreSendPolicy.warningText(count: issues.count), anchor: currentAnchor(), fontSize: config.fontSize)
+        case .send:
+            UsageLog.record(.proofread, .dismissed, reason: "sentAnyway", detail: "presend")
+            popover.hide()
+        case .review:
+            UsageLog.record(.proofread, .accepted, detail: "presend:review")
+            popover.hide()
+            showFirstIssue()
+        case .fixAll:
+            UsageLog.record(.proofread, .accepted, detail: "presend:fixAll")
+            popover.hide()
+            fixAll()
+        case .dismiss, .passAndDismiss:
+            popover.hide()
+        case .pass:
+            break
+        }
+    }
+
     private func redrawUnderlines() {
+        defer { syncPreSend() }
         guard !issues.isEmpty, let element = target?.element else {
             underlines.hide()
             return
         }
-        underlines.show(issues: issues, element: element)
+        let unplaced = underlines.show(issues: issues, element: element, map: target?.offsetMap)
+        // An issue that cannot be found in the field would neither underline nor apply; dropping it
+        // keeps "N of M" equal to what is on screen.
+        if !unplaced.isEmpty {
+            Self.log.debug("dropping \(unplaced.count, privacy: .public) issue(s) that could not be placed in the field")
+            issues.removeAll { unplaced.contains($0.id) }
+            if issues.isEmpty { underlines.hide() }
+        }
     }
 
     // MARK: - Session
 
     private func focusIssue(_ index: Int) {
         guard index >= 0, index < issues.count else { endNavigation(); return }
+        if !popupShown { UsageLog.record(.proofread, .shown) }
+        popupShown = true
+        // Stepping to another issue keeps you inside the fixes if you were there.
         currentIndex = index
         selectedReplacement = 0
         showCurrent()
         setActive(true)
+        syncPreSend()
     }
 
     /// Shows the popup for the current issue. Never highlights the word in the user's field: editors
@@ -321,62 +453,96 @@ final class ProofreadController {
         guard currentIndex < issues.count else { endNavigation(); return }
         let issue = issues[currentIndex]
 
-        popover.show(issue: issue, selected: selectedReplacement,
+        syncKeySnapshot()
+        popover.show(issue: issue, selected: selectedReplacement, softSelection: !browsing,
                      position: "\(currentIndex + 1) of \(issues.count)",
                      anchor: anchor(for: issue),
                      layout: config.layout,
                      fontSize: config.fontSize,
                      onHover: { [weak self] index in self?.hoverReplacement(index) },
-                     onAccept: { [weak self] index in self?.acceptReplacement(index) })
+                     onAccept: { [weak self] index in self?.acceptReplacement(index) },
+                     onClose: { [weak self] in self?.endNavigation(reason: "closeButton") },
+                     fixAllCount: FixAll.fixable(issues).count,
+                     onAddWord: issue.kind == .spelling ? { [weak self] in self?.addCurrentToDictionary() } : nil,
+                     onFixAll: { [weak self] in self?.fixAll() })
+        syncKeySnapshot() // where the popup landed decides which arrow goes into it
     }
+
+    /// The "Skip" row comes after the fixes, so its index is the number of fixes.
+    private func skipIndex(of issue: TextIssue) -> Int { issue.replacements.count }
 
     /// Mouse hover over a row: mirror it into the keyboard selection.
     private func hoverReplacement(_ index: Int) {
-        guard let issue = issues[safe: currentIndex], index >= 0, index < issue.replacements.count,
-              index != selectedReplacement else { return }
+        guard let issue = issues[safe: currentIndex], index >= 0, index <= skipIndex(of: issue),
+              index != selectedReplacement || !browsing else { return }
+        // Pointing at a fix is choosing among them, the same as going in with ↓.
+        browsing = true
         selectedReplacement = index
         showCurrent()
     }
 
     /// Mouse click on a row: same path as selecting it with arrows and pressing Return.
     private func acceptReplacement(_ index: Int) {
-        guard let issue = issues[safe: currentIndex], index >= 0, index < issue.replacements.count else { return }
+        guard let issue = issues[safe: currentIndex], index >= 0, index <= skipIndex(of: issue) else { return }
         selectedReplacement = index
         accept()
     }
 
     private func move(_ delta: Int) {
-        let issue = issues[safe: currentIndex]
-        guard let count = issue?.replacements.count, count > 0 else { return }
-        selectedReplacement = max(0, min(count - 1, selectedReplacement + delta))
+        guard let issue = issues[safe: currentIndex] else { return }
+        selectedReplacement = max(0, min(skipIndex(of: issue), selectedReplacement + delta))
         showCurrent()
     }
 
     /// Moves the fix selection inside the two-row tile grid.
+    /// The Skip row sits below the grid: down from the bottom row reaches it, up leaves it.
     private func moveGrid(dx: Int, dy: Int) {
-        guard let issue = issues[safe: currentIndex], issue.replacements.count > 0 else { return }
-        selectedReplacement = PopupLayout.tileIndex(from: selectedReplacement, deltaX: dx, deltaY: dy,
-                                                    count: issue.replacements.count,
-                                                    topRowCount: popover.lastTileTopCount)
+        guard let issue = issues[safe: currentIndex] else { return }
+        let skip = skipIndex(of: issue)
+        if selectedReplacement == skip {
+            guard dy < 0, skip > 0 else { return }
+            selectedReplacement = skip - 1
+        } else {
+            let next = PopupLayout.tileIndex(from: selectedReplacement, deltaX: dx, deltaY: dy,
+                                             count: issue.replacements.count,
+                                             topRowCount: popover.lastTileTopCount)
+            selectedReplacement = (next == selectedReplacement && dy > 0) ? skip : next
+        }
         showCurrent()
     }
 
     /// Routes an arrow key by layout. The column keeps fixes on the vertical axis and problem
     /// stepping on the horizontal one; the line swaps them; the tile uses both axes for fixes (Tab
     /// still steps between problems).
+    /// Only reached while browsing the fixes: the policy already decided the arrow belongs to them.
     private func moveArrow(dx: Int, dy: Int) {
         switch config.layout {
-        case .column:
-            if dx != 0 { step(dx) } else { move(dy) }
-        case .line:
-            if dy != 0 { step(dy) } else { move(dx) }
-        case .tile:
-            moveGrid(dx: dx, dy: dy)
+        case .column: move(dy)
+        case .line: move(dx)
+        case .tile: moveGrid(dx: dx, dy: dy)
         }
     }
 
-    /// Moves to another issue, wrapping around: with the popup open, Tab and the horizontal arrows
-    /// walk the problem words, while the vertical ones choose among that word's fixes.
+    /// Going into the fixes shows the selection in full; backing out returns to the first fix, which
+    /// Return would apply, shown softly.
+    private func setBrowsing(_ on: Bool) {
+        guard popupShown, browsing != on else { return }
+        browsing = on
+        if !on { selectedReplacement = 0 }
+        showCurrent()
+    }
+
+    /// Publishes what the key tap needs to decide, after anything that changes it.
+    private func syncKeySnapshot() {
+        var snap = shared.snapshot
+        snap.browsing = browsing
+        snap.atFirst = selectedReplacement == 0
+        snap.layout = config.layout
+        snap.opensUpward = popover.placedAbove
+        shared.snapshot = snap
+    }
+
+    /// Moves to another issue, wrapping around: Tab and Shift+Tab walk the problem words.
     private func step(_ delta: Int) {
         guard !issues.isEmpty else { endNavigation(); return }
         let next = (currentIndex + delta + issues.count) % issues.count
@@ -386,6 +552,10 @@ final class ProofreadController {
     private func accept() {
         guard !isApplying else {
             Self.log.debug("accept ignored: a fix is already being applied")
+            return
+        }
+        if let issue = issues[safe: currentIndex], selectedReplacement == skipIndex(of: issue) {
+            skipCurrent()
             return
         }
         guard let issue = issues[safe: currentIndex],
@@ -413,9 +583,55 @@ final class ProofreadController {
         }
     }
 
+    /// Every issue's first fix at once. The field is re-read so the result is built on what is there
+    /// now; the preview (or the write) is left to `onFixAll`.
+    private func fixAll() {
+        guard !isApplying, let target, let onFixAll else { return }
+        let text = ProofreadAX.currentText(of: target.element) ?? target.text
+        let outcome = FixAll.apply(issues, to: text)
+        guard outcome.fixed > 0 else { flash("Nothing to fix."); return }
+        let anchor = currentAnchor()
+        endNavigation(reason: "fixAll")
+        UsageLog.record(.proofread, .shown, detail: "fixAll:\(outcome.fixed)")
+        onFixAll(StarContext(element: target.element, pid: target.pid, text: text,
+                             selection: NSRange(location: 0, length: 0), offsetMap: target.offsetMap,
+                             anchor: NSPoint(x: anchor.minX, y: anchor.minY)),
+                 outcome.text, outcome.fixed)
+    }
+
+    /// The current word goes into the personal dictionary; every underline on it goes at once.
+    private func addCurrentToDictionary() {
+        guard let issue = issues[safe: currentIndex] else { return }
+        let word = issue.original
+        UsageLog.record(.proofread, .skipped, reason: "dictionary")
+        config.dictionary.insert(PersonalDictionary.normalize(word))
+        onAddWord?(word)
+        let index = currentIndex
+        issues = PersonalDictionary.filter(issues, words: config.dictionary)
+        redrawUnderlines()
+        if issues.isEmpty { endNavigation() } else { focusIssue(min(index, issues.count - 1)) }
+    }
+
+    /// "Not here": forgets this one place for the rest of the session and moves on to whatever
+    /// problem now sits at the same position, or closes the popup when none is left.
+    private func skipCurrent() {
+        guard let issue = issues[safe: currentIndex] else { endNavigation(); return }
+        skips.insert(issue)
+        UsageLog.record(.proofread, .skipped)
+        let index = currentIndex
+        issues.remove(at: index)
+        redrawUnderlines()
+        if issues.isEmpty {
+            endNavigation()
+        } else {
+            focusIssue(min(index, issues.count - 1))
+        }
+    }
+
     private func handleApplyResult(_ result: IssueApplier.Result, issue: TextIssue, replacement: String) {
         switch result {
         case .applied(let replacedRange):
+            UsageLog.record(.proofread, .applied, detail: issue.ruleId.map { "rule:\($0)" })
             // Captured before endNavigation() resets currentIndex: the issue that was next in order
             // ends up at this same position once the fixed one is gone from the fresh, re-checked list.
             let fixedIndex = currentIndex
@@ -430,6 +646,7 @@ final class ProofreadController {
             underlines.hide()
             recheckAfterWrite(previousText: lastCheckedText, resumeAt: fixedIndex)
         case .stale:
+            UsageLog.record(.proofread, .failed, reason: "stale")
             // The message promises a re-check, so actually run one instead of waiting for the user
             // to type again -- they just clicked a fix and are looking at the field, not typing.
             // The issue that failed keeps its place in the list, so the popup can reopen on it.
@@ -441,6 +658,7 @@ final class ProofreadController {
                 self?.typingPaused(resumeIndex: staleIndex)
             }
         case .failed(let reason):
+            UsageLog.record(.proofread, .failed, reason: "notApplied")
             flash(reason)
         }
     }
@@ -476,11 +694,16 @@ final class ProofreadController {
 
     /// Closes the popup and disarms the key tap, leaving the underlines and the found issues alone:
     /// they belong to the field, not to this popup.
-    private func endNavigation() {
+    /// `reason`, when given, records that an open popup was dismissed and why.
+    private func endNavigation(reason: String? = nil) {
+        if popupShown, let reason { UsageLog.record(.proofread, .dismissed, reason: reason) }
+        popupShown = false
+        browsing = false
         currentIndex = 0
         selectedReplacement = 0
         popover.hide()
         setActive(false)
+        syncPreSend()
     }
 
     /// Forgets everything found in the field and takes the underlines down. Used when the focus
@@ -496,6 +719,7 @@ final class ProofreadController {
         lastCheckedText = ""
         target = nil
         underlines.hide()
+        syncPreSend()
     }
 
     private func end() {
@@ -576,38 +800,41 @@ final class ProofreadController {
 
         let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
-        // Any modifier (including Shift) passes through, so Shift+Return still makes a newline.
-        guard !flags.contains(.maskCommand), !flags.contains(.maskControl),
-              !flags.contains(.maskAlternate), !flags.contains(.maskShift) else {
-            return Unmanaged.passUnretained(event)
-        }
+        let snap = shared.snapshot
 
-        switch keyCode {
-        case kVK_UpArrow:
-            DispatchQueue.main.async { [weak self] in self?.moveArrow(dx: 0, dy: -1) }
+        switch ProofreadKeyPolicy.action(keyCode: keyCode, command: flags.contains(.maskCommand),
+                                         control: flags.contains(.maskControl),
+                                         option: flags.contains(.maskAlternate), shift: flags.contains(.maskShift),
+                                         browsing: snap.browsing, atFirst: snap.atFirst, layout: snap.layout,
+                                         opensUpward: snap.opensUpward) {
+        case .enter:
+            DispatchQueue.main.async { [weak self] in self?.setBrowsing(true) }
             return nil
-        case kVK_DownArrow:
-            DispatchQueue.main.async { [weak self] in self?.moveArrow(dx: 0, dy: 1) }
+        case .leave:
+            DispatchQueue.main.async { [weak self] in self?.setBrowsing(false) }
             return nil
-        case kVK_LeftArrow:
-            DispatchQueue.main.async { [weak self] in self?.moveArrow(dx: -1, dy: 0) }
+        case .move(let dx, let dy):
+            DispatchQueue.main.async { [weak self] in self?.moveArrow(dx: dx, dy: dy) }
             return nil
-        case kVK_RightArrow:
-            DispatchQueue.main.async { [weak self] in self?.moveArrow(dx: 1, dy: 0) }
-            return nil
-        case kVK_Return, kVK_ANSI_KeypadEnter:
+        case .apply:
             DispatchQueue.main.async { [weak self] in self?.accept() }
             return nil
-        case kVK_Tab:
+        case .fixAll:
+            DispatchQueue.main.async { [weak self] in self?.fixAll() }
+            return nil
+        case .nextIssue:
             DispatchQueue.main.async { [weak self] in self?.step(1) }
             return nil
-        case kVK_Escape:
-            // Closes the popup only: the underlines stay, they are not part of this popup.
-            DispatchQueue.main.async { [weak self] in self?.endNavigation() }
+        case .previousIssue:
+            DispatchQueue.main.async { [weak self] in self?.step(-1) }
             return nil
-        default:
-            // Anything else means the user moved on: close, but let the key reach the field.
-            DispatchQueue.main.async { [weak self] in self?.endNavigation() }
+        case .close(let reason):
+            // Closes the popup only: the underlines stay, they are not part of this popup.
+            DispatchQueue.main.async { [weak self] in self?.endNavigation(reason: reason) }
+            return nil
+        case .passAndClose(let reason):
+            // The user moved on (caret, selection, shortcut, typing): close, and let the key through.
+            DispatchQueue.main.async { [weak self] in self?.endNavigation(reason: reason) }
             return Unmanaged.passUnretained(event)
         }
     }
@@ -631,6 +858,12 @@ final class ProofreadController {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.end() }
         }
+        // Switching the input language means the user is about to type, not to pick a fix.
+        inputSourceObserver = DistributedNotificationCenter.default().addObserver(
+            forName: AutocompleteController.inputSourceChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.endNavigation(reason: "languageSwitch") }
+        }
     }
 
     private func stopClickMonitor() {
@@ -638,6 +871,8 @@ final class ProofreadController {
         mouseMonitor = nil
         if let appSwitchObserver { NSWorkspace.shared.notificationCenter.removeObserver(appSwitchObserver) }
         appSwitchObserver = nil
+        if let inputSourceObserver { DistributedNotificationCenter.default().removeObserver(inputSourceObserver) }
+        inputSourceObserver = nil
         clickDebounce?.cancel()
         clickDebounce = nil
     }

@@ -60,10 +60,7 @@ final class AutocompleteLearningStore {
         if let fileURL {
             self.fileURL = fileURL
         } else {
-            let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            let dir = base.appendingPathComponent("BindAll", isDirectory: true)
-            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            self.fileURL = dir.appendingPathComponent("autocomplete.json")
+            self.fileURL = AppPaths.supportDirectory.appendingPathComponent("autocomplete.json")
         }
         load()
         // Explicit URLs override the bundle lookups so tests/CLI can point at the same data files.

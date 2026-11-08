@@ -19,8 +19,9 @@ final class HotkeyMonitor {
 
     private static let log = Logger(subsystem: "com.evgeny.bindall", category: "hotkeys")
 
-    /// Called on the main thread when a burst of identical presses ends.
-    var onBurst: ((UInt16, HotkeyModifiers, Int) -> Void)?
+    /// Called on the main thread when a burst of identical presses ends, with the pasteboard's change
+    /// count from before its first press: a Cmd+C burst that copied nothing leaves it unchanged.
+    var onBurst: ((UInt16, HotkeyModifiers, Int, Int) -> Void)?
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -29,6 +30,7 @@ final class HotkeyMonitor {
     private struct BurstState {
         var count: Int
         var workItem: DispatchWorkItem?
+        var changeCount: Int
     }
     private var bursts: [String: BurstState] = [:]
 
@@ -100,6 +102,8 @@ final class HotkeyMonitor {
     // MARK: - Private
 
     private func handle(event: CGEvent) {
+        // A held key repeats, and BindAll's own Cmd+C (copying for a menu action) is not the user's.
+        if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 || InjectedEvents.isInjected(event) { return }
         let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let relevant: CGEventFlags = [.maskCommand, .maskShift, .maskControl, .maskAlternate]
         let flags = event.flags.intersection(relevant)
@@ -117,10 +121,13 @@ final class HotkeyMonitor {
         let key = "\(keyCode)|\(mods.command)\(mods.option)\(mods.control)\(mods.shift)"
         let window = Self.burstWindow
         let maxRepeat = match.maxRepeat
+        // Read before the app under the tap handles the key, so a copy it makes counts as a change.
+        let changeCount = NSPasteboard.general.changeCount
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            var state = self.bursts[key] ?? BurstState(count: 0, workItem: nil)
+            var state = self.bursts[key] ?? BurstState(count: 0, workItem: nil, changeCount: changeCount)
+            let startCount = state.changeCount
             state.workItem?.cancel()
             state.count += 1
             let count = state.count
@@ -128,14 +135,14 @@ final class HotkeyMonitor {
             // Highest expected press count reached: fire now instead of waiting out the window.
             if count >= maxRepeat {
                 self.bursts[key] = nil
-                self.onBurst?(keyCode, mods, count)
+                self.onBurst?(keyCode, mods, count, startCount)
                 return
             }
 
             let work = DispatchWorkItem { [weak self] in
                 guard let self else { return }
                 self.bursts[key] = nil
-                self.onBurst?(keyCode, mods, count)
+                self.onBurst?(keyCode, mods, count, startCount)
             }
             state.workItem = work
             self.bursts[key] = state

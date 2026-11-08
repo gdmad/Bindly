@@ -1,6 +1,6 @@
 import AppKit
 import SwiftUI
-import Combine
+import Observation
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWindowDelegate {
@@ -9,7 +9,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindow?
-    private var pulseTimer: Timer?
+    private var twinkleTimer: Timer?
+    private var twinkleStart: Date?
+    /// Seconds into the wave at which it ends, once the action is over.
+    private var twinkleStopAt: Double?
     /// Alive only while the status menu is open -- see `menuWillOpen`.
     private var menuKeyMonitor: Any?
     private lazy var historyPopover: NSPopover = {
@@ -17,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         popover.behavior = .transient
         return popover
     }()
-    private var cancellables = Set<AnyCancellable>()
+    private var stateObservers: [Task<Void, Never>] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -30,27 +33,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // only if not yet granted. No window is opened automatically.
         AccessibilityPermission.requestIfNeeded()
 
-        // Swap the menu-bar icon while an action is being processed.
-        appState.$isProcessing
-            .removeDuplicates()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] busy in self?.updateStatusIcon(busy: busy) }
-            .store(in: &cancellables)
-
-        // The icon also carries the master switch: dimmed while off. The main-thread hop matters --
-        // @Published fires in willSet, so the new value is only readable after it.
-        appState.$settings
-            .map(\.enabled)
-            .removeDuplicates()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
+        // The menu-bar icon shows both "processing" (swapped while an action runs) and the master
+        // switch (dimmed while off), so it is redrawn whenever either changes.
+        let appState = self.appState
+        stateObservers.append(Task { [weak self] in
+            var last: (busy: Bool, enabled: Bool)?
+            for await state in Observations({ (busy: appState.isProcessing, enabled: appState.settings.enabled) }) {
                 guard let self else { return }
-                self.updateStatusIcon(busy: self.appState.isProcessing)
+                if let last, last == state { continue }
+                last = state
+                self.updateStatusIcon(busy: state.busy)
             }
-            .store(in: &cancellables)
+        })
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        stateObservers.forEach { $0.cancel() }
         coordinator.stop()
         appState.localServer.stopForTermination()
         AutocompleteLearningStore.shared.flush() // save any words learned in the debounce window
@@ -83,37 +81,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     /// for days while its shortcuts silently do nothing.
     private static let disabledAlpha: CGFloat = 0.4
 
-    /// The icon is always "sparkles" -- idle, off and busy differ only in alpha, not symbol. It is
-    /// the button's own image, so the system click highlight and template inversion work correctly.
-    /// While busy, it pulses via the button's alpha (symbol-effect animations would require an
-    /// overlay view, which breaks the highlight).
+    /// The icon is always the three sparkles (`StatusIconRenderer`) -- idle, off and busy differ in
+    /// alpha and size, not shape. It is the button's own image, so the system click highlight and
+    /// template inversion work correctly. While busy the sparkles flare one after another
+    /// (`StatusIconTwinkle`): fresh frames of the button's image, since symbol effects would need an
+    /// overlay view, which breaks the highlight. A wave plays at least one round and ends at the end
+    /// of one, so a quick action is still seen; work that resumes meanwhile carries on the same wave.
     private func updateStatusIcon(busy: Bool) {
         guard let button = statusItem?.button else { return }
-        let enabled = appState.settings.enabled
-        let description = busy ? "BindAll — working" : (enabled ? "BindAll" : "BindAll — off")
-        let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-        var image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: description)
-        image = image?.withSymbolConfiguration(config)
-        image?.isTemplate = true
-        button.image = image
-
-        pulseTimer?.invalidate()
-        pulseTimer = nil
         if busy {
-            var dimmed = false
-            pulseTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: true) { _ in
-                Task { @MainActor in
-                    guard let button = self.statusItem?.button else { return }
-                    dimmed.toggle()
-                    NSAnimationContext.runAnimationGroup { context in
-                        context.duration = 0.4
-                        button.animator().alphaValue = dimmed ? 0.4 : 1.0
-                    }
-                }
-            }
+            twinkleStopAt = nil
+            button.alphaValue = 1
+            if twinkleStart == nil { startTwinkle() }
+        } else if let start = twinkleStart {
+            twinkleStopAt = StatusIconTwinkle.stopTime(endedAt: Date.now.timeIntervalSince(start))
         } else {
-            button.alphaValue = enabled ? 1.0 : Self.disabledAlpha
+            showIdleIcon()
         }
+    }
+
+    private func startTwinkle() {
+        twinkleStart = .now
+        twinkleTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 20, repeats: true) { _ in
+            Task { @MainActor in self.twinkleTick() }
+        }
+        twinkleTick()
+    }
+
+    private func twinkleTick() {
+        guard let start = twinkleStart, let button = statusItem?.button else { return }
+        let elapsed = Date.now.timeIntervalSince(start)
+        if let stopAt = twinkleStopAt, elapsed >= stopAt {
+            showIdleIcon()
+            return
+        }
+        button.image = StatusIconRenderer.image(frames: StatusIconTwinkle.frames(at: elapsed),
+                                                description: "BindAll — working")
+    }
+
+    private func showIdleIcon() {
+        twinkleTimer?.invalidate()
+        twinkleTimer = nil
+        twinkleStart = nil
+        twinkleStopAt = nil
+        guard let button = statusItem?.button else { return }
+        let enabled = appState.settings.enabled
+        button.image = StatusIconRenderer.image(description: enabled ? "BindAll" : "BindAll — off")
+        button.alphaValue = enabled ? 1.0 : Self.disabledAlpha
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -130,6 +144,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         enabled.state = appState.settings.enabled ? .on : .off
         menu.addItem(enabled)
 
+        let stars = NSMenuItem(title: "Stars", action: #selector(toggleStars), keyEquivalent: "")
+        stars.target = self
+        stars.state = appState.settings.starFieldEnabled || appState.settings.starSelectionEnabled ? .on : .off
+        menu.addItem(stars)
+
         // Only surface the Accessibility action when it still needs granting (first run / re-sign).
         if !appState.accessibilityGranted {
             let grant = NSMenuItem(title: "Grant Accessibility…", action: #selector(grantAccessibility), keyEquivalent: "")
@@ -144,12 +163,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // drawn too, on purpose. A real key equivalent makes the system reserve its own column right
         // of the widest title in the menu -- and our drawn line counts as a title -- so it would
         // always sit to the right of ours, and moving ours only moves it further. With no real key
-        // equivalents in the menu there is no second column, and all six line up. The two keys still
+        // equivalents in the menu there is no second column, and they all line up. The two keys still
         // work while the menu is open: see `menuWillOpen`.
         let s = appState.settings
         let leading: [(title: String, shortcut: String, action: Selector)] = [
             ("Fix selection", HotkeyFormatter.string(s.defaultActionHotkey), #selector(menuFix)),
             ("Translate selection", HotkeyFormatter.string(s.translateHotkey), #selector(menuTranslate)),
+            ("Explain selection", s.explainHotkey.map(HotkeyFormatter.string) ?? "", #selector(menuExplain)),
+            ("Summarize selection", s.summarizeHotkey.map(HotkeyFormatter.string) ?? "", #selector(menuSummarize)),
             ("Translate from screen", HotkeyFormatter.string(s.screenTranslateHotkey), #selector(menuScreenTranslate)),
             ("Quick Translate", HotkeyFormatter.string(s.quickTranslateHotkey), #selector(menuQuickTranslate)),
         ]
@@ -160,8 +181,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         // Column = widest "title + gap + shortcut" across every shortcut-bearing item.
         let font = NSFont.menuFont(ofSize: 0)
         let gap: CGFloat = 18
-        let widths = (leading + trailing)
-            .map { (title: $0.title, shortcut: $0.shortcut) }
+        // The star's editing actions, on the selection, for when there is no star to click.
+        let commands = SelectionCommand.allCases.map { command in
+            (command: command, title: command.title, shortcut: s.commandHotkeys[command.settingsKey].map(HotkeyFormatter.string) ?? "")
+        }
+        let widths = ((leading + trailing).map { (title: $0.title, shortcut: $0.shortcut) }
+                      + commands.map { (title: $0.title, shortcut: $0.shortcut) })
             .map { (title, shortcut) in
                 (title as NSString).size(withAttributes: [.font: font]).width + gap
                     + (shortcut as NSString).size(withAttributes: [.font: font]).width
@@ -170,6 +195,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
         for a in leading {
             menu.addItem(actionMenuItem(a.title, shortcut: a.shortcut, action: a.action, tab: column))
+        }
+
+        menu.addItem(.separator())
+        for c in commands {
+            let item = ClosureMenuItem(title: c.title) { [weak self] in self?.coordinator.menuCommand(c.command) }
+            item.attributedTitle = Self.menuTitle(c.title, shortcut: c.shortcut, tab: column)
+            menu.addItem(item)
         }
 
         menu.addItem(.separator())
@@ -239,6 +271,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     // MARK: - Actions
 
+    /// Both stars at once; Settings -> General keeps them separately.
+    @objc private func toggleStars() {
+        let on = !(appState.settings.starFieldEnabled || appState.settings.starSelectionEnabled)
+        appState.settings.starFieldEnabled = on
+        appState.settings.starSelectionEnabled = on
+        rebuildMenu()
+    }
+
     @objc private func toggleEnabled() {
         appState.settings.enabled.toggle()
         rebuildMenu()
@@ -251,13 +291,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     @objc func showSettings() {
         if settingsWindow == nil {
-            let hosting = NSHostingController(rootView: SettingsView().environmentObject(appState))
-            let window = EscClosableWindow(contentViewController: hosting)
+            // Sized before the content is attached: a window built around the hosting controller lays
+            // the TabView out at zero width first, which AppKit reports as "Invalid view geometry:
+            // width is negative" once per tab.
+            let size = SettingsView.defaultSize
+            let hosting = NSHostingController(rootView: SettingsView().environment(appState))
+            hosting.view.frame = NSRect(origin: .zero, size: size)
+            let window = EscClosableWindow(contentRect: NSRect(origin: .zero, size: size),
+                                           styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                                           backing: .buffered, defer: false)
+            window.contentViewController = hosting
             window.title = "BindAll Settings"
-            window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.isReleasedWhenClosed = false
             window.delegate = self
-            window.setContentSize(NSSize(width: 560, height: 558))
             // Remember where the user put it, instead of yanking it back to the center every time.
             if !window.setFrameUsingName(Self.settingsFrameName) { window.center() }
             window.setFrameAutosaveName(Self.settingsFrameName)
@@ -327,6 +373,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     @objc private func menuFix() { coordinator.menuFix() }
     @objc private func menuTranslate() { coordinator.menuTranslate() }
+    @objc private func menuExplain() { coordinator.menuExplain() }
+    @objc private func menuSummarize() { coordinator.menuSummarize() }
     @objc private func menuScreenTranslate() { coordinator.menuScreenTranslate() }
     @objc private func menuQuickTranslate() { coordinator.menuQuickTranslate() }
 }

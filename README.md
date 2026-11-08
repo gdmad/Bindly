@@ -16,10 +16,13 @@ No Dock icon: BindAll lives in the menu bar (`LSUIElement`); the icon pulses whi
 
 - **Fix / transform text** — select text, press the shortcut, and the corrected result replaces it in
   place. Uses the Apple on-device model by default, or a cloud provider.
-- **Action keys** — short suffixes after a separator (default `--`) run a saved instruction, e.g.
-  `Ghbdtn rfr ltkf -- w`. A free-form instruction also works: `Hello -- translate to Chinese`.
-  Built-in keys: `w` (fix keyboard layout), `u` (UPPERCASE), `l` (lowercase), `о` (formal tone),
-  `гг` (polite request). Each key can also get **its own global shortcut**.
+- **Action keys** — saved, named instructions, run from the star menu or **their own global
+  shortcut**. Built in: Formal tone, Polite request.
+- **Text tools** — UPPERCASE, lowercase and Fix keyboard layout, done without AI and exactly; in the
+  star menu and with optional shortcuts.
+- **Explain / Summarize** — for text someone else wrote: select it and pick Explain selection or
+  Summarize selection in the menu bar, or give them a shortcut on the Shortcuts tab. The result opens
+  in a window; the text is left as it is.
 - **Translate** — on-device translation (Apple Translation) into your target language with source
   auto-detection, shown in a popup near the cursor with the original text and Copy.
 - **Quick Translate** — a window to type text and translate it on the fly, with a Source/Target
@@ -51,6 +54,17 @@ No Dock icon: BindAll lives in the menu bar (`LSUIElement`); the icon pulses whi
   dictionary language, and per-app allow/deny.
 - **Launch at login**, automatic light/dark, and in-app **Check for Updates**.
 
+## Where it works
+
+Checked so far (more apps as they are tested):
+
+| App | Autocomplete | Proofread | Stars |
+|---|---|---|---|
+| TextEdit | inline + list | yes | yes |
+| Slack | list | yes (lists, quotes, code blocks, emoji) | yes |
+| Claude (desktop) | list | yes | yes |
+| Google Docs | no (canvas, no accessible text) | no | no |
+
 ## Default shortcuts
 
 All shortcuts are configurable in Settings → Actions → Shortcuts.
@@ -65,7 +79,7 @@ All shortcuts are configurable in Settings → Actions → Shortcuts.
 
 Because `Cmd+C` is the real copy shortcut, pressing it the configured number of times both copies the
 selection and triggers BindAll. Per-action-key shortcuts (any combo you record) copy the selection
-themselves, so no separator is needed.
+themselves.
 
 ## Install
 
@@ -135,13 +149,13 @@ BindAll/
   Selection/     TextInjector (synthetic Cmd+C / Cmd+V), InjectedEvents
   Engines/       AIEngine, AppleFoundationEngine, OpenAICompatibleEngine, LanguageToolEngine,
                  TranslationService, OCRService
-  Actions/       PromptParser, ActionRouter (EngineFactory), MaskAISlop
+  Actions/       ActionRouter (EngineFactory), MaskAISlop
   Autocomplete/  AutocompleteController (CGEventTap), AutocompleteEngine, AutocompleteLearningStore,
                  AutocompleteOverlay, LearnedWordAudit
   Proofread/     ProofreadController, ProofreadAX, IssueApplier, IssueMerger, UnderlineOverlay
   UI/            SettingsView + one view per tab, PopupKit (shared popup chrome/placement)
   Store/         Settings, ActionKey, KeychainStore, HistoryStore, LoginItemManager, AppLanguages
-Tests/           run_tests.sh, main.swift, autocomplete ranking evaluator
+Tests/           run_tests.sh, Unit/ (unit tests by area), E2E/, autocomplete ranking evaluator
 ```
 
 The visible UI (status item, settings window, popups) is driven from `AppDelegate` with AppKit; the

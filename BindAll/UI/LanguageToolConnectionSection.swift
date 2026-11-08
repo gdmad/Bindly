@@ -4,7 +4,7 @@ import SwiftUI
 /// Proofread tab: LanguageTool serves only that feature, so its connection lives with it, the way
 /// every other feature keeps its options on its own tab.
 struct LanguageToolConnectionSection: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) private var appState
 
     // URL, username and token are edited via drafts: a TextField bound straight to the published
     // settings commits its text while SwiftUI switches tabs, publishing from within a view update.
@@ -32,7 +32,7 @@ struct LanguageToolConnectionSection: View {
             .onChange(of: modeDraft) { _, mode in
                 // A stale test verdict is misleading once the mode changed.
                 resetTest()
-                DispatchQueue.main.async { appState.settings.languageToolMode = mode }
+                Task { @MainActor in appState.settings.languageToolMode = mode }
                 // Pre-fill the URL for the chosen mode; the field stays editable. The draft's own
                 // onChange forwards it into settings on the next runloop tick.
                 guard let url = mode.defaultURL else { return }
@@ -47,32 +47,18 @@ struct LanguageToolConnectionSection: View {
                 .pickerStyle(.segmented)
                 .onChange(of: targetDraft) { _, target in
                     resetTest()
-                    DispatchQueue.main.async { appState.settings.languageToolTarget = target }
+                    Task { @MainActor in appState.settings.languageToolTarget = target }
                 }
             }
 
-            LabeledContent("Server URL") {
-                if modeDraft == .selfHosted && targetDraft == .local {
-                    Text(appState.settings.localServerURL)
-                        .foregroundStyle(.secondary).textSelection(.enabled)
-                } else {
-                    TextField("", text: $urlDraft,
-                              prompt: Text("https://api.languagetool.org/v2"))
-                        .labelsHidden().textFieldStyle(.plain).darkField()
-                        .onChange(of: urlDraft) { _, url in
-                            // Deferred: onChange fires inside the view update.
-                            DispatchQueue.main.async { appState.settings.languageToolBaseURL = url }
-                        }
-                }
-            }
             // Credentials belong to Premium only: the public server rejects them, and a self-hosted
             // server is reached by URL.
             if modeDraft == .premium {
                 LabeledContent("Username / email") {
-                    TextField("", text: $usernameDraft)
+                    TextField("Username / email", text: $usernameDraft)
                         .labelsHidden().textFieldStyle(.plain).darkField()
                         .onChange(of: usernameDraft) { _, name in
-                            DispatchQueue.main.async { appState.settings.languageToolUsername = name }
+                            Task { @MainActor in appState.settings.languageToolUsername = name }
                         }
                 }
                 LabeledContent("API token") {
@@ -80,26 +66,21 @@ struct LanguageToolConnectionSection: View {
                     // onDisappear fires when the window is simply closed, and a token typed and left
                     // behind used to be discarded silently. The engine is rebuilt once, on submit or
                     // when the tab goes away, rather than on every keystroke.
-                    SecureField("", text: $tokenDraft)
+                    SecureField("API token", text: $tokenDraft)
                         .labelsHidden().textFieldStyle(.plain).darkField()
                         .onChange(of: tokenDraft) { _, _ in storeToken() }
                         .onSubmit { commitToken() }
                 }
             }
 
-            HStack {
-                Button(testing ? "Testing…" : "Test connection") { test() }
-                    .disabled(testing)
-                if let ok {
-                    Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundStyle(ok ? .green : .red)
-                }
-            }
-            if !status.isEmpty {
-                Text(status).font(.caption).foregroundStyle(.secondary)
+            if modeDraft == .free {
+                // The public server needs nothing set up; its details are folded away.
+                AdvancedDisclosure("Server URL and test", id: "languageTool") { details }
+            } else {
+                details
             }
         } header: {
-            helpHeader("LanguageTool server", "How BindAll reaches LanguageTool.\n\nFree public: api.languagetool.org, no account, rate-limited, and your text is sent to languagetool.org. Credentials are never sent (the public server rejects them).\n\nPremium: api.languagetoolplus.com (a different host) with the username and token from your LanguageTool Premium account.\n\nSelf-hosted: a server BindAll installs and runs on this Mac, or your own server URL; no credentials. Both stay configured, so you can switch between them.\n\nThe URL is pre-filled per mode but stays editable.")
+            HelpHeader("LanguageTool server", "How BindAll reaches LanguageTool.\n\nFree public: api.languagetool.org, no account, rate-limited, and your text is sent to languagetool.org. Credentials are never sent (the public server rejects them).\n\nPremium: api.languagetoolplus.com (a different host) with the username and token from your LanguageTool Premium account.\n\nSelf-hosted: a server BindAll installs and runs on this Mac, or your own server URL (an address like http://192.168.1.5:8081 is enough); no credentials. Both stay configured, so you can switch between them.\n\nThe URL is pre-filled per mode but stays editable.")
         }
         .onAppear { load() }
         .onChange(of: appState.settings.languageToolTarget) { _, target in targetDraft = target }
@@ -110,6 +91,35 @@ struct LanguageToolConnectionSection: View {
             testTask = nil
             testing = false
             resetTest()
+        }
+    }
+
+    @ViewBuilder private var details: some View {
+        LabeledContent("Server URL") {
+            if modeDraft == .selfHosted && targetDraft == .local {
+                Text(appState.settings.localServerURL)
+                    .foregroundStyle(.secondary).textSelection(.enabled)
+            } else {
+                TextField("Server URL", text: $urlDraft,
+                          prompt: Text("https://api.languagetool.org/v2"))
+                    .labelsHidden().textFieldStyle(.plain).darkField()
+                    .onChange(of: urlDraft) { _, url in
+                        // Deferred: onChange fires inside the view update.
+                        Task { @MainActor in appState.settings.languageToolBaseURL = url }
+                    }
+            }
+        }
+        HStack {
+            Button(testing ? "Testing…" : "Test connection", action: test)
+                .disabled(testing)
+            if let ok {
+                Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .foregroundStyle(ok ? .green : .red)
+                    .accessibilityLabel(ok ? "Connected" : "Failed")
+            }
+        }
+        if !status.isEmpty {
+            Text(status).font(.caption).foregroundStyle(.secondary)
         }
     }
 

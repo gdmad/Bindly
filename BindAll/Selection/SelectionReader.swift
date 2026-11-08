@@ -6,14 +6,17 @@ import AppKit
 /// pasteboard by the time a burst fires. We read it directly, with a short poll to make sure the
 /// last Cmd+C of the burst has landed. The Accessibility focused-element value is used as a fallback.
 enum SelectionReader {
-    /// Returns the selected text, or nil if nothing usable was found.
+    /// Returns the selected text, or nil if nothing usable was found. `previousChangeCount` is the
+    /// pasteboard's count from before the burst: if the copy never changed it, nothing was selected
+    /// (or the field refuses copying), and what is on the pasteboard is an older copy -- not used.
     static func currentSelection(previousChangeCount: Int) -> String? {
         let pb = NSPasteboard.general
-        // Give the last synthetic/real copy a brief moment to update the pasteboard.
+        // Give the last copy a brief moment to update the pasteboard.
         let deadline = Date().addingTimeInterval(0.25)
         while pb.changeCount == previousChangeCount && Date() < deadline {
             usleep(15_000)
         }
+        guard pb.changeCount != previousChangeCount else { return axSelectedText() }
         if let text = pb.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return text
         }

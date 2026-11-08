@@ -192,7 +192,6 @@ struct Settings: Codable, Equatable {
     var defaultEngine: ProviderKind = .apple
 
     // Default action parsing
-    var separator: String = "--"
     var defaultPrompt: String =
         "Fix spelling, grammar and punctuation. Keep the same language and formatting. Return only the corrected text."
     var actionKeys: [ActionKey] = ActionKey.defaults
@@ -210,6 +209,7 @@ struct Settings: Codable, Equatable {
     var autocompleteLearn: Bool = true        // learn accepted/typed words and rank them
     var autocompleteNextWord: Bool = true     // predict the next word after a space
     var autocompleteAcceptReturn: Bool = true // accept with Return in addition to Tab
+    var autocompleteInline: Bool = true       // first suggestion as gray text after the caret, when possible
     var autocompleteContextRanking: Bool = true // rank completions by the preceding words (n-grams)
     var autocompleteAppMode: String = "all"   // "all" | "allow" | "deny"
     var autocompleteApps: [String] = []       // bundle identifiers for allow/deny
@@ -221,9 +221,21 @@ struct Settings: Codable, Equatable {
     var proofreadMinLength: Int = 12           // shortest text worth checking
     var proofreadAppMode: String = "all"       // "all" | "allow" | "deny"
     var proofreadApps: [String] = []           // bundle identifiers for allow/deny
+    var personalDictionary: [String] = []     // words never flagged as misspelled
+    var preSendCheck: Bool = false             // chat apps: Return with issues left asks first
 
     // History of recent results (menu-bar submenu)
     var historyEnabled: Bool = true
+
+    // Push to Talk: hold the key, speak, release. Off until the user turns it on (microphone).
+    var pushToTalkEnabled: Bool = false
+    var pushToTalkKey: PushToTalkKey = .rightOption
+    var pushToTalkLanguage: String = "auto"     // BCP-47 code or "auto" (the keyboard layout)
+    var pushToTalkTranslate: Bool = false
+    var pushToTalkTargetLanguage: String = "same" // "same" = the Translation tab's target
+    // Dictate and translate: its own hold key, always translates, works with Push to Talk off.
+    var voiceTranslateEnabled: Bool = false
+    var voiceTranslateKey: PushToTalkKey = .rightCommand
 
     // Translation. Source may be "auto" (detect). With an explicit source, the configured pair is
     // bidirectional (text is translated to whichever of source/target it is NOT).
@@ -233,6 +245,25 @@ struct Settings: Codable, Equatable {
     // Proofread (LanguageTool): optional, has no shortcut -- it checks as you type. The token (if
     // any) lives in the Keychain; only non-secret config is stored here.
     var correctEnabled: Bool = false
+
+    // Stars: the violet star in a text field's corner (whole text) and at a selection's end.
+    var starFieldEnabled: Bool = true
+    var starSelectionEnabled: Bool = true
+    /// Where stars show, on their own: they used to follow Proofread's list, so hiding stars in one
+    /// app stopped checking there too. Stored settings from then start from that list.
+    var starAppMode: String = "all"
+    var starApps: [String] = []
+    // Preview before replacing text: for star actions, and for the global shortcuts.
+    var previewFromMenu: Bool = true
+    var previewFromHotkeys: Bool = false
+    /// The last custom prompts, newest first (at most 5).
+    var recentPrompts: [String] = []
+    /// Which Mask AI Slop clean-ups run (`MaskAISlopRule` raw values).
+    var maskAISlopRules: [String] = MaskAISlopRule.defaults.map(\.rawValue).sorted()
+    /// "Remove AI tells" also asks the AI to rewrite stock phrases, after the mechanical clean-up.
+    var removeTellsWithAI: Bool = false
+
+    var maskRules: Set<MaskAISlopRule> { Set(maskAISlopRules.compactMap(MaskAISlopRule.init(rawValue:))) }
     var languageToolMode: LanguageToolMode = .free
     var languageToolBaseURL: String = "https://api.languagetool.org/v2"  // used only in self-hosted mode
     var languageToolUsername: String = ""           // Premium account email
@@ -265,8 +296,10 @@ struct Settings: Codable, Equatable {
         switch languageToolMode {
         case .selfHosted where languageToolTarget == .local:
             return (localServerURL, "", "")
-        case .free, .selfHosted:
+        case .free:
             return (languageToolBaseURL, "", "")
+        case .selfHosted:
+            return (LanguageToolURL.normalized(languageToolBaseURL), "", "")
         case .premium:
             return (languageToolBaseURL, languageToolUsername, token)
         }
@@ -287,6 +320,16 @@ struct Settings: Codable, Equatable {
     var translateHotkey: HotkeyConfig = .translate
     var screenTranslateHotkey: HotkeyConfig = .screenTranslate
     var quickTranslateHotkey: HotkeyConfig = .quickTranslate
+    /// Explain and Summarize are for reading someone else's text, so they live in the menu bar and
+    /// have no shortcut until the user sets one.
+    var explainHotkey: HotkeyConfig?
+    var summarizeHotkey: HotkeyConfig?
+    /// Optional shortcuts of the `SelectionCommand`s, by `settingsKey`.
+    var commandHotkeys: [String: HotkeyConfig] = [:]
+    /// Fix spelling has said once that the free LanguageTool server is on the internet.
+    var spellingNoticeShown = false
+    /// Optional shortcuts of the `TextTool`s, by raw value.
+    var textToolHotkeys: [String: HotkeyConfig] = [:]
 
     func provider(_ kind: ProviderKind) -> ProviderConfig {
         providers.first(where: { $0.kind == kind }) ?? .makeDefault(kind)
@@ -300,17 +343,19 @@ struct Settings: Codable, Equatable {
 /// extension so the implicit `Settings()` initializer is preserved.
 extension Settings {
     enum CodingKeys: String, CodingKey {
-        case enabled, defaultEngine, separator, defaultPrompt, actionKeys,
+        case enabled, defaultEngine, defaultPrompt, actionKeys,
              restoreClipboard, maskAISlop, autocompleteEnabled, autocompleteCount, autocompleteLayout,
              popupFontSize, autocompleteLanguages, autocompleteLearn, autocompleteNextWord,
-             autocompleteAcceptReturn, autocompleteContextRanking, autocompleteAppMode, autocompleteApps,
+             autocompleteAcceptReturn, autocompleteInline, autocompleteContextRanking, autocompleteAppMode, autocompleteApps,
              proofreadMaxReplacements, proofreadLayout,
-             proofreadMinLength, proofreadAppMode, proofreadApps,
-             historyEnabled, sourceLanguage, targetLanguage,
-             correctEnabled, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
+             proofreadMinLength, proofreadAppMode, proofreadApps, personalDictionary, preSendCheck,
+             historyEnabled, pushToTalkEnabled, pushToTalkKey, pushToTalkLanguage, pushToTalkTranslate,
+             pushToTalkTargetLanguage, voiceTranslateEnabled, voiceTranslateKey, sourceLanguage, targetLanguage,
+             correctEnabled, starFieldEnabled, starSelectionEnabled, starAppMode, starApps, previewFromMenu, previewFromHotkeys,
+             recentPrompts, maskAISlopRules, removeTellsWithAI, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
              languageToolTarget, localServerPort,
              openRouterFreeOnly, providers, defaultActionHotkey, translateHotkey,
-             screenTranslateHotkey, quickTranslateHotkey
+             screenTranslateHotkey, quickTranslateHotkey, explainHotkey, summarizeHotkey, commandHotkeys, spellingNoticeShown, textToolHotkeys
     }
 
     /// Old key names still honoured on decode (never written back).
@@ -324,7 +369,6 @@ extension Settings {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         if let v = try c.decodeIfPresent(Bool.self, forKey: .enabled) { enabled = v }
         if let v = try c.decodeIfPresent(ProviderKind.self, forKey: .defaultEngine) { defaultEngine = v }
-        if let v = try c.decodeIfPresent(String.self, forKey: .separator) { separator = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .defaultPrompt) { defaultPrompt = v }
         if let v = try c.decodeIfPresent([ActionKey].self, forKey: .actionKeys) { actionKeys = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .restoreClipboard) { restoreClipboard = v }
@@ -348,6 +392,7 @@ extension Settings {
         if let v = try c.decodeIfPresent(Bool.self, forKey: .autocompleteLearn) { autocompleteLearn = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .autocompleteNextWord) { autocompleteNextWord = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .autocompleteAcceptReturn) { autocompleteAcceptReturn = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .autocompleteInline) { autocompleteInline = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .autocompleteContextRanking) { autocompleteContextRanking = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .autocompleteAppMode) { autocompleteAppMode = v }
         if let v = try c.decodeIfPresent([String].self, forKey: .autocompleteApps) { autocompleteApps = v }
@@ -356,10 +401,28 @@ extension Settings {
         if let v = try c.decodeIfPresent(Int.self, forKey: .proofreadMinLength) { proofreadMinLength = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .proofreadAppMode) { proofreadAppMode = v }
         if let v = try c.decodeIfPresent([String].self, forKey: .proofreadApps) { proofreadApps = v }
+        if let v = try c.decodeIfPresent([String].self, forKey: .personalDictionary) { personalDictionary = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .preSendCheck) { preSendCheck = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .historyEnabled) { historyEnabled = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .pushToTalkEnabled) { pushToTalkEnabled = v }
+        if let v = try c.decodeIfPresent(PushToTalkKey.self, forKey: .pushToTalkKey) { pushToTalkKey = v }
+        if let v = try c.decodeIfPresent(String.self, forKey: .pushToTalkLanguage) { pushToTalkLanguage = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .pushToTalkTranslate) { pushToTalkTranslate = v }
+        if let v = try c.decodeIfPresent(String.self, forKey: .pushToTalkTargetLanguage) { pushToTalkTargetLanguage = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .voiceTranslateEnabled) { voiceTranslateEnabled = v }
+        if let v = try c.decodeIfPresent(PushToTalkKey.self, forKey: .voiceTranslateKey) { voiceTranslateKey = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .sourceLanguage) { sourceLanguage = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .targetLanguage) { targetLanguage = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .correctEnabled) { correctEnabled = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .starFieldEnabled) { starFieldEnabled = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .starSelectionEnabled) { starSelectionEnabled = v }
+        starAppMode = try c.decodeIfPresent(String.self, forKey: .starAppMode) ?? proofreadAppMode
+        starApps = try c.decodeIfPresent([String].self, forKey: .starApps) ?? proofreadApps
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .previewFromMenu) { previewFromMenu = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .previewFromHotkeys) { previewFromHotkeys = v }
+        if let v = try c.decodeIfPresent([String].self, forKey: .recentPrompts) { recentPrompts = v }
+        if let v = try c.decodeIfPresent([String].self, forKey: .maskAISlopRules) { maskAISlopRules = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .removeTellsWithAI) { removeTellsWithAI = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .languageToolBaseURL) { languageToolBaseURL = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .languageToolUsername) { languageToolUsername = v }
         if let v = try c.decodeIfPresent(String.self, forKey: .languageToolLanguage) { languageToolLanguage = v }
@@ -372,6 +435,12 @@ extension Settings {
         if let v = try c.decodeIfPresent(HotkeyConfig.self, forKey: .translateHotkey) { translateHotkey = v }
         if let v = try c.decodeIfPresent(HotkeyConfig.self, forKey: .screenTranslateHotkey) { screenTranslateHotkey = v }
         if let v = try c.decodeIfPresent(HotkeyConfig.self, forKey: .quickTranslateHotkey) { quickTranslateHotkey = v }
+        explainHotkey = try c.decodeIfPresent(HotkeyConfig.self, forKey: .explainHotkey)
+        summarizeHotkey = try c.decodeIfPresent(HotkeyConfig.self, forKey: .summarizeHotkey)
+        if let v = try c.decodeIfPresent([String: HotkeyConfig].self, forKey: .commandHotkeys) { commandHotkeys = v }
+        if let v = try c.decodeIfPresent(Bool.self, forKey: .spellingNoticeShown) { spellingNoticeShown = v }
+        if let v = try c.decodeIfPresent([String: HotkeyConfig].self, forKey: .textToolHotkeys) { textToolHotkeys = v }
+        (actionKeys, textToolHotkeys) = TextToolMigration.migrate(actionKeys, hotkeys: textToolHotkeys)
     }
 }
 

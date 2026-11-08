@@ -6,6 +6,8 @@ struct FixesPopupView: View {
     let kind: IssueKind
     let replacements: [String]
     let selected: Int
+    /// Before the fixes are entered with ↓ the selection only hints at what Return applies.
+    let softSelection: Bool
     let layout: PopupLayout
     /// Fixes on the first row of a tile, measured in `ProofreadPopover.show()`; 0 = even split.
     let tileTopCount: Int
@@ -15,10 +17,21 @@ struct FixesPopupView: View {
     let fontSize: CGFloat
     let onHover: (Int) -> Void
     let onAccept: (Int) -> Void
+    let onClose: () -> Void
+    /// Above the word the fixes list bottom-up, the first nearest the word.
+    var bottomUp = false
+    /// Issues "Fix all" would change; its header button shows from two up.
+    var fixAllCount = 0
+    /// Nil hides "Add to dictionary" (only spelling issues offer it).
+    var onAddWord: (() -> Void)?
+    var onFixAll: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: PopupMetrics.cellSpacing) {
-            FixesPopupHeader(title: title, kind: kind, position: position, fontSize: fontSize)
+            FixesPopupHeader(title: title, kind: kind, position: position, fontSize: fontSize,
+                             skipSelected: selected == skipIndex, onHoverSkip: hoverSkip, onSkip: skip,
+                             onAddWord: onAddWord, onClose: onClose,
+                             fixAllCount: fixAllCount, onFixAll: onFixAll)
             if replacements.isEmpty {
                 // Real information, not a hint: secondary rather than tertiary, which is hard to read
                 // on the material.
@@ -27,12 +40,24 @@ struct FixesPopupView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, PopupMetrics.cellPaddingH)
             } else {
-                PopupItemsLayout(items: replacements, selected: selected, layout: layout,
+                PopupItemsLayout(items: replacements, selected: selected, softSelection: softSelection, layout: layout,
+                                 bottomUp: bottomUp,
                                  fontSize: fontSize, tileTopCount: tileTopCount,
                                  onHover: onHover, onActivate: onAccept)
             }
         }
         .frame(minWidth: PopupMetrics.minWidth, maxWidth: PopupMetrics.maxWidth, alignment: .leading)
         .popupChrome()
+    }
+
+    /// The Skip row follows the fixes, so its index is the number of fixes.
+    private var skipIndex: Int { replacements.count }
+
+    private func hoverSkip() {
+        onHover(skipIndex)
+    }
+
+    private func skip() {
+        onAccept(skipIndex)
     }
 }
