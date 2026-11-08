@@ -62,7 +62,7 @@ func runAutocompleteTests() {
     // An isolated store: temp state file plus temp seed files, so this never touches the real learned
     // vocabulary or the bundled seeds, and runs the same under `swiftc` as under the app.
     func makeStore(bigramSeed: [(String, String, Int)] = [], trigramSeed: [(String, String, String, Int)] = []) -> AutocompleteLearningStore {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bindall-test-\(UUID().uuidString)")
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bindly-test-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let bigramURL = dir.appendingPathComponent("bigrams.txt")
         let bigramText = bigramSeed.map { "\($0.0)\t\($0.1)\t\($0.2)" }.joined(separator: "\n")
@@ -129,14 +129,14 @@ func runAutocompleteTests() {
         ("привет", 40),
         ("прывет", 2),       // typo, typed twice -- already being suggested
         ("прифет", 7),       // typo, typed often: still a typo
-        ("bindall", 1_000_000), // pinned by hand
+        ("bindly", 1_000_000), // pinned by hand
         ("ok", 3),           // too short to judge
         ("hello", 12),
     ]
     let suspects = LearnedWordAudit.suspects(in: learned) { dictionary.contains($0) }
     check(suspects.map(\.word) == ["прывет", "прифет"], "only the unknown, unpinned, long-enough words")
     check(suspects.first?.word == "прывет", "least-used first: the safest to drop is at the top")
-    check(!suspects.contains { $0.word == "bindall" }, "a pinned word is never a suspect")
+    check(!suspects.contains { $0.word == "bindly" }, "a pinned word is never a suspect")
     check(!suspects.contains { $0.word == "ok" }, "short words are left alone")
     check(LearnedWordAudit.suspects(in: []) { _ in false }.isEmpty, "no words, no suspects")
     check(LearnedWordAudit.suspects(in: learned) { _ in true }.isEmpty,

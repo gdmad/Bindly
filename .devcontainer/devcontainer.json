@@ -1,7 +1,7 @@
 {
   // Minimal dev container whose only job is to run the GitHub CLI (`gh`) for cutting releases.
-  // The BindAll macOS app is built on the host with Xcode; this container does not build it.
-  "name": "bindall-gh",
+  // The Bindly macOS app is built on the host with Xcode; this container does not build it.
+  "name": "bindly-gh",
   "build": { "dockerfile": "Dockerfile" },
   "workspaceFolder": "/workspace",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",

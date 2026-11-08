@@ -26,16 +26,16 @@ func pressTrayItem(_ title: String) -> Bool {
 /// With `submenu`, `downs` reaches the submenu's item and `subDowns` the item inside it.
 func runStarItem(_ title: String, downs: Int, in submenu: String? = nil, subDowns: Int = 0) -> Bool {
     guard let pid = E2E.testApp?.processIdentifier else { return false }
-    let before = E2E.window("BindAll Star")?.bounds
+    let before = E2E.window("Bindly Star")?.bounds
     E2E.key(kVK_ANSI_A, .maskCommand)
     // The star moves from the field's corner to the selection; wait for that, not just for a star.
-    guard E2E.wait(3, { E2E.window("BindAll Star").map { $0.bounds != before } ?? false }) || E2E.window("BindAll Star") != nil,
-          let star = E2E.window("BindAll Star")?.bounds else {
+    guard E2E.wait(3, { E2E.window("Bindly Star").map { $0.bounds != before } ?? false }) || E2E.window("Bindly Star") != nil,
+          let star = E2E.window("Bindly Star")?.bounds else {
         print("    \(title): no star; windows \(E2E.windows().map(\.name))")
         return false
     }
     E2E.pause(0.3)
-    let current = E2E.window("BindAll Star")?.bounds ?? star
+    let current = E2E.window("Bindly Star")?.bounds ?? star
     E2E.click(CGPoint(x: current.midX, y: current.midY))
     E2E.pause(0.6)
     let app = AXUIElementCreateApplication(pid)
@@ -68,7 +68,7 @@ func runStarItem(_ title: String, downs: Int, in submenu: String? = nil, subDown
     return true
 }
 
-/// Clicks a button of a BindAll window by its name.
+/// Clicks a button of a Bindly window by its name.
 @discardableResult
 func clickButton(_ name: String, in window: String) -> Bool {
     guard let frame = E2E.testElement(window: window, E2E.named(name)).flatMap(E2E.frame) else { return false }
@@ -111,11 +111,11 @@ func hotkeyScenarios() {
     E2E.key(kVK_ANSI_C, .maskCommand)
     E2E.pause(0.08)
     E2E.key(kVK_ANSI_C, .maskCommand)
-    let told = E2E.wait(5) { E2E.window("BindAll Translation") != nil && E2E.dumpTestWindows("BindAll Translation").contains("No text selected") }
+    let told = E2E.wait(5) { E2E.window("Bindly Translation") != nil && E2E.dumpTestWindows("Bindly Translation").contains("No text selected") }
     record("⌘C ⌘C with nothing selected says so", told, "windows \(E2E.windows().map(\.name))")
     record("…and pastes nothing", fieldText() == untouched, "now: \(fieldText())")
-    if E2E.window("BindAll Translation") != nil { clickButton("Close", in: "BindAll Translation") }
-    E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+    if E2E.window("Bindly Translation") != nil { clickButton("Close", in: "Bindly Translation") }
+    E2E.wait(2) { E2E.window("Bindly Translation") == nil }
 
     // A whole line selected with its line break: the fixed line keeps it.
     clearField()
@@ -144,13 +144,13 @@ func hotkeyScenarios() {
     E2E.key(kVK_ANSI_A, .maskCommand)
     E2E.pause(0.3)
     for _ in 0..<3 { E2E.key(kVK_ANSI_C, .maskCommand); E2E.pause(0.08) }
-    let shown = E2E.wait(20) { E2E.window("BindAll Translation") != nil }
-    let body = shown ? E2E.dumpTestWindows("BindAll Translation") : ""
+    let shown = E2E.wait(20) { E2E.window("Bindly Translation") != nil }
+    let body = shown ? E2E.dumpTestWindows("Bindly Translation") : ""
     record("⌘C ⌘C ⌘C shows the translation in a window", shown && body.range(of: "[A-Za-z]{4}", options: .regularExpression) != nil,
            shown ? "" : "windows \(E2E.windows().map(\.name))")
     record("…and leaves the text alone", fieldText() == original, "now: \(fieldText())")
-    if shown { clickButton("Close", in: "BindAll Translation") }
-    record("its Close button closes it", E2E.wait(2) { E2E.window("BindAll Translation") == nil } && isAlive())
+    if shown { clickButton("Close", in: "Bindly Translation") }
+    record("its Close button closes it", E2E.wait(2) { E2E.window("Bindly Translation") == nil } && isAlive())
 
     // Restore clipboard (on in the test build): after a star action replaced the text, what was on
     // the clipboard before is back.
@@ -160,7 +160,7 @@ func hotkeyScenarios() {
     let marker = "e2e clipboard marker \(Int(Date().timeIntervalSince1970))"
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(marker, forType: .string)
-    guard runStarItem("Fix spelling (LanguageTool)", downs: 2), E2E.wait(15, { E2E.window("BindAll Preview") != nil }) else {
+    guard runStarItem("Fix spelling (LanguageTool)", downs: 2), E2E.wait(15, { E2E.window("Bindly Preview") != nil }) else {
         record("Restore clipboard: Fix spelling opens its preview", false); return
     }
     E2E.allowBareReturn = true
@@ -182,11 +182,11 @@ func starActionScenarios() {
     E2E.type(original)
     E2E.pause(1.0)
     if runStarItem("Show translation", downs: 3) {
-        let shown = E2E.wait(20) { E2E.window("BindAll Translation") != nil }
+        let shown = E2E.wait(20) { E2E.window("Bindly Translation") != nil }
         record("Show translation opens the translation window", shown, shown ? "" : "windows \(E2E.windows().map(\.name))")
         record("…and leaves the text alone", fieldText() == original, "now: \(fieldText())")
-        if shown { clickButton("Close", in: "BindAll Translation") }
-        E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+        if shown { clickButton("Close", in: "Bindly Translation") }
+        E2E.wait(2) { E2E.window("Bindly Translation") == nil }
     } else {
         record("Show translation opens the translation window", false, "no selection star")
     }
@@ -196,10 +196,10 @@ func starActionScenarios() {
     E2E.type("a quiet line of text")
     E2E.pause(1.0)
     if runStarItem("UPPERCASE", downs: 7, in: "Text tools", subDowns: 1) {
-        let preview = E2E.wait(5) { E2E.window("BindAll Preview") != nil }
+        let preview = E2E.wait(5) { E2E.window("Bindly Preview") != nil }
         record("a text tool from the star shows a preview at once", preview)
         if preview {
-            clickButton("Apply", in: "BindAll Preview")
+            clickButton("Apply", in: "Bindly Preview")
             // No model involved: exactly the text, upper-cased.
             record("Apply writes the tool's exact result", E2E.wait(6) { fieldText() == "A QUIET LINE OF TEXT" }, "now: \(fieldText())")
         }
@@ -212,10 +212,10 @@ func starActionScenarios() {
     E2E.type("пришли отчёт")
     E2E.pause(1.0)
     if runStarItem("Formal tone", downs: 6, in: "Actions", subDowns: 1) {
-        let preview = E2E.wait(30) { E2E.window("BindAll Preview") != nil }
+        let preview = E2E.wait(30) { E2E.window("Bindly Preview") != nil }
         record("an action key from the Actions submenu shows a preview", preview)
         if preview { E2E.key(kVK_Escape) }
-        E2E.wait(2) { E2E.window("BindAll Preview") == nil }
+        E2E.wait(2) { E2E.window("Bindly Preview") == nil }
     } else {
         record("an action key from the Actions submenu shows a preview", false, "no selection star")
     }
@@ -224,7 +224,7 @@ func starActionScenarios() {
     clearField()
     E2E.type("привет, завтра встреча в 10")
     E2E.pause(1.0)
-    guard runStarItem("Custom prompt…", downs: 8), E2E.wait(3, { E2E.window("BindAll Prompt") != nil }) else {
+    guard runStarItem("Custom prompt…", downs: 8), E2E.wait(3, { E2E.window("Bindly Prompt") != nil }) else {
         record("Custom prompt: its window opens", false); E2E.key(kVK_Escape); return
     }
     let promptPid = E2E.testApp!.processIdentifier
@@ -238,10 +238,10 @@ func starActionScenarios() {
     E2E.allowBareReturn = true
     E2E.key(kVK_Return)
     E2E.allowBareReturn = false
-    let preview = E2E.wait(25) { E2E.window("BindAll Preview") != nil }
+    let preview = E2E.wait(25) { E2E.window("Bindly Preview") != nil }
     record("a custom prompt leads to a preview", preview, preview ? "" : "windows \(E2E.windows().map(\.name))")
     if preview {
-        clickButton("Apply", in: "BindAll Preview")
+        clickButton("Apply", in: "Bindly Preview")
         // The on-device model words things its own way; what is checked is that the instruction was followed.
         record("Apply writes the custom prompt's result", E2E.wait(6) { isShouting(fieldText(), not: "привет, завтра встреча в 10") },
                "now: \(fieldText())")
@@ -259,23 +259,23 @@ func cancelScenario() {
     E2E.pause(1.2)
     guard pressTrayItem("Explain selection") else { record("setup: Explain selection is in the menu bar", false); return }
     // Esc while it runs, not before: the working star says it has started.
-    let started = E2E.wait(4, step: 0.02) { (E2E.window("BindAll Star")?.bounds.width ?? 0) > 26 }
+    let started = E2E.wait(4, step: 0.02) { (E2E.window("Bindly Star")?.bounds.width ?? 0) > 26 }
     guard started else { record("setup: the action starts", false, "windows \(E2E.windows().map(\.name))"); return }
     E2E.key(kVK_Escape)
-    let neverShown = !E2E.wait(6) { E2E.window("BindAll Translation") != nil }
+    let neverShown = !E2E.wait(6) { E2E.window("Bindly Translation") != nil }
     record("Esc right after starting an action cancels it", neverShown && isAlive(),
            "windows \(E2E.windows().map(\.name))")
-    if !neverShown { clickButton("Close", in: "BindAll Translation") }
-    let idle = E2E.wait(3) { (E2E.window("BindAll Star")?.bounds.width ?? 0) < 26 }
-    record("the star is idle again", idle, "star \(E2E.window("BindAll Star").map { "\($0.bounds)" } ?? "hidden")")
+    if !neverShown { clickButton("Close", in: "Bindly Translation") }
+    let idle = E2E.wait(3) { (E2E.window("Bindly Star")?.bounds.width ?? 0) < 26 }
+    record("the star is idle again", idle, "star \(E2E.window("Bindly Star").map { "\($0.bounds)" } ?? "hidden")")
     focusTextEdit()
     E2E.key(kVK_ANSI_A, .maskCommand)
     E2E.pause(1.2)
     if pressTrayItem("Explain selection") {
-        let shown = E2E.wait(30) { E2E.window("BindAll Translation") != nil }
+        let shown = E2E.wait(30) { E2E.window("Bindly Translation") != nil }
         record("the next action still runs", shown)
-        if shown { clickButton("Close", in: "BindAll Translation") }
-        E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+        if shown { clickButton("Close", in: "Bindly Translation") }
+        E2E.wait(2) { E2E.window("Bindly Translation") == nil }
     }
 }
 
@@ -307,7 +307,7 @@ func masterSwitchScenario() {
     E2E.type("Тут малако и сегодня мы обсуждали прив")
     E2E.pause(4)
     record("off: no underlines, no star, no suggestions",
-           E2E.underlineCount() == 0 && E2E.window("BindAll Star") == nil && !suggestionsVisible(),
+           E2E.underlineCount() == 0 && E2E.window("Bindly Star") == nil && !suggestionsVisible(),
            "underlines \(E2E.underlineCount()), windows \(E2E.windows().map(\.name))")
     if let bright, let dim = trayBrightness() {
         // The dimming is relative: light and dark menu bars differ, the difference does not.
@@ -320,10 +320,10 @@ func masterSwitchScenario() {
     E2E.key(kVK_ANSI_A, .maskCommand)
     E2E.pause(0.5)
     if pressTrayItem("Translate selection") {
-        let shown = E2E.wait(20) { E2E.window("BindAll Translation") != nil }
+        let shown = E2E.wait(20) { E2E.window("Bindly Translation") != nil }
         record("off: a menu-bar item still runs", shown)
-        if shown { clickButton("Close", in: "BindAll Translation") }
-        E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+        if shown { clickButton("Close", in: "Bindly Translation") }
+        E2E.wait(2) { E2E.window("Bindly Translation") == nil }
     }
     focusTextEdit()
     // The star's editing actions on the selection from the menu bar, without a star.
@@ -333,7 +333,7 @@ func masterSwitchScenario() {
     E2E.key(kVK_ANSI_A, .maskCommand)
     E2E.pause(0.5)
     if pressTrayItem("Fix spelling") {
-        let preview = E2E.wait(15) { E2E.window("BindAll Preview") != nil }
+        let preview = E2E.wait(15) { E2E.window("Bindly Preview") != nil }
         record("off: Fix spelling from the menu bar previews the selection", preview)
         if preview {
             E2E.allowBareReturn = true
@@ -360,7 +360,7 @@ func settingsScenario() {
     guard pressTrayItem("Settings…") else { record("the status menu opens Settings", false); return }
     let app = AXUIElementCreateApplication(pid)
     func window() -> AXUIElement? {
-        ((E2E.attr(app, kAXWindowsAttribute) as? [AXUIElement]) ?? []).first { (E2E.attr($0, kAXTitleAttribute) as? String) == "BindAll Settings" }
+        ((E2E.attr(app, kAXWindowsAttribute) as? [AXUIElement]) ?? []).first { (E2E.attr($0, kAXTitleAttribute) as? String) == "Bindly Settings" }
     }
     let opened = E2E.wait(4) { window() != nil }
     record("the status menu opens Settings", opened)
@@ -375,13 +375,13 @@ func settingsScenario() {
         E2E.pause(0.7)
         var elements = 0
         if let current = window() { collect(current, depth: 25) { _ in elements += 1 } }
-        if !isAlive() { failed.append("\(tab): BindAll stopped"); break }
+        if !isAlive() { failed.append("\(tab): Bindly stopped"); break }
         if elements < 25 { failed.append("\(tab): \(elements) elements") }
     }
     record("every tab opens and shows its settings", failed.isEmpty, failed.joined(separator: "; "))
     if let frame = E2E.frame(settings) { E2E.snapshot(frame, to: outDir.appending(path: "settings.png")) }
     if let close = E2E.attr(settings, kAXCloseButtonAttribute) { E2E.press(close as! AXUIElement) }
-    record("the window closes and BindAll keeps running", E2E.wait(3) { window() == nil } && isAlive())
+    record("the window closes and Bindly keeps running", E2E.wait(3) { window() == nil } && isAlive())
 }
 
 // MARK: - Every window can be dragged
@@ -413,10 +413,10 @@ func dragScenario() {
     E2E.pause(0.5)
     E2E.key(kVK_ANSI_A, .maskCommand)
     E2E.pause(0.5)
-    if pressTrayItem("Explain selection"), E2E.wait(40, { E2E.window("BindAll Translation") != nil }) {
+    if pressTrayItem("Explain selection"), E2E.wait(40, { E2E.window("Bindly Translation") != nil }) {
         E2E.pause(0.5)
-        check("BindAll Translation", "the result window")
-        record("…and its Close still works", clickButton("Close", in: "BindAll Translation") && E2E.wait(2) { E2E.window("BindAll Translation") == nil })
+        check("Bindly Translation", "the result window")
+        record("…and its Close still works", clickButton("Close", in: "Bindly Translation") && E2E.wait(2) { E2E.window("Bindly Translation") == nil })
     } else {
         record("setup: Explain opens its window", false)
     }
@@ -426,17 +426,17 @@ func dragScenario() {
     clearField()
     E2E.type("Тут малако в тексте. ")
     E2E.pause(1.0)
-    if runStarItem("Fix spelling (LanguageTool)", downs: 2), E2E.wait(15, { E2E.window("BindAll Preview") != nil }) {
+    if runStarItem("Fix spelling (LanguageTool)", downs: 2), E2E.wait(15, { E2E.window("Bindly Preview") != nil }) {
         E2E.pause(0.5)
-        check("BindAll Preview", "the preview")
-        let result = E2E.testElement(window: "BindAll Preview", E2E.named("Result")).flatMap(E2E.frame)
+        check("Bindly Preview", "the preview")
+        let result = E2E.testElement(window: "Bindly Preview", E2E.named("Result")).flatMap(E2E.frame)
         if let result { E2E.click(CGPoint(x: result.midX, y: result.midY)) }
         E2E.pause(0.4)
         // On Result the text shows without the struck-out word.
-        let switched = E2E.wait(2) { !E2E.dumpTestWindows("BindAll Preview").contains("малако") }
+        let switched = E2E.wait(2) { !E2E.dumpTestWindows("Bindly Preview").contains("малако") }
         record("…its Changes / Result switch still takes clicks", result != nil && switched)
         E2E.key(kVK_Escape)
-        E2E.wait(2) { E2E.window("BindAll Preview") == nil }
+        E2E.wait(2) { E2E.window("Bindly Preview") == nil }
         record("…and the text is as it was", fieldText().contains("малако"), "now: \(fieldText())")
     } else {
         record("setup: Fix spelling opens the preview", false)
@@ -446,24 +446,24 @@ func dragScenario() {
     focusTextEdit()
     E2E.pause(1.0)
     let promptOpened = (1...2).contains { _ in
-        runStarItem("Custom prompt…", downs: 8) && E2E.wait(3, { E2E.window("BindAll Prompt") != nil })
+        runStarItem("Custom prompt…", downs: 8) && E2E.wait(3, { E2E.window("Bindly Prompt") != nil })
     }
     if promptOpened {
         E2E.pause(0.5)
-        check("BindAll Prompt", "the custom prompt")
+        check("Bindly Prompt", "the custom prompt")
         E2E.key(kVK_Escape)
-        E2E.wait(2) { E2E.window("BindAll Prompt") == nil }
+        E2E.wait(2) { E2E.window("Bindly Prompt") == nil }
     } else {
         record("setup: Custom prompt opens", false)
     }
 
     // Quick Translate.
     E2E.key(kVK_ANSI_E, [.maskCommand, .maskShift])
-    if E2E.wait(4, { E2E.window("BindAll Quick Translate") != nil }) {
+    if E2E.wait(4, { E2E.window("Bindly Quick Translate") != nil }) {
         E2E.pause(0.8)
-        check("BindAll Quick Translate", "Quick Translate", headerY: 5)
+        check("Bindly Quick Translate", "Quick Translate", headerY: 5)
         E2E.key(kVK_Escape)
-        E2E.wait(2) { E2E.window("BindAll Quick Translate") == nil }
+        E2E.wait(2) { E2E.window("Bindly Quick Translate") == nil }
     } else {
         record("setup: Quick Translate opens", false)
     }
@@ -505,20 +505,20 @@ func plainTextStarScenario() {
     guard let text = word else { record("setup: the page's text is found", false); return }
     E2E.pause(0.5)
     E2E.doubleClick(CGPoint(x: text.minX + 30, y: text.midY))
-    let shown = E2E.wait(4) { E2E.window("BindAll Star") != nil }
+    let shown = E2E.wait(4) { E2E.window("Bindly Star") != nil }
     record("a star shows on text selected in a web page", shown, "windows \(E2E.windows().map(\.name))")
-    guard shown, let star = E2E.window("BindAll Star")?.bounds else { return }
+    guard shown, let star = E2E.window("Bindly Star")?.bounds else { return }
     E2E.click(CGPoint(x: star.midX, y: star.midY))
     E2E.pause(0.6)
     // The star's menu is not always in the AX tree: its first item tells the two menus apart --
     // Show translation (a window) in the reading one, Fix (a preview) in the editing one.
     _ = pid
     pickMenuItem(downs: 1)
-    let window = E2E.wait(20) { E2E.window("BindAll Translation") != nil || E2E.window("BindAll Preview") != nil }
-    record("its menu is the reading one: Show translation comes first", window && E2E.window("BindAll Translation") != nil,
+    let window = E2E.wait(20) { E2E.window("Bindly Translation") != nil || E2E.window("Bindly Preview") != nil }
+    record("its menu is the reading one: Show translation comes first", window && E2E.window("Bindly Translation") != nil,
            "windows \(E2E.windows().map(\.name))")
-    if E2E.window("BindAll Translation") != nil { clickButton("Close", in: "BindAll Translation") }
-    if E2E.window("BindAll Preview") != nil { E2E.key(kVK_Escape) }
+    if E2E.window("Bindly Translation") != nil { clickButton("Close", in: "Bindly Translation") }
+    if E2E.window("Bindly Preview") != nil { E2E.key(kVK_Escape) }
 }
 
 // MARK: - LanguageTool unreachable
@@ -532,8 +532,8 @@ func offlineScenario() {
     record("with LanguageTool unreachable, a typo is still underlined", underlined, "count \(E2E.underlineCount())")
     guard underlined, let milk = wordRect("малако") else { return }
     E2E.click(CGPoint(x: milk.midX, y: milk.midY))
-    let popup = E2E.wait(4) { E2E.window("BindAll Fixes") != nil }
-    let tree = popup ? E2E.dumpTestWindows("BindAll Fixes") : ""
+    let popup = E2E.wait(4) { E2E.window("Bindly Fixes") != nil }
+    let tree = popup ? E2E.dumpTestWindows("Bindly Fixes") : ""
     // The guesses are macOS's own, often not the word meant ("малако": "малого", "макало").
     record("the fixes say they are offline", tree.contains("Offline"),
            popup ? String(tree.prefix(300)) : "no popup")
@@ -543,8 +543,8 @@ func offlineScenario() {
     clearField()
     E2E.type("Вчера малако было свежее. ")
     E2E.pause(1.0)
-    if runStarItem("Fix spelling (LanguageTool)", downs: 2), E2E.wait(15, { E2E.window("BindAll Preview") != nil }) {
-        let preview = E2E.dumpTestWindows("BindAll Preview")
+    if runStarItem("Fix spelling (LanguageTool)", downs: 2), E2E.wait(15, { E2E.window("Bindly Preview") != nil }) {
+        let preview = E2E.dumpTestWindows("Bindly Preview")
         record("Fix spelling offline changes the word and notes it", preview.contains("LanguageTo") && preview.contains("малого"),
                String(preview.prefix(300)))
         E2E.key(kVK_Escape)

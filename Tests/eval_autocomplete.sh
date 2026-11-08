@@ -10,14 +10,14 @@ cd "$(dirname "$0")/.."
 VARIANT="${1:-baseline}"
 WARM="${2:-cold}"
 LIMIT="${3:-5}"
-BIGRAM="${4:-BindAll/Autocomplete/ru_bigrams_ctx.txt}"
+BIGRAM="${4:-Bindly/Autocomplete/ru_bigrams_ctx.txt}"
 TRIGRAM="${5:-}"
 
 OUT="$(mktemp -d)/EvalAutocomplete"
 swiftc -O \
-    BindAll/Autocomplete/AutocompleteEngine.swift \
-    BindAll/Autocomplete/AutocompleteLearningStore.swift \
-    BindAll/Autocomplete/SemanticRanker.swift \
+    Bindly/Autocomplete/AutocompleteEngine.swift \
+    Bindly/Autocomplete/AutocompleteLearningStore.swift \
+    Bindly/Autocomplete/SemanticRanker.swift \
     Tests/eval_autocomplete.swift \
     -o "$OUT"
 

@@ -7,12 +7,12 @@
 #   export GH_TOKEN=ghp_xxx                  # or a token in the environment (forwarded in)
 #
 # Example:
-#   .devcontainer/gh.sh release create v0.2.1 .release/BindAll-0.2.1.dmg \
-#       --title "BindAll 0.2.1" --notes-file notes.md
+#   .devcontainer/gh.sh release create v0.2.1 .release/Bindly-0.2.1.dmg \
+#       --title "Bindly 0.2.1" --notes-file notes.md
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-IMAGE=bindall-gh
+IMAGE=bindly-gh
 
 docker build -q -t "$IMAGE" .devcontainer >/dev/null
 

@@ -108,7 +108,7 @@ func electronScenarios(_ target: ElectronTarget) {
     guard let field = composer(of: pid), E2E.value(field).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
         skip("all", "no empty composer in focus; nothing was typed"); return
     }
-    // Every key from here on goes only to this very field, or to BindAll's own windows. Anything
+    // Every key from here on goes only to this very field, or to Bindly's own windows. Anything
     // else -- a channel's box, another app -- stops the typing for good.
     let testPid = E2E.testApp?.processIdentifier
     E2E.keysBlocked = false
@@ -148,16 +148,16 @@ func electronScenarios(_ target: ElectronTarget) {
         record("the draft is left empty", text().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "left: \(text())")
     }
 
-    // Closes whatever BindAll has open. Claude never gets Esc; ← does the job there.
+    // Closes whatever Bindly has open. Claude never gets Esc; ← does the job there.
     func dismiss() {
         if target.allowsEscape {
             E2E.key(kVK_Escape)
         } else {
             E2E.key(kVK_LeftArrow)
-            E2E.wait(2) { E2E.window("BindAll Fixes") == nil && !suggestionsVisible() }
+            E2E.wait(2) { E2E.window("Bindly Fixes") == nil && !suggestionsVisible() }
             E2E.key(kVK_RightArrow)
         }
-        E2E.wait(2) { E2E.window("BindAll Fixes") == nil && !suggestionsVisible() }
+        E2E.wait(2) { E2E.window("Bindly Fixes") == nil && !suggestionsVisible() }
         E2E.pause(0.6)
     }
     func clearComposer() {
@@ -168,9 +168,9 @@ func electronScenarios(_ target: ElectronTarget) {
     func openFixes(_ word: String) -> CGRect? {
         guard let box = rect(word) else { return nil }
         E2E.click(CGPoint(x: box.midX, y: box.midY))
-        if E2E.wait(4, { E2E.window("BindAll Fixes") != nil }) { return box }
+        if E2E.wait(4, { E2E.window("Bindly Fixes") != nil }) { return box }
         E2E.click(CGPoint(x: box.midX, y: box.midY))
-        let second = E2E.wait(4) { E2E.window("BindAll Fixes") != nil }
+        let second = E2E.wait(4) { E2E.window("Bindly Fixes") != nil }
         print("    \(word): first click opened nothing, second \(second ? "did" : "did not either"); underlines \(E2E.underlineCount())")
         return second ? box : nil
     }
@@ -201,8 +201,8 @@ func electronScenarios(_ target: ElectronTarget) {
            "count \(E2E.underlineCount()); word rect \(wordBox.map { "\($0)" } ?? "none"); field \(E2E.frame(field) ?? .zero)")
     if let frame = E2E.frame(field) { E2E.snapshot(frame, to: outDir.appending(path: "\(target.name.lowercased())-underlines.png")) }
 
-    let star = E2E.wait(3) { E2E.window("BindAll Star") != nil }
-    let starRect = E2E.window("BindAll Star")?.bounds ?? .zero
+    let star = E2E.wait(3) { E2E.window("Bindly Star") != nil }
+    let starRect = E2E.window("Bindly Star")?.bounds ?? .zero
     let fieldFrame = E2E.frame(field) ?? .zero
     record("the field star sits at the field's edge", star && fieldFrame.insetBy(dx: -40, dy: -40).contains(starRect)
            && starRect.minX > fieldFrame.maxX - 80, "star \(starRect), field \(fieldFrame)")
@@ -211,10 +211,10 @@ func electronScenarios(_ target: ElectronTarget) {
         record("clicking an underlined word opens the fixes", true)
         let before = text()
         E2E.key(kVK_LeftArrow)
-        record("← moves the caret and closes the fixes", E2E.wait(1.5) { E2E.window("BindAll Fixes") == nil } && text() == before)
+        record("← moves the caret and closes the fixes", E2E.wait(1.5) { E2E.window("Bindly Fixes") == nil } && text() == before)
         if target.name == "Slack", openFixes("малако") != nil {
-            let tree = E2E.dumpTestWindows("BindAll Fixes")
-            let counter = E2E.testElement(window: "BindAll Fixes") { el in
+            let tree = E2E.dumpTestWindows("Bindly Fixes")
+            let counter = E2E.testElement(window: "Bindly Fixes") { el in
                 ["AXValue", "AXValueDescription"].contains { key in
                     (E2E.attr(el, key) as? String)?.range(of: #"^\d+ of \d+$"#, options: .regularExpression) != nil
                 }
@@ -228,13 +228,13 @@ func electronScenarios(_ target: ElectronTarget) {
             dismiss()
         }
         if openFixes("малако") != nil,
-           let row = E2E.testElement(window: "BindAll Fixes", E2E.named("молоко")), let frame = E2E.frame(row) {
+           let row = E2E.testElement(window: "Bindly Fixes", E2E.named("молоко")), let frame = E2E.frame(row) {
             E2E.click(CGPoint(x: frame.midX, y: frame.midY))
             record("clicking a fix applies it", E2E.wait(5) { text().contains("молоко") && !text().contains("малако") },
                    "now: \(text())")
         } else {
             record("clicking a fix applies it", false, "no \"молоко\" row")
-            try? E2E.dumpTestWindows("BindAll Fixes").write(
+            try? E2E.dumpTestWindows("Bindly Fixes").write(
                 to: outDir.appending(path: "\(target.name.lowercased())-fixes-tree.txt"), atomically: true, encoding: .utf8)
         }
         dismiss()
@@ -245,16 +245,16 @@ func electronScenarios(_ target: ElectronTarget) {
     // Arrows go into the popup (↑ above the word, ↓ below) without touching the text; Skip by click,
     // since a bare Return here would send.
     E2E.pause(0.8)
-    if let typo = openFixes("ощибка"), let popupRect = E2E.window("BindAll Fixes")?.bounds {
+    if let typo = openFixes("ощибка"), let popupRect = E2E.window("Bindly Fixes")?.bounds {
         let count = E2E.underlineCount()
         let before = text()
         let above = popupRect.maxY <= typo.minY + 2
         E2E.key(above ? kVK_UpArrow : kVK_DownArrow)
         E2E.pause(0.4)
-        record("the arrow toward the popup enters it", E2E.window("BindAll Fixes") != nil && text() == before,
+        record("the arrow toward the popup enters it", E2E.window("Bindly Fixes") != nil && text() == before,
                "popup \(above ? "above" : "below"); windows \(E2E.windows().map(\.name)); text \(text() == before ? "same" : text())")
         let since = Date()
-        if let skipButton = E2E.testElement(window: "BindAll Fixes", E2E.named("Skip this issue")), let frame = E2E.frame(skipButton) {
+        if let skipButton = E2E.testElement(window: "Bindly Fixes", E2E.named("Skip this issue")), let frame = E2E.frame(skipButton) {
             E2E.click(CGPoint(x: frame.midX, y: frame.midY))
             record("Skip removes that underline",
                    E2E.wait(3) { E2E.underlineCount() < count } && E2E.hasEvent("proofread", "skipped", since: since),
@@ -272,7 +272,7 @@ func electronScenarios(_ target: ElectronTarget) {
     if let word = rect("тексте") {
         E2E.doubleClick(CGPoint(x: word.midX, y: word.midY))
         E2E.pause(1.2)
-        let stars = E2E.windows().filter { $0.name == "BindAll Star" }
+        let stars = E2E.windows().filter { $0.name == "Bindly Star" }
         let near = stars.first.map { $0.bounds.insetBy(dx: -80, dy: -80).intersects(word) } ?? false
         record("selecting a word shows one star next to it", stars.count == 1 && near,
                "stars \(stars.map(\.bounds)), word \(word)")
@@ -284,7 +284,7 @@ func electronScenarios(_ target: ElectronTarget) {
     E2E.pause(1.0)
     E2E.key(kVK_ANSI_A, .maskCommand)
     E2E.pause(1.2)
-    if let starNow = E2E.window("BindAll Star")?.bounds, let testPid = E2E.testApp?.processIdentifier {
+    if let starNow = E2E.window("Bindly Star")?.bounds, let testPid = E2E.testApp?.processIdentifier {
         E2E.click(CGPoint(x: starNow.midX, y: starNow.midY))
         E2E.pause(0.6)
         let item = E2E.find(in: AXUIElementCreateApplication(testPid), depth: 6) {
@@ -294,9 +294,9 @@ func electronScenarios(_ target: ElectronTarget) {
         record("clicking the star opens its menu", menuUp)
         if menuUp {
             if let item { E2E.press(item) } else { pickMenuItem(downs: 2) }
-            let preview = E2E.wait(15) { E2E.window("BindAll Preview") != nil }
+            let preview = E2E.wait(15) { E2E.window("Bindly Preview") != nil }
             record("Fix spelling shows a preview", preview)
-            if preview, let apply = E2E.testElement(window: "BindAll Preview", E2E.named("Apply")), let frame = E2E.frame(apply) {
+            if preview, let apply = E2E.testElement(window: "Bindly Preview", E2E.named("Apply")), let frame = E2E.frame(apply) {
                 E2E.click(CGPoint(x: frame.midX, y: frame.midY))
                 record("Apply replaces the text", E2E.wait(6) { !text().contains("звёздачки") && text().contains("звёздоч") },
                        "now: \(text())")
@@ -316,14 +316,14 @@ func electronScenarios(_ target: ElectronTarget) {
     E2E.key(kVK_ANSI_A, .maskCommand)
     E2E.pause(1.2)
     if pressTrayItem("Summarize selection") {
-        let shown = E2E.wait(40) { E2E.window("BindAll Translation") != nil }
+        let shown = E2E.wait(40) { E2E.window("Bindly Translation") != nil }
         record("Summarize shows its result", shown)
-        if shown, let close = E2E.testElement(window: "BindAll Translation", E2E.named("Close")).flatMap(E2E.frame) {
+        if shown, let close = E2E.testElement(window: "Bindly Translation", E2E.named("Close")).flatMap(E2E.frame) {
             E2E.hoverThenClick(CGPoint(x: close.midX, y: close.midY))
-            let closed = E2E.wait(2) { E2E.window("BindAll Translation") == nil }
+            let closed = E2E.wait(2) { E2E.window("Bindly Translation") == nil }
             E2E.pause(1.0)
             let alive = !(E2E.testApp?.isTerminated ?? true)
-            record("Close closes the summary and BindAll keeps running", closed && alive, "closed \(closed), running \(alive)")
+            record("Close closes the summary and Bindly keeps running", closed && alive, "closed \(closed), running \(alive)")
             if !alive { return }
         }
     } else {
@@ -336,12 +336,12 @@ func electronScenarios(_ target: ElectronTarget) {
     clearComposer()
     E2E.type("Снова малако \(joiner) граматика тут ")
     if E2E.wait(12, { E2E.underlineCount() >= 2 }), openFixes("граматика") != nil,
-       let button = E2E.testElement(window: "BindAll Fixes", {
+       let button = E2E.testElement(window: "Bindly Fixes", {
            ((E2E.attr($0, kAXDescriptionAttribute) as? String) ?? (E2E.attr($0, kAXTitleAttribute) as? String) ?? "").hasPrefix("Fix all")
        }) ?? nil, let frame = E2E.frame(button) {
         E2E.click(CGPoint(x: frame.midX, y: frame.midY))
-        if E2E.wait(4, { E2E.window("BindAll Preview") != nil }),
-           let apply = E2E.testElement(window: "BindAll Preview", E2E.named("Apply")), let applyFrame = E2E.frame(apply) {
+        if E2E.wait(4, { E2E.window("Bindly Preview") != nil }),
+           let apply = E2E.testElement(window: "Bindly Preview", E2E.named("Apply")), let applyFrame = E2E.frame(apply) {
             E2E.click(CGPoint(x: applyFrame.midX, y: applyFrame.midY))
             record("Fix all fixes every word at once", E2E.wait(6) { !text().contains("граматика") && !text().contains("малако") }, "now: \(text())")
         } else {
@@ -358,9 +358,9 @@ func electronScenarios(_ target: ElectronTarget) {
     E2E.type("Сегодня мы обсуждали прив")
     let shown = E2E.wait(4) { suggestionsVisible() }
     record("a suggestion appears while typing", shown, shown ? "" : "windows: \(E2E.windows().map(\.name))")
-    record("at the end of a line it is inline gray text", E2E.window("BindAll Inline") != nil,
+    record("at the end of a line it is inline gray text", E2E.window("Bindly Inline") != nil,
            "shown as \(E2E.windows().map(\.name))")
-    if let inline = E2E.window("BindAll Inline")?.bounds, let typed = rect("прив") {
+    if let inline = E2E.window("Bindly Inline")?.bounds, let typed = rect("прив") {
         record("the gray text follows the caret", abs(inline.minX - typed.maxX) <= 2 && abs(inline.midY - typed.midY) < 8,
                "inline \(inline), word \(typed)")
     }
@@ -380,24 +380,24 @@ func electronScenarios(_ target: ElectronTarget) {
     _ = E2E.wait(3) { suggestionsVisible() }
     E2E.key(kVK_DownArrow)
     record("↓ opens the list from the gray text",
-           E2E.wait(1.5) { E2E.window("BindAll Suggestions") != nil && E2E.window("BindAll Inline") == nil },
+           E2E.wait(1.5) { E2E.window("Bindly Suggestions") != nil && E2E.window("Bindly Inline") == nil },
            "windows: \(E2E.windows().map(\.name))")
     dismiss()
 
     E2E.type(" конец")
     for _ in 0..<5 { E2E.key(kVK_LeftArrow) }
     E2E.type("прив")
-    let midLine = E2E.wait(3) { E2E.window("BindAll Suggestions") != nil }
-    record("in the middle of a line the list is shown", midLine && E2E.window("BindAll Inline") == nil,
+    let midLine = E2E.wait(3) { E2E.window("Bindly Suggestions") != nil }
+    record("in the middle of a line the list is shown", midLine && E2E.window("Bindly Inline") == nil,
            "windows: \(E2E.windows().map(\.name))")
     dismiss()
 
     // Several lines (Shift+Return, never a bare Return): still gray text on the last line.
     clearComposer()
     E2E.type("Первая строка\nВторая строка\nСегодня мы обсуждали прив")
-    let multi = E2E.wait(4) { E2E.window("BindAll Inline") != nil }
+    let multi = E2E.wait(4) { E2E.window("Bindly Inline") != nil }
     var note = "windows \(E2E.windows().map(\.name))"
-    if let inline = E2E.window("BindAll Inline")?.bounds, let el = composer(of: pid) {
+    if let inline = E2E.window("Bindly Inline")?.bounds, let el = composer(of: pid) {
         var word: CGRect?
         collect(el, depth: 8) { child in
             guard word == nil, (E2E.attr(child, kAXRoleAttribute) as? String) == "AXStaticText" else { return }
@@ -443,7 +443,7 @@ func electronScenarios(_ target: ElectronTarget) {
         print("    composer tree: \(leaves) text runs, deepest at level \(deepest)")
     }
     record("the long list reaches the composer", flat.contains("обсуждали прив"), "value: \(long.prefix(80))…")
-    let longInline = E2E.wait(4) { E2E.window("BindAll Inline") != nil }
+    let longInline = E2E.wait(4) { E2E.window("Bindly Inline") != nil }
     record("at the end of a long list it is inline gray text", longInline, "windows \(E2E.windows().map(\.name))")
     dismiss()
     E2E.type(" ")

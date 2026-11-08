@@ -70,7 +70,7 @@ func runLocalServerTests() {
           "the arm64 query asks for the Java 21 JRE")
     check(LocalServerRelease.jreMetadataURL(architecture: .x64).absoluteString.contains("architecture=x64"),
           "the x64 query asks for x64")
-    let digestFile = FileManager.default.temporaryDirectory.appendingPathComponent("bindall-digest-\(UUID().uuidString)")
+    let digestFile = FileManager.default.temporaryDirectory.appendingPathComponent("bindly-digest-\(UUID().uuidString)")
     try! Data("abc".utf8).write(to: digestFile)
     eq(try! LocalServerRelease.sha256Hex(of: digestFile),
        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "SHA-256 of a file")
@@ -104,7 +104,7 @@ func runLocalServerTests() {
           "the manifest survives a round trip, pending update included")
     
     print("LocalServerLayout")
-    let tmpRoot = FileManager.default.temporaryDirectory.appendingPathComponent("bindall-layout-\(UUID().uuidString)")
+    let tmpRoot = FileManager.default.temporaryDirectory.appendingPathComponent("bindly-layout-\(UUID().uuidString)")
     let layout = LocalServerLayout(root: tmpRoot)
     check(!layout.isInstalled(), "an empty folder is not an installation")
     eq(layout.javaExecutable.path, tmpRoot.path + "/jre/Contents/Home/bin/java", "java lives under the JRE folder")

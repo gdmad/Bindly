@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/logo.png" width="120" alt="BindAll logo">
+  <img src="assets/logo.png" width="120" alt="Bindly logo">
 </p>
 
-<h1 align="center">BindAll</h1>
+<h1 align="center">Bindly</h1>
 
 <p align="center">
   A minimal macOS menu-bar utility that acts on the currently selected text with global shortcuts —
@@ -10,7 +10,7 @@
   On-device by default (Apple Intelligence + Apple Translation), with optional cloud providers.
 </p>
 
-No Dock icon: BindAll lives in the menu bar (`LSUIElement`); the icon pulses while an action runs.
+No Dock icon: Bindly lives in the menu bar (`LSUIElement`); the icon pulses while an action runs.
 
 ## Features
 
@@ -35,14 +35,14 @@ No Dock icon: BindAll lives in the menu bar (`LSUIElement`); the icon pulses whi
   checked by a [LanguageTool](https://languagetool.org) server (public, self-hosted, or Premium) and
   every issue is underlined in place. Click an underlined word to pick a fix; Tab moves to the next
   issue, and applying a fix walks straight to the next one when several are found. No shortcut
-  involved. Enable and configure it all on the Proofread tab. In Self-hosted mode BindAll can install
+  involved. Enable and configure it all on the Proofread tab. In Self-hosted mode Bindly can install
   and run its own portable LanguageTool (own Java runtime, one folder, ~540 MB, listens on this Mac
   only) with one click, and remove it completely with another; a server of your own stays available
   as a second choice.
   **Google Docs and other sites:** Google Docs draws its text on a canvas that macOS accessibility
-  cannot read, so BindAll cannot check it. Use the LanguageTool browser extension there and point it
+  cannot read, so Bindly cannot check it. Use the LanguageTool browser extension there and point it
   at the same server: in the extension's settings, Advanced settings -> local or other server, URL
-  `http://127.0.0.1:<port>/v2` for BindAll's local server (or your self-hosted URL). Some users report
+  `http://127.0.0.1:<port>/v2` for Bindly's local server (or your self-hosted URL). Some users report
   the extension failing against a local server in Chromium, and the extension's own terms may change,
   so check it works before relying on it.
 - **Providers** — Apple on-device (default), DeepSeek, OpenRouter, OpenAI, Ollama. Add an API key,
@@ -81,22 +81,22 @@ All shortcuts are configurable in Settings → Actions → Shortcuts.
 | `Esc` | Cancel the action in progress |
 
 Because `Cmd+C` is the real copy shortcut, pressing it the configured number of times both copies the
-selection and triggers BindAll. Per-action-key shortcuts (any combo you record) copy the selection
+selection and triggers Bindly. Per-action-key shortcuts (any combo you record) copy the selection
 themselves.
 
 ## Install
 
-Download the latest `BindAll-<version>.dmg` from [Releases](https://github.com/gdmad/BindAll/releases),
-open it, and drag **BindAll** into **Applications**.
+Download the latest `Bindly-<version>.dmg` from [Releases](https://github.com/gdmad/Bindly/releases),
+open it, and drag **Bindly** into **Applications**.
 
 The build is **not notarized** (no paid Apple Developer account), so macOS blocks it on first launch.
 Open **System Settings → Privacy & Security**, scroll to the bottom, and click **Open Anyway** next to
-BindAll. You only do this once.
+Bindly. You only do this once.
 
 ## Permissions
 
 1. **Accessibility** — required to detect the shortcut key taps and to paste results back. On first
-   launch BindAll asks for it; grant it in *System Settings → Privacy & Security → Accessibility*.
+   launch Bindly asks for it; grant it in *System Settings → Privacy & Security → Accessibility*.
    The tap starts automatically once granted (no relaunch needed).
 2. **Apple Intelligence** — needed only for the on-device text engine. Enable it in System Settings;
    the General tab shows live status. Cloud providers work without it.
@@ -107,7 +107,7 @@ BindAll. You only do this once.
 - API keys are stored in the **Keychain**, never in plain settings or the repo.
 - The default engine and translation run **on device**. Cloud providers are used only if you select
   one and add a key.
-- History is stored locally in `~/Library/Application Support/BindAll/` and never includes API keys;
+- History is stored locally in `~/Library/Application Support/Bindly/` and never includes API keys;
   it can be turned off and cleared.
 
 ## Build from source
@@ -115,14 +115,14 @@ BindAll. You only do this once.
 Requirements: **macOS 26**, **Xcode 26**.
 
 ```sh
-open BindAll.xcodeproj
+open Bindly.xcodeproj
 ```
 
-In Xcode, select the **BindAll** target → *Signing & Capabilities* → set **your** Team (a stable
+In Xcode, select the **Bindly** target → *Signing & Capabilities* → set **your** Team (a stable
 signature keeps the Accessibility grant across rebuilds). Then Run. From the CLI without signing:
 
 ```sh
-xcodebuild -scheme BindAll build CODE_SIGNING_ALLOWED=NO
+xcodebuild -scheme Bindly build CODE_SIGNING_ALLOWED=NO
 ```
 
 Build a distributable `.dmg`:
@@ -146,7 +146,7 @@ to run it).
 ## Architecture
 
 ```
-BindAll/
+Bindly/
   App/           AppDelegate (menu bar, settings window, icon), AppState, UpdateChecker
   Hotkeys/       HotkeyMonitor (CGEventTap), HotkeyCoordinator, AccessibilityPermission
   Selection/     TextInjector (synthetic Cmd+C / Cmd+V), InjectedEvents

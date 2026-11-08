@@ -1,23 +1,23 @@
-# BindAll — AGENTS.md
+# Bindly — AGENTS.md
 
 macOS menu-bar utility that acts on the current selection via global hotkeys: AI text correction /
 custom prompts, on-device translation, and screen-region OCR translation.
 
 ## Stack
 - **Swift 6 + SwiftUI + AppKit**, target **macOS 26**
-- Hand-authored Xcode project (`BindAll.xcodeproj`, file-system-synchronized group — new source files
+- Hand-authored Xcode project (`Bindly.xcodeproj`, file-system-synchronized group — new source files
   are picked up automatically, no need to edit `project.pbxproj`)
 - Frameworks: `FoundationModels` (on-device LLM), `Translation` + `NaturalLanguage` (translation),
   `Vision` (OCR), `ServiceManagement` (launch at login), `Security` (Keychain)
 - Menu-bar agent: `LSUIElement = true` (no Dock icon)
-- Bundle id: `com.evgeny.bindall`
+- Bundle id: `com.evgeny.bindly`
 
 ## Structure
 
 ```
-BindAll/
+Bindly/
 ├── App/
-│   ├── BindAllApp.swift        # @main; placeholder SwiftUI Settings scene — UI is AppKit-driven
+│   ├── BindlyApp.swift        # @main; placeholder SwiftUI Settings scene — UI is AppKit-driven
 │   ├── AppDelegate.swift       # NSStatusItem menu (actions + shortcuts), settings window, icon, login
 │   ├── StatusIconRenderer.swift / StatusIconTwinkle.swift # the drawn tray icon and its busy wave
 │   └── AppState.swift          # @Observable: settings persistence, Keychain keys (keychainRevision), isProcessing;
@@ -30,7 +30,7 @@ BindAll/
 │   ├── SelectionReader.swift   # Reads selection from the pasteboard (AX attribute fallback)
 │   ├── TextInjector.swift      # Sets pasteboard + synthesizes Cmd+V; copy helper
 │   ├── EdgeWhitespace.swift / ReplaceTarget.swift # pure: a result keeps the subject's edges; where it goes now
-│   └── InjectedEvents.swift    # Marks/detects BindAll's own synthetic keys, so proofread/autocomplete ignore each other's writes
+│   └── InjectedEvents.swift    # Marks/detects Bindly's own synthetic keys, so proofread/autocomplete ignore each other's writes
 ├── Engines/
 │   ├── AIEngine.swift          # protocol + EngineError
 │   ├── AppleFoundationEngine.swift   # FoundationModels on-device LLM (temperature 0)
@@ -244,9 +244,9 @@ language, permissions) · Providers (connections only). Rarely changed options s
   twice gets learned, typos included.
   Configurable: count, column/line/tile layout, text
   size, dictionary language, and per-app allow/deny. Uses AX text+caret where available, otherwise a
-  keystroke buffer (works in most apps). Skipped in password fields and BindAll's own windows.
+  keystroke buffer (works in most apps). Skipped in password fields and Bindly's own windows.
   The ranking mode can be overridden for experiments with
-  `defaults write com.evgeny.bindall AutocompleteVariant -string baseline|context|semantic`
+  `defaults write com.evgeny.bindly AutocompleteVariant -string baseline|context|semantic`
   (semantic re-ranking via `SemanticRanker` measured poorly on Russian and stays off by default).
   Its tap is an active tap (it consumes Tab/arrows while suggesting), so it runs on a **dedicated
   run-loop thread** and the callback only makes a cheap lock-protected suppression decision; all AX
@@ -260,7 +260,7 @@ shortcuts and Correct are not copy shortcuts, so they synthesize Cmd+C first
 count for that key is reached (only counts with a larger sibling wait out the time window).
 `HotkeyMonitor` reads the pasteboard's change count before a burst's first press and passes it on:
 a burst that copied nothing (no selection, a field that refuses copying) never uses the older
-clipboard -- only the AX selected text, else "No text selected.". Key auto-repeat and BindAll's own
+clipboard -- only the AX selected text, else "No text selected.". Key auto-repeat and Bindly's own
 marked keystrokes (`InjectedEvents`) are not presses. Read-only text (`ProofTarget.isEditable`: neither
 the value nor the selected text is settable, e.g. Terminal) gets no field star, no proofreading, and
 a selection star with only Show translation, Explain, Summarize and Copy. Selected text outside any field (a web
@@ -271,7 +271,7 @@ back only where its text still is (`ReplaceTarget`: unchanged, or found again ne
 when there is no offset map), checks the select and the selected text, and otherwise shows the
 result to copy ("Not replaced"); the hotkey preview captures its selection (`selectionContext`) and
 goes through it. Results keep the subject's leading/trailing whitespace (`EdgeWhitespace`).
-Hotkey bursts do nothing while BindAll itself is in front (Quick Translate's toggle aside). Every
+Hotkey bursts do nothing while Bindly itself is in front (Quick Translate's toggle aside). Every
 engine and translation task is `currentTask`, so Esc cancels it; the local Esc monitor swallows Esc
 only while there is a task. The 25 s watchdog cancels the task, not just the busy flag. Fix spelling
 skips personal-dictionary words (`LanguageToolEngine.correct(_:dictionary:)`); history records the
@@ -349,15 +349,15 @@ dimmed while Proofread is off.
   lone username or apiKey. The Premium token lives in the Keychain. The URL is pre-filled per mode
   but stays editable; there is no settings migration (mode defaults to Free).
   **Self-hosted has two targets** (`LanguageToolTarget`), kept side by side so switching loses
-  nothing: **Local server** (installed by BindAll, address derived from `localServerPort`) and
+  nothing: **Local server** (installed by Bindly, address derived from `localServerPort`) and
   **Custom URL** (`languageToolBaseURL`). `Settings.usesLocalServer` says which is live.
 - **Google Docs** is not supported: it renders to a canvas, so there is no AX text or word geometry.
   Only extensions Google allowlists (Grammarly, LanguageTool) get its text; the README points users
-  to the LanguageTool extension configured with BindAll's server (`http://127.0.0.1:<port>/v2`).
+  to the LanguageTool extension configured with Bindly's server (`http://127.0.0.1:<port>/v2`).
 - **Local LanguageTool server** (`LocalServer/`, opt-in from Settings -> Proofread -> Self-hosted):
-  the user clicks Install and BindAll downloads Temurin 21 JRE (Adoptium API, SHA-256 verified) and
+  the user clicks Install and Bindly downloads Temurin 21 JRE (Adoptium API, SHA-256 verified) and
   `LanguageTool-stable.zip` (no published checksum: only unpacking success is checked) into
-  `~/Library/Application Support/BindAll/LanguageTool/` (`AppPaths.supportDirectory`, so the E2E build has
+  `~/Library/Application Support/Bindly/LanguageTool/` (`AppPaths.supportDirectory`, so the E2E build has
   its own; `jre/`, `server/`, `install.json`,
   `server.log`, `server.pid`). Nothing else on disk, no system Java, ~540 MB. Downloads are prepared
   in `.staging` and swapped in atomically, so a failed update keeps the old files. The server
@@ -426,7 +426,7 @@ dimmed while Proofread is off.
   Command): its own hold key that always translates, also with plain Push to Talk off.
   `HoldKeyMonitor` watches both keys as slots (one hold at a time). The voice target language is
   "same" by default, meaning the Translation tab's target.
-  The note by the caret is the "BindAll Voice" panel (`VoiceIndicatorView`): a violet `mic.fill` (`Color.brand`)
+  The note by the caret is the "Bindly Voice" panel (`VoiceIndicatorView`): a violet `mic.fill` (`Color.brand`)
   (`VoiceMicIcon`) that swells with the input level (`AudioLevelMeter`, RMS measured in the audio tap,
   reported through `VoiceLevel` about 12 times a second; still with Reduce Motion). 1.5 s in, no
   buffers or a peak below `AudioLevelMeter.silentDecibels` (-60 dB) shows "The microphone is silent",
@@ -491,7 +491,7 @@ dimmed while Proofread is off.
   orbits (only the color shift with Reduce Motion); it stays shown through typing in a click-through-free non-activating panel (`StarPanel`) -- at the end of the selection
   (below it, away from editors' own selection toolbars) when something is selected, otherwise in the
   focused field's bottom-right corner; never both. Re-evaluated on mouse-up, key-up and app switch
-  (debounced), hidden on key-down/scroll; follows the Proofread app filter; skips BindAll itself,
+  (debounced), hidden on key-down/scroll; follows the Proofread app filter; skips Bindly itself,
   password and tiny fields. Uses `ProofreadAX.focus(analyze: false)` (no hidden-break walk) and the
   offset map for the selection's end. A click opens an `NSMenu` built by the coordinator: Fix, Fix
   spelling (LanguageTool `correct`), Show translation (popup), Replace with translation (Apple
@@ -523,7 +523,7 @@ dimmed while Proofread is off.
   focused element), above it when there is no room, else centered on the app's window. Look:
   `.panelChrome()` (material, radius 14, hairline border) and `PanelActionBar` (secondary left,
   Close and the main action right); Quick Translate uses the same bar. `FloatingPanelHost` remembers the app in front when it shows a window
-  and gives it the focus back on close when BindAll is left in front with no key window (opened from
+  and gives it the focus back on close when Bindly is left in front with no key window (opened from
   the menu bar, nothing else does; typing then went nowhere). `FloatingPanelHost.close()`
   and `QuickTranslateController.close()` order the window out at once but free it on the next main
   run-loop turn: Close is clicked in that very window, and freeing it (with its SwiftUI hierarchy)
@@ -547,7 +547,7 @@ dimmed while Proofread is off.
   `MaskAISlopRule.removeTells`, optionally followed by an AI rewrite (`removeTellsWithAI`); its
   preview notes stock phrases still present.
 - **Usage metrics** (`Store/UsageLog.swift`): local only, JSON lines in
-  `Application Support/BindAll/Usage/usage-YYYY-MM.jsonl`. Each event: feature, kind
+  `Application Support/Bindly/Usage/usage-YYYY-MM.jsonl`. Each event: feature, kind
   (shown/accepted/applied/skipped/dismissed/failed), frontmost app, optional ms, and fixed `reason` /
   `detail` tokens chosen by the code -- never user text. `UsageLog.record` is fire-and-forget from any
   thread. Recorded today: autocomplete shown/accepted(index)/dismissed(esc, typedOn, navigation,
@@ -561,20 +561,20 @@ dimmed while Proofread is off.
 
 ## Build & test
 
-- **End-to-end** (`./scripts/e2e.sh`, `Tests/E2E/`): builds a separate app "BindAll E2E"
-  (`com.evgeny.bindall.e2e`, signed with the dev certificate so its Accessibility grant survives
-  rebuilds) with its own UserDefaults and data folder (`AppPaths`: `Application Support/BindAll E2E`),
+- **End-to-end** (`./scripts/e2e.sh`, `Tests/E2E/`): builds a separate app "Bindly E2E"
+  (`com.evgeny.bindly.e2e`, signed with the dev certificate so its Accessibility grant survives
+  rebuilds) with its own UserDefaults and data folder (`AppPaths`: `Application Support/Bindly E2E`),
   writes test settings, launches it and drives TextEdit with synthesized input, then checks the field
-  text, the test build's windows (panels are named: "BindAll Underlines: N", "BindAll Fixes",
-  "BindAll Suggestions", "BindAll Inline", "BindAll Star", "BindAll Preview", "BindAll Prompt",
-  "BindAll Quick Translate"), their AX trees and its usage events. Report: `.build/e2e/report.md`.
-  Once: grant "BindAll E2E" Accessibility; quit the real BindAll first. `E2E_ONLY=proofread,quick`
+  text, the test build's windows (panels are named: "Bindly Underlines: N", "Bindly Fixes",
+  "Bindly Suggestions", "Bindly Inline", "Bindly Star", "Bindly Preview", "Bindly Prompt",
+  "Bindly Quick Translate"), their AX trees and its usage events. Report: `.build/e2e/report.md`.
+  Once: grant "Bindly E2E" Accessibility; quit the real Bindly first. `E2E_ONLY=proofread,quick`
   runs single groups. The star menu is not always in the AX tree, so items are picked with the
   arrows and Return when it is not (`pickMenuItem`); `slack` and `claude` drive those apps (no TextEdit then): Slack in an empty
   "New message" draft, Claude only in the composer of the window in front, left empty by hand, and
   never with Esc (Esc stops a Claude Code session in that app). Chromium word geometry comes from the
   field's AXStaticText children. Skips last for the whole run in every app, so each group types its
-  own sentence. Never sends a bare Return outside TextEdit and BindAll's own windows. SwiftUI
+  own sentence. Never sends a bare Return outside TextEdit and Bindly's own windows. SwiftUI
   fields ignore Unicode-only synthesized keys, so the driver sets their text through AX.
   Groups (`Tests/E2E/main.swift`, `CoreScenarios.swift`, `ElectronScenarios.swift`): autocomplete,
   proofread, fixAll, dictionary, history, explain, preSend, translateInPlace, voice, stars,
@@ -594,12 +594,12 @@ dimmed while Proofread is off.
 
 
 ```bash
-xcodebuild -scheme BindAll -configuration Debug build      # build
+xcodebuild -scheme Bindly -configuration Debug build      # build
 ./Tests/run_tests.sh                                       # pure-logic unit tests
 ```
 
 For a signing-free local build (CI / no certificate): append `CODE_SIGNING_ALLOWED=NO`.
-Open `BindAll.xcodeproj` in Xcode and Run to launch the app (set the signing Team first).
+Open `Bindly.xcodeproj` in Xcode and Run to launch the app (set the signing Team first).
 
 ## Permissions
 - **Accessibility** — required for the event taps and the synthetic Cmd+V. `HotkeyCoordinator`'s
@@ -608,7 +608,7 @@ Open `BindAll.xcodeproj` in Xcode and Run to launch the app (set the signing Tea
   leave the Accessibility checkbox showing granted while `AXIsProcessTrusted()` is actually stale
   (its designated requirement no longer matches what got re-signed); Settings → General → Status
   shows Accessibility and **Global shortcuts** separately for exactly this case -- if shortcuts
-  read "Not active" with Accessibility "Granted", remove BindAll from the Accessibility list and
+  read "Not active" with Accessibility "Granted", remove Bindly from the Accessibility list and
   grant it again. `AccessibilityPermission.listenEventAccessGranted` (Input Monitoring) is
   diagnostic-only, logged when a tap fails to install; it is never requested on its own.
 - **Apple Intelligence** — must be enabled for the on-device engine (`AppleFoundationEngine`).
@@ -616,20 +616,20 @@ Open `BindAll.xcodeproj` in Xcode and Run to launch the app (set the signing Tea
 
 ## Diagnostics
 Failures that used to be silent (a `tapCreate` returning nil, a monitor that never (re)installs) are
-now logged via `os.Logger`, subsystem `com.evgeny.bindall`, one category per area (`hotkeys`,
+now logged via `os.Logger`, subsystem `com.evgeny.bindly`, one category per area (`hotkeys`,
 `proofread`, `proofread-ax`, `login-item`, …): `log stream --predicate 'subsystem ==
-"com.evgeny.bindall"'`. `ProofreadAX.alignedRange`'s search window now scales with how far into the
+"com.evgeny.bindly"'`. `ProofreadAX.alignedRange`'s search window now scales with how far into the
 text the range sits (`max(16, min(256, location / 20))`) instead of a fixed ±16 UTF-16 units, and a
 miss is logged at `.debug` -- a fixed small window is what let long-document offset drift (an app's
 own AX bookkeeping disagreeing with ours) silently drop underlines and fixes. All AX calls made
 against another app's process now go through a 0.25s `AXUIElementSetMessagingTimeout`
-(`ProofreadAX.enableElectronAccessibilityIfNeeded`), so a hung target app cannot hang BindAll's main
+(`ProofreadAX.enableElectronAccessibilityIfNeeded`), so a hung target app cannot hang Bindly's main
 thread (and, with it, the active proofread popup tap the system would then disable).
 
 ## Key Guarantees
 - Menu-bar agent (`LSUIElement`); no Dock icon. The settings window temporarily switches the activation
   policy to `.regular` so it can come to the front, then back to `.accessory` on close.
-- **Accent color:** `Assets.xcassets/AccentColor` (BindAll's violet, `#990FE0`, lighter in dark mode,
+- **Accent color:** `Assets.xcassets/AccentColor` (Bindly's violet, `#990FE0`, lighter in dark mode,
   with high-contrast variants), named by `NSAccentColorName` in Info.plist, so default buttons,
   toggles, segmented controls, focus rings and the popups' `selectedContentBackgroundColor`
   selection are violet. macOS uses it only while System Settings > Appearance > Accent color is
@@ -667,7 +667,7 @@ shifts architecture, or deprecates documented behavior. This file is the single 
 it in sync with the code.
 
 ### Build must stay green
-After any code change, the project must compile: `xcodebuild -scheme BindAll build CODE_SIGNING_ALLOWED=NO`.
+After any code change, the project must compile: `xcodebuild -scheme Bindly build CODE_SIGNING_ALLOWED=NO`.
 If logic in `Actions/` or `Engines/` changes, run `./Tests/run_tests.sh` and extend the tests.
 
 ### Git hygiene

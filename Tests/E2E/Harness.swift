@@ -5,7 +5,7 @@ import Carbon.HIToolbox
 /// Low-level helpers for driving apps and reading the test build's windows. Nothing here sends a
 /// bare Return: in chat apps that sends the message.
 enum E2E {
-    static let testBundleID = "com.evgeny.bindall.e2e"
+    static let testBundleID = "com.evgeny.bindly.e2e"
 
     // MARK: Waiting
 
@@ -230,9 +230,9 @@ enum E2E {
         return nil
     }
 
-    /// The number of underlines drawn, from the underline panel's window name ("BindAll Underlines: N").
+    /// The number of underlines drawn, from the underline panel's window name ("Bindly Underlines: N").
     static func underlineCount() -> Int {
-        guard let name = windows().first(where: { $0.name.hasPrefix("BindAll Underlines") })?.name,
+        guard let name = windows().first(where: { $0.name.hasPrefix("Bindly Underlines") })?.name,
               let n = Int(name.split(separator: ":").last?.trimmingCharacters(in: .whitespaces) ?? "") else { return 0 }
         return n
     }
@@ -267,7 +267,7 @@ enum E2E {
 
     // MARK: Usage events
 
-    static let usageDirectory = URL.applicationSupportDirectory.appending(path: "BindAll E2E/Usage")
+    static let usageDirectory = URL.applicationSupportDirectory.appending(path: "Bindly E2E/Usage")
 
     struct Event: Decodable {
         let feature: String

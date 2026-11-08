@@ -4,9 +4,9 @@ The full project guide is **[AGENTS.md](./AGENTS.md)** — read it first. It is 
 truth for stack, structure, architecture, build/test commands, and the working rules below.
 
 ## Quick reference
-- Build: `xcodebuild -scheme BindAll build CODE_SIGNING_ALLOWED=NO`
+- Build: `xcodebuild -scheme Bindly build CODE_SIGNING_ALLOWED=NO`
 - Tests: `./Tests/run_tests.sh`
-- App: open `BindAll.xcodeproj` and Run (menu-bar agent, no Dock icon).
+- App: open `Bindly.xcodeproj` and Run (menu-bar agent, no Dock icon).
 
 ## Non-negotiable rules (see AGENTS.md for detail)
 - English only; no emojis in code, comments, docs, or commit messages.
