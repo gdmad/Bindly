@@ -514,7 +514,9 @@ dimmed while Proofread is off.
   keeping its top edge. Placed by `PanelPlacement`: under the field (`FocusedField.rect()`, the
   focused element), above it when there is no room, else centered on the app's window. Look:
   `.panelChrome()` (material, radius 14, hairline border) and `PanelActionBar` (secondary left,
-  Close and the main action right); Quick Translate uses the same bar. `FloatingPanelHost.close()`
+  Close and the main action right); Quick Translate uses the same bar. `FloatingPanelHost` remembers the app in front when it shows a window
+  and gives it the focus back on close when BindAll is left in front with no key window (opened from
+  the menu bar, nothing else does; typing then went nowhere). `FloatingPanelHost.close()`
   and `QuickTranslateController.close()` order the window out at once but free it on the next main
   run-loop turn: Close is clicked in that very window, and freeing it (with its SwiftUI hierarchy)
   while AppKit is still delivering the click stopped the app after Summarize. The E2E clicks the real

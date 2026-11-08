@@ -10,6 +10,8 @@ final class FloatingPanelHost {
     private var resizeObserver: NSObjectProtocol?
     private var liveResizeObserver: NSObjectProtocol?
     private var field = CGRect.zero
+    /// The app in front before this window took focus: it gets it back when the window closes.
+    private var previousApp: NSRunningApplication?
     /// Stops the window following its content's size.
     private var stopFollowingContent: (() -> Void)?
     /// Handed to the content of a resizable window; see `PanelSizing`.
@@ -73,6 +75,7 @@ final class FloatingPanelHost {
                 DispatchQueue.main.async { self?.keepOnScreen() }
             }
         }
+        if let front = NSWorkspace.shared.frontmostApplication, front != NSRunningApplication.current { previousApp = front }
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         // Once, after the first layout: a window shorter than its content hides its own header and
@@ -130,6 +133,12 @@ final class FloatingPanelHost {
         panel = nil
         closing.onEscape = nil
         closing.orderOut(nil)
+        // An accessory app left in front with no window: typing would go nowhere (opened from the
+        // menu bar, nothing hands the focus back on its own).
+        if let previousApp, NSApp.isActive, !NSApp.windows.contains(where: { $0.isKeyWindow && $0 !== closing && $0.isVisible }) {
+            previousApp.activate()
+        }
+        previousApp = nil
         // Close is usually clicked in this very window: freeing it (and its SwiftUI hierarchy) while
         // AppKit is still delivering that click left the app stuck. It goes once the event is over.
         DispatchQueue.main.async { withExtendedLifetime(closing) {} }
