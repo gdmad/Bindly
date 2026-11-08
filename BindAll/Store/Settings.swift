@@ -288,6 +288,8 @@ struct Settings: Codable, Equatable {
     var commandHotkeys: [String: HotkeyConfig] = [:]
     /// Fix spelling has said once that the free LanguageTool server is on the internet.
     var spellingNoticeShown = false
+    /// Optional shortcuts of the `TextTool`s, by raw value.
+    var textToolHotkeys: [String: HotkeyConfig] = [:]
 
     func provider(_ kind: ProviderKind) -> ProviderConfig {
         providers.first(where: { $0.kind == kind }) ?? .makeDefault(kind)
@@ -312,7 +314,7 @@ extension Settings {
              correctEnabled, starFieldEnabled, starSelectionEnabled, starAppMode, starApps, previewFromMenu, previewFromHotkeys,
              recentPrompts, maskAISlopRules, removeTellsWithAI, languageToolMode, languageToolBaseURL, languageToolUsername, languageToolLanguage,
              openRouterFreeOnly, providers, defaultActionHotkey, translateHotkey,
-             screenTranslateHotkey, quickTranslateHotkey, explainHotkey, summarizeHotkey, commandHotkeys, spellingNoticeShown
+             screenTranslateHotkey, quickTranslateHotkey, explainHotkey, summarizeHotkey, commandHotkeys, spellingNoticeShown, textToolHotkeys
     }
 
     /// Old key names still honoured on decode (never written back).
@@ -394,6 +396,8 @@ extension Settings {
         summarizeHotkey = try c.decodeIfPresent(HotkeyConfig.self, forKey: .summarizeHotkey)
         if let v = try c.decodeIfPresent([String: HotkeyConfig].self, forKey: .commandHotkeys) { commandHotkeys = v }
         if let v = try c.decodeIfPresent(Bool.self, forKey: .spellingNoticeShown) { spellingNoticeShown = v }
+        if let v = try c.decodeIfPresent([String: HotkeyConfig].self, forKey: .textToolHotkeys) { textToolHotkeys = v }
+        (actionKeys, textToolHotkeys) = TextToolMigration.migrate(actionKeys, hotkeys: textToolHotkeys)
     }
 }
 

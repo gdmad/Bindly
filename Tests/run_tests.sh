@@ -11,7 +11,7 @@ swiftc -O \
     BindAll/Actions/MaskAISlopRule.swift \
     BindAll/Actions/MaskAISlop.swift \
     BindAll/Actions/KeyboardLayoutMap.swift \
-    BindAll/Actions/LocalTransform.swift \
+    BindAll/Actions/TextTool.swift \
     BindAll/Store/AppPaths.swift \
     BindAll/Store/HistoryStore.swift \
     BindAll/Store/HistoryMenuTitle.swift \

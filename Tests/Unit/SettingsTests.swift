@@ -87,6 +87,7 @@ func runSettingsTests() {
     allChanged.historyEnabled = false
     allChanged.starAppMode = "deny"
     allChanged.spellingNoticeShown = true
+    allChanged.textToolHotkeys = ["lowercase": HotkeyConfig(keyCode: 37, modifiers: HotkeyModifiers(command: true, control: true), repeatCount: 1)]
     allChanged.commandHotkeys = ["spelling": HotkeyConfig(keyCode: 1, modifiers: HotkeyModifiers(command: true, control: true), repeatCount: 1)]
     allChanged.starApps = ["com.example.stars"]
     allChanged.sourceLanguage = "de"

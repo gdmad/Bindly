@@ -37,7 +37,7 @@ struct ActionsSettingsView: View {
             Section {
                 ActionKeysSettingsView()
             } header: {
-                HelpHeader("Action keys", "Named instructions for the AI. Each one is in the star menu; its global shortcut is set on the Shortcuts tab.")
+                HelpHeader("Action keys", "Named instructions for the AI, in the star menu under Actions; a global shortcut for each is set on the Shortcuts tab. UPPERCASE, lowercase and Fix keyboard layout are not here: they work without AI and cannot be changed (star menu > Text tools).")
             }
         }
         .formStyle(.grouped)

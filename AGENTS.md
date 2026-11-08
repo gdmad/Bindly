@@ -85,7 +85,7 @@ BindAll/
 ├── Actions/
 │   ├── ActionRouter.swift      # EngineFactory (builds an AIEngine from settings)
 │   └── MaskAISlop.swift        # typography normalizer (dashes/quotes/emoji)
-│   ├── LocalTransform.swift / KeyboardLayoutMap.swift # pure: built-in keys done without a model
+│   ├── TextTool.swift / KeyboardLayoutMap.swift # pure: fixed transforms without AI, and the old keys' migration
 ├── UI/
 │   ├── SettingsView.swift      # tab bar + selected tab (see "Settings layout"); `showSettingsTab` in the environment switches tabs
 │   ├── SettingsTab / SettingsTabBar / SettingsTabRow / SettingsTabButton / SettingsTabContent .swift
@@ -281,9 +281,12 @@ start from the Proofread list). A shown-only result from an editable star's text
 window. The preview opens on Result when most of the text changed (`TextDiff.changedShare` > 0.5:
 translations, history insertions, rewrites). `SelectionCommand` (Custom prompt, Fix spelling,
 Remove AI tells, Replace with translation) also runs on the selection from the menu bar and from
-optional shortcuts (`commandHotkeys`), through `selectionContext` and the star's own paths. The
-built-in UPPERCASE, lowercase and Fix keyboard layout keys run locally (`LocalTransform`,
-`KeyboardLayoutMap`), recognized by their built-in instruction. Mask AI Slop keeps every non-ASCII
+optional shortcuts (`commandHotkeys`), through `selectionContext` and the star's own paths. UPPERCASE,
+lowercase and Fix keyboard layout are `TextTool`s, not action keys: fixed, no AI, no instruction to
+edit, in the star's Text tools submenu and with optional shortcuts (`textToolHotkeys`). Stored action
+keys still carrying their old built-in instruction become the tools on decode (`TextToolMigration`,
+the shortcut moves along); an edited one stays an AI key. AI action keys sit in the star's Actions
+submenu. Mask AI Slop keeps every non-ASCII
 character the user typed in the input (`apply(to:rules:keeping:)`); Remove AI tells never takes the
 user's "All emoji" rule. Fix spelling is labelled "(LanguageTool)" and, in Free mode, says once in its
 preview that the text goes to languagetool.org (`spellingNoticeShown`). "Check before sending" is

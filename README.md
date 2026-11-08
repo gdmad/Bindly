@@ -17,7 +17,9 @@ No Dock icon: BindAll lives in the menu bar (`LSUIElement`); the icon pulses whi
 - **Fix / transform text** — select text, press the shortcut, and the corrected result replaces it in
   place. Uses the Apple on-device model by default, or a cloud provider.
 - **Action keys** — saved, named instructions, run from the star menu or **their own global
-  shortcut**. Built in: Fix keyboard layout, UPPERCASE, lowercase, Formal tone, Polite request.
+  shortcut**. Built in: Formal tone, Polite request.
+- **Text tools** — UPPERCASE, lowercase and Fix keyboard layout, done without AI and exactly; in the
+  star menu and with optional shortcuts.
 - **Explain / Summarize** — for text someone else wrote: select it and pick Explain selection or
   Summarize selection in the menu bar, or give them a shortcut on the Shortcuts tab. The result opens
   in a window; the text is left as it is.

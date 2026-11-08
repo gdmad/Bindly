@@ -225,6 +225,7 @@ final class HotkeyCoordinator {
     enum StarAction {
         case fix, spelling, translate, translateInPlace, removeTells
         case reading(Reading)
+        case textTool(TextTool)
         case actionKey(ActionKey)
         case prompt(String, showOnly: Bool)
     }
@@ -269,6 +270,16 @@ final class HotkeyCoordinator {
             actions.submenu = submenu
             menu.addItem(actions)
         }
+        // Fixed transforms with no AI and nothing to set up.
+        let tools = NSMenu()
+        for tool in TextTool.allCases {
+            tools.addItem(ClosureMenuItem(title: tool.title) { [weak self] in self?.runStarAction(.textTool(tool), context) })
+        }
+        let toolsItem = NSMenuItem(title: "Text tools", action: nil, keyEquivalent: "")
+        toolsItem.image = NSImage(systemSymbolName: "textformat", accessibilityDescription: nil)
+        toolsItem.submenu = tools
+        if keys.isEmpty { menu.addItem(.separator()) }
+        menu.addItem(toolsItem)
         menu.addItem(.separator())
         add("Custom prompt…", "text.bubble") { [weak self] in self?.askForPrompt(context) }
         if let history = historyMenu(for: context) { menu.addItem(history) }
@@ -375,6 +386,7 @@ final class HotkeyCoordinator {
         case .prompt: (.customPrompt, "Custom prompt", "source:star")
         case .translate, .translateInPlace: (.translate, "Translate", "source:star")
         case .reading(let reading): (reading.feature, reading.title, "source:star")
+        case .textTool(let tool): (.actionKey, tool.title, "tool:\(tool.rawValue)")
         }
         let showOnly = switch action {
         case .reading, .prompt(_, true): true
@@ -392,9 +404,9 @@ final class HotkeyCoordinator {
                         .correct(text, dictionary: PersonalDictionary.set(settings.personalDictionary))
                 case .removeTells:
                     result = try await self.removeTells(from: text, settings: settings)
-                case .actionKey(let key) where key.localTransform != nil:
-                    result = key.localTransform!.apply(to: text)
-                case .fix, .actionKey, .prompt, .translate, .translateInPlace, .reading:
+                case .textTool(let tool):
+                    result = tool.apply(to: text)
+                case .fix, .actionKey, .prompt, .translate, .translateInPlace, .reading, .textTool:
                     let instruction: String = switch action {
                     case .actionKey(let key): key.prompt
                     case .prompt(let prompt, _): prompt
@@ -409,6 +421,7 @@ final class HotkeyCoordinator {
                 let ms = UsageLog.elapsed(since: started)
                 let engineName = switch action {
                 case .spelling: "LanguageTool"
+                case .textTool: "Text tools"
                 case .removeTells: settings.removeTellsWithAI ? settings.defaultEngine.displayName : "Rules"
                 default: settings.defaultEngine.displayName
                 }
@@ -583,6 +596,7 @@ final class HotkeyCoordinator {
         let s = appState.settings
         let configs = [s.defaultActionHotkey, s.translateHotkey, s.screenTranslateHotkey, s.quickTranslateHotkey]
             + [s.explainHotkey, s.summarizeHotkey].compactMap { $0 } + Array(s.commandHotkeys.values)
+            + Array(s.textToolHotkeys.values)
             + s.actionKeys.compactMap(\.hotkey)
 
         // Group configs that share key+modifiers so the monitor knows the highest press count to
@@ -634,6 +648,8 @@ final class HotkeyCoordinator {
             runReading(.explain)
         } else if s.summarizeHotkey.map(matches) == true {
             runReading(.summarize)
+        } else if let tool = TextTool.allCases.first(where: { s.textToolHotkeys[$0.rawValue].map(matches) == true }) {
+            runDefaultAction(textTool: tool)
         } else if let command = SelectionCommand.allCases.first(where: { s.commandHotkeys[$0.settingsKey].map(matches) == true }) {
             runCommand(command)
         } else if let key = s.actionKeys.first(where: { $0.hotkey.map(matches) == true }) {
@@ -733,9 +749,10 @@ final class HotkeyCoordinator {
 
     /// Runs the text pipeline on the current selection with `fixedInstruction`, or the default prompt.
     private func runDefaultAction(fixedInstruction: String? = nil, forceCopy: Bool = false,
-                                  actionKey key: ActionKey? = nil, showOnly: Bool = false, reading: Reading? = nil) {
-        let actionKey = key?.logToken
-        let actionTitle = key?.title ?? reading?.title
+                                  actionKey key: ActionKey? = nil, showOnly: Bool = false, reading: Reading? = nil,
+                                  textTool: TextTool? = nil) {
+        let actionKey = key?.logToken ?? textTool.map { "tool:\($0.rawValue)" }
+        let actionTitle = key?.title ?? reading?.title ?? textTool?.title
         let settings = appState.settings
         let feature: UsageFeature = reading?.feature ?? (actionKey == nil ? .fix : .actionKey)
         let source = forceCopy ? "source:menu" : "source:hotkey"
@@ -753,9 +770,9 @@ final class HotkeyCoordinator {
             defer { self.endBusy() }
 
             // The default-action hotkey is Cmd+C-based, so the selection is already on the pasteboard.
-            // A per-action-key shortcut (fixedInstruction) or a menu invocation (forceCopy) does NOT
+            // A per-action-key or text-tool shortcut, or a menu invocation (forceCopy), does NOT
             // copy, so we copy it ourselves.
-            let selection = (fixedInstruction != nil || forceCopy)
+            let selection = (fixedInstruction != nil || textTool != nil || forceCopy)
                 ? SelectionReader.copyCurrentSelection()
                 : SelectionReader.currentSelection(previousChangeCount: self.burstChangeCount)
 
@@ -770,7 +787,7 @@ final class HotkeyCoordinator {
             let instruction = fixedInstruction ?? settings.defaultPrompt
 
             do {
-                let local = key?.localTransform
+                let local = textTool
                 var result: String
                 if let local { result = local.apply(to: content) } else {
                     result = try await engine.process(text: content, instruction: instruction)

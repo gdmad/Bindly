@@ -195,23 +195,36 @@ func starActionScenarios() {
     clearField()
     E2E.type("a quiet line of text")
     E2E.pause(1.0)
-    if runStarItem("UPPERCASE", downs: 6, in: "Actions", subDowns: 1) {
-        let preview = E2E.wait(20) { E2E.window("BindAll Preview") != nil }
-        record("an action key from the star shows a preview", preview)
+    if runStarItem("UPPERCASE", downs: 7, in: "Text tools", subDowns: 1) {
+        let preview = E2E.wait(5) { E2E.window("BindAll Preview") != nil }
+        record("a text tool from the star shows a preview at once", preview)
         if preview {
             clickButton("Apply", in: "BindAll Preview")
-            record("Apply writes the action key's result", E2E.wait(6) { isShouting(fieldText(), not: "a quiet line of text") },
-                   "now: \(fieldText())")
+            // No model involved: exactly the text, upper-cased.
+            record("Apply writes the tool's exact result", E2E.wait(6) { fieldText() == "A QUIET LINE OF TEXT" }, "now: \(fieldText())")
         }
     } else {
-        record("an action key from the star shows a preview", false, "no selection star")
+        record("a text tool from the star shows a preview at once", false, "no selection star")
+    }
+
+    // An AI action key, from the Actions submenu.
+    clearField()
+    E2E.type("пришли отчёт")
+    E2E.pause(1.0)
+    if runStarItem("Formal tone", downs: 6, in: "Actions", subDowns: 1) {
+        let preview = E2E.wait(30) { E2E.window("BindAll Preview") != nil }
+        record("an action key from the Actions submenu shows a preview", preview)
+        if preview { E2E.key(kVK_Escape) }
+        E2E.wait(2) { E2E.window("BindAll Preview") == nil }
+    } else {
+        record("an action key from the Actions submenu shows a preview", false, "no selection star")
     }
 
     // Custom prompt, all the way to the result.
     clearField()
     E2E.type("привет, завтра встреча в 10")
     E2E.pause(1.0)
-    guard runStarItem("Custom prompt…", downs: 7), E2E.wait(3, { E2E.window("BindAll Prompt") != nil }) else {
+    guard runStarItem("Custom prompt…", downs: 8), E2E.wait(3, { E2E.window("BindAll Prompt") != nil }) else {
         record("Custom prompt: its window opens", false); E2E.key(kVK_Escape); return
     }
     let promptPid = E2E.testApp!.processIdentifier
@@ -433,7 +446,7 @@ func dragScenario() {
     focusTextEdit()
     E2E.pause(1.0)
     let promptOpened = (1...2).contains { _ in
-        runStarItem("Custom prompt…", downs: 7) && E2E.wait(3, { E2E.window("BindAll Prompt") != nil })
+        runStarItem("Custom prompt…", downs: 8) && E2E.wait(3, { E2E.window("BindAll Prompt") != nil })
     }
     if promptOpened {
         E2E.pause(0.5)

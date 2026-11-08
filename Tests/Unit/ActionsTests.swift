@@ -23,12 +23,22 @@ func runActionsTests() {
     check(KeyboardLayoutMap.convert("Ghbdtn? rfr ltkf") == "Привет, как дела", "US keys meant as Russian")
     check(KeyboardLayoutMap.convert("руддщ цщкдв") == "hello world", "Russian keys meant as US")
     check(KeyboardLayoutMap.convert("Ghbdtn 2026") == "Привет 2026", "digits and spaces stay")
-    check(ActionKey.defaults.first { $0.label == "UPPERCASE" }?.localTransform == .uppercase, "the built-in UPPERCASE runs locally")
-    check(LocalTransform.lowercase.apply(to: "ПрИвЕт") == "привет", "lowercase")
-    var renamed = ActionKey.defaults[0]
-    renamed.label = "Раскладка"
-    check(renamed.localTransform == .keyboardLayout, "a renamed built-in key still counts")
-    check(ActionKey(label: "UPPERCASE", prompt: "Shout it").localTransform == nil, "an edited instruction goes to the model")
+    check(TextTool.uppercase.apply(to: "Привет") == "ПРИВЕТ" && TextTool.lowercase.apply(to: "ПрИвЕт") == "привет", "case tools")
+    check(TextTool.keyboardLayout.apply(to: "Ghbdtn") == "Привет", "the layout tool")
+    check(!ActionKey.defaults.contains { key in TextTool.allCases.contains { $0.title == key.label } }, "the tools are no action keys")
+
+    print("TextToolMigration")
+    do {
+        let hotkey = HotkeyConfig(keyCode: 32, modifiers: HotkeyModifiers(command: true, option: true), repeatCount: 1)
+        var upper = ActionKey(label: "Капс", prompt: TextTool.uppercase.legacyPrompt)
+        upper.hotkey = hotkey
+        let edited = ActionKey(label: "lowercase", prompt: "Make it lowercase, keep names capitalized.")
+        let polite = ActionKey(label: "Polite", prompt: "Be polite.")
+        let (keys, hotkeys) = TextToolMigration.migrate([upper, edited, polite], hotkeys: [:])
+        check(keys.map(\.label) == ["lowercase", "Polite"], "an untouched built-in key becomes the tool; an edited one stays")
+        check(hotkeys == ["uppercase": hotkey], "its shortcut moves to the tool")
+        check(TextToolMigration.migrate(keys, hotkeys: hotkeys) == (keys, hotkeys), "a second pass changes nothing")
+    }
 
     print("TextDiff changedShare")
     check(TextDiff.changedShare(TextDiff.words(old: "один два три четыре", new: "один два три пять")) < 0.5, "one word of four: the diff")

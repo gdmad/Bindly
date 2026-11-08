@@ -34,6 +34,11 @@ struct ShortcutsSettingsView: View {
                                          others: others(excluding: "command:" + command.settingsKey))
                     }
                 }
+                ForEach(TextTool.allCases) { tool in
+                    LabeledContent(tool.title) {
+                        ShortcutRecorder(optionalConfig: toolBinding(tool), others: others(excluding: "tool:" + tool.rawValue))
+                    }
+                }
             } header: {
                 HelpHeader("Editing the selection", "The star's actions on the selected text, also in the menu bar. No shortcut by default.")
             }
@@ -74,6 +79,13 @@ struct ShortcutsSettingsView: View {
     /// Every other shortcut, so no two actions share keys -- the hold keys included.
     private func others(excluding id: String) -> [HotkeyConfig] {
         ShortcutConflicts.others(excluding: id, in: appState.settings)
+    }
+
+    private func toolBinding(_ tool: TextTool) -> Binding<HotkeyConfig?> {
+        Binding(
+            get: { appState.settings.textToolHotkeys[tool.rawValue] },
+            set: { appState.settings.textToolHotkeys[tool.rawValue] = $0 }
+        )
     }
 
     private func commandBinding(_ command: SelectionCommand) -> Binding<HotkeyConfig?> {
