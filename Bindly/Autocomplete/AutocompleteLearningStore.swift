@@ -53,6 +53,8 @@ final class AutocompleteLearningStore {
     /// Bundled seed trigrams (Russian only, Leipzig news corpus), keyed by `trigramKey(prev2, prev1)`,
     /// used as a stronger context-score level than the seed bigrams. Read-only.
     private var seedTrigrams: [String: [String: Int]] = [:]
+    /// Bundled endings after a word ("в" -> "ом" -> count), the same shape as the bigram seed. Read-only.
+    private var seedSuffixes: [String: [String: Int]] = [:]
     /// Bundled word frequencies (Russian only): pool candidates. Read-only.
     private var lexicon = UnigramLexicon(entries: [])
     private let fileURL: URL
@@ -65,7 +67,7 @@ final class AutocompleteLearningStore {
     /// launch path; until they land, suggestions simply lack the seeds. Tests and the evaluator load
     /// them synchronously so the first lookup already sees them.
     init(fileURL: URL? = nil, seedURL: URL? = nil, trigramSeedURL: URL? = nil, unigramSeedURL: URL? = nil,
-         seedsInBackground: Bool = false) {
+         suffixSeedURL: URL? = nil, seedsInBackground: Bool = false) {
         if let fileURL {
             self.fileURL = fileURL
         } else {
@@ -76,23 +78,26 @@ final class AutocompleteLearningStore {
         let bigramURL = seedURL ?? Bundle.main.url(forResource: "ru_bigrams_ctx", withExtension: "txt")
         let trigramURL = trigramSeedURL ?? Bundle.main.url(forResource: "ru_trigrams", withExtension: "txt")
         let unigramURL = unigramSeedURL ?? Bundle.main.url(forResource: "ru_unigrams", withExtension: "txt")
+        let suffixURL = suffixSeedURL ?? Bundle.main.url(forResource: "ru_suffixes", withExtension: "txt")
         if seedsInBackground {
             DispatchQueue.global(qos: .utility).async { [self] in
-                loadSeeds(bigrams: bigramURL, trigrams: trigramURL, unigrams: unigramURL)
+                loadSeeds(bigrams: bigramURL, trigrams: trigramURL, unigrams: unigramURL, suffixes: suffixURL)
             }
         } else {
-            loadSeeds(bigrams: bigramURL, trigrams: trigramURL, unigrams: unigramURL)
+            loadSeeds(bigrams: bigramURL, trigrams: trigramURL, unigrams: unigramURL, suffixes: suffixURL)
         }
     }
 
     /// Silent by design elsewhere in this class, but a seed failing to load is otherwise
     /// indistinguishable from "the feature just doesn't work" -- log the outcome either way.
-    private func loadSeeds(bigrams: URL?, trigrams: URL?, unigrams: URL?) {
+    private func loadSeeds(bigrams: URL?, trigrams: URL?, unigrams: URL?, suffixes: URL?) {
         let started = DispatchTime.now().uptimeNanoseconds
         let bi = bigrams.map(Self.loadBigrams(from:)) ?? [:]
         let tri = trigrams.map(Self.loadTrigrams(from:)) ?? [:]
         let lex = unigrams.map(UnigramLexicon.init(contentsOf:)) ?? UnigramLexicon(entries: [])
+        let suf = suffixes.map(Self.loadBigrams(from:)) ?? [:]
         withLock {
+            seedSuffixes = suf
             seedBigrams = bi
             seedTrigrams = tri
             lexicon = lex
@@ -158,10 +163,10 @@ final class AutocompleteLearningStore {
 
     // MARK: - Picks
 
-    /// How much a pick weighs in ranking, against `contextScore`'s levels (1000 learned trigram, 100
-    /// learned bigram, 30/10 seeds, 1 frequency). Measured with `Tests/eval_autocomplete.sh context
-    /// online-picks`: as strong as personal frequency it is neutral; above the n-grams it overrode
-    /// the context and lost hits. So it breaks ties between equally supported words.
+    /// A pick scales the word's probability by `1 + pickWeight * pickScore` (up to double). Measured
+    /// with `Tests/eval_autocomplete.sh context online-picks` (PICK_ON=3: picked from the top 3):
+    /// neutral at 0.3-1, while putting picked words first in the learned pool -- as 0.11.1 did --
+    /// cost 1-3 points of hit@1, so picks only re-weigh, never reorder the pool.
     static let pickWeight: Double = 1
 
     /// The prefixes a pick is remembered under: 2 to 4 letters of what was typed.
@@ -221,13 +226,14 @@ final class AutocompleteLearningStore {
     /// (as opposed to one-off typos) and are excluded from suggestions, though still recorded.
     /// Pinned custom words (weight 1_000_000) are always exempt.
     private let minSurfaceCount = 2
+    /// The count a pinned custom word gets: far above anything typed.
+    static let pinnedWeight = 1_000_000
 
     /// Learned words extending `partial` (case-insensitive): the ones picked on these letters first,
     /// then most-used first.
     func completions(matching partial: String, limit: Int) -> [String] {
         let lower = partial.lowercased()
-        let picks = picked(matching: partial)
-        let learned = withLock {
+        return withLock {
             model.wordCounts
                 .filter { $0.key.count > partial.count && $0.key.lowercased().hasPrefix(lower)
                          && $0.value >= minSurfaceCount }
@@ -235,8 +241,6 @@ final class AutocompleteLearningStore {
                 .prefix(limit)
                 .map { $0.key }
         }
-        var seen = Set<String>()
-        return (picks + learned).filter { seen.insert($0.lowercased()).inserted }.prefix(limit).map { $0 }
     }
 
     /// Words that extend `prefix` and followed these preceding words before, best first: learned
@@ -292,38 +296,36 @@ final class AutocompleteLearningStore {
         }
     }
 
-    /// Context-aware score for ranking *current-word completions*: how likely is `word` to follow
-    /// `prev1`/`prev2` (up to two preceding words). Interpolated evidence with the same precedence as
-    /// `nextWords()` (learned trigram > learned bigram > seed trigram > seed bigram > personal
-    /// frequency), each level normalized to its context maximum so counts of different scales (seed
-    /// corpora vs personal typing) stay comparable. Non-negative; 0 means no evidence. Read-only.
+    /// How likely `word` is after `prev1`/`prev2`, for ranking current-word completions
+    /// (`ContextProbability`). Positive for every word; for many candidates use
+    /// `contextProbability(prev1:prev2:)` once instead.
     func contextScore(word: String, prev1: String?, prev2: String?) -> Double {
-        let w = word.lowercased()
-        return withLock {
-            var score = 0.0
+        contextProbability(prev1: prev1, prev2: prev2).probability(of: word)
+    }
 
-            if let p1 = prev1?.lowercased(), !p1.isEmpty,
-               let p2 = prev2?.lowercased(), !p2.isEmpty,
-               let following = model.trigrams[Self.trigramKey(p2, p1)], let c = following[w] {
-                score += 1000.0 * relative(c, to: following.values.max() ?? c)
-            }
-            if let p1 = prev1?.lowercased(), !p1.isEmpty,
-               let following = model.bigrams[p1], let c = following[w] {
-                score += 100.0 * relative(c, to: following.values.max() ?? c)
-            }
-            if let p1 = prev1?.lowercased(), !p1.isEmpty,
-               let p2 = prev2?.lowercased(), !p2.isEmpty,
-               let following = seedTrigrams[Self.trigramKey(p2, p1)], let c = following[w] {
-                score += 30.0 * relative(c, to: following.values.max() ?? c)
-            }
-            if let p1 = prev1?.lowercased(), !p1.isEmpty,
-               let following = seedBigrams[p1], let c = following[w] {
-                score += 10.0 * relative(c, to: following.values.max() ?? c)
-            }
-            if let c = model.wordCounts[w] {
-                score += 1.0 * relative(c, to: model.wordCounts.values.max() ?? c)
-            }
-            return score
+    /// The tables for this context, for scoring many candidates with one lock (`ContextProbability`).
+    /// Pinned custom words count as the most used ordinary word, so their huge weight does not
+    /// flatten everyone else's personal frequency.
+    func contextProbability(prev1: String?, prev2: String?) -> ContextProbability {
+        let p1 = prev1?.lowercased() ?? "", p2 = prev2?.lowercased() ?? ""
+        return withLock {
+            let triKey = !p1.isEmpty && !p2.isEmpty ? Self.trigramKey(p2, p1) : nil
+            let counts = model.wordCounts
+            let ordinaryMax = counts.values.filter { $0 < Self.pinnedWeight }.max() ?? 1
+            let personalTotal = counts.values.reduce(0.0) { $0 + Double(min($1, ordinaryMax)) }
+            return ContextProbability(
+                personalTrigram: triKey.flatMap { ContextProbability.Level(model.trigrams[$0]) },
+                personalBigram: p1.isEmpty ? nil : ContextProbability.Level(model.bigrams[p1]),
+                personalUnigram: { w in
+                    guard personalTotal > 0, let c = counts[w] else { return 0 }
+                    return Double(min(c, ordinaryMax)) / personalTotal
+                },
+                seedTrigram: triKey.flatMap { ContextProbability.Level(seedTrigrams[$0]) },
+                seedBigram: p1.isEmpty ? nil : ContextProbability.Level(seedBigrams[p1]),
+                // Uniform: ordering context-free words by corpus frequency ranked worse than the pool
+                // order (measured with the lexicon's counts), so the bundled model stops at bigrams.
+                seedUnigram: { _ in 1e-5 },
+                seedSuffix: p1.isEmpty ? nil : ContextProbability.Level(seedSuffixes[p1]))
         }
     }
 
@@ -354,7 +356,7 @@ final class AutocompleteLearningStore {
         let trimmed = word.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 1, trimmed.allSatisfy({ $0.isLetter }) else { return }
         let snapshot = withLock { () -> Model in
-            model.wordCounts[trimmed] = max(model.wordCounts[trimmed] ?? 0, 1_000_000)
+            model.wordCounts[trimmed] = max(model.wordCounts[trimmed] ?? 0, Self.pinnedWeight)
             return model
         }
         persist(snapshot)

@@ -55,12 +55,14 @@ Bindly/
 │   ├── AutocompleteController.swift   # two CGEventTaps on own thread (listen-only monitor + active suppressor); AX/keystroke word; suggestions, next-word, accept
 │   ├── AutocompleteLearningStore.swift# learned counts + bi/trigrams + picks; RU seeds (loaded off the launch path); contextCandidates/contextScore/nextWords (thread-safe)
 │   ├── UnigramLexicon.swift           # pure: sorted word-frequency list, prefix range by binary search
+│   ├── ContextProbability.swift       # pure: smoothed P(word | two preceding words), personal + bundled mixed
 │   ├── LearnedWordAudit.swift         # pure: which learned words look like typos (dictionary check comes in as a closure)
 │   ├── AutocompleteInsertion.swift    # pure: append the suggestion's remainder vs. delete-and-retype (never passes through an empty field)
 │   ├── SemanticRanker.swift           # experimental: NLContextualEmbedding (Cyrillic) cosine re-ranking, debug-only
 │   ├── ru_unigrams.txt                # RU word frequencies (100k) -- pool candidates     \
 │   ├── ru_bigrams_ctx.txt             # RU bigram seed -- next-word, pool and ranking      } mixed corpus, see Credits in README
 │   ├── ru_trigrams.txt                # RU trigram seed -- pool and ranking               /
+│   ├── ru_suffixes.txt                # RU endings after a word ("в" -> "ом") -- ranking (160 KB)
 │   └── AutocompleteOverlay.swift      # non-activating floating list shown near the caret (PopupKit)
 ├── Proofread/                  # step through LanguageTool's findings one at a time
 │   ├── TextIssue.swift                # shared issue model (UTF-16 ranges, stable ids)
@@ -169,7 +171,7 @@ Tests/
 ├── run_tests.sh
 ├── eval_autocomplete.sh        # autocomplete evaluator over the three RU sets (default: context, online)
 ├── eval_autocomplete.swift     # harness: hit@1/hit@3/MRR, inPool (ranking ceiling), KSR, lookup time
-├── gen_ru_ngrams.py            # rebuilds the three ru_*.txt seeds from weighted corpora (txt / Taiga parquet)
+├── gen_ru_ngrams.py            # rebuilds the ru_*.txt seeds from weighted corpora (txt / Taiga parquet)
 ├── ru_eval_chat.txt            # ~200 hand-written chat/AI-request messages -- the main, frozen set
 ├── ru_eval_news.txt            # 25 Leipzig news sentences (held out of any seed rebuild)
 └── ru_eval_corpus.txt          # 80 hand-written general sentences
@@ -231,11 +233,18 @@ language, permissions) · Providers (connections only). Rarely changed options s
 - **Word autocomplete** (off by default; enable and configure on the Autocomplete tab): as you type, a list of case-matched completions appears near the caret; arrow keys choose,
   **Tab** (and optionally Return) inserts; any other key, a click anywhere, or leaving the app
   dismisses it. Completions are **ranked by the preceding words** (the "Rank by context" setting,
-  default on): `AutocompleteLearningStore.contextScore` interpolates learned trigram > learned
-  bigram > bundled RU trigram/bigram seeds > personal frequency, and the pool (learned + dictionary
-  completions, up to 30) is re-ranked by that score -- this was validated by an experiment, run with
-  `Tests/eval_autocomplete.sh` (context beat baseline and a semantic-embedding variant on hit@1/MRR
-  against `Tests/ru_eval_corpus.txt`). It can predict the next word
+  default on): the pool (below) is re-ranked by `ContextProbability`, a smoothed probability of the
+  word after the two preceding words -- interpolated absolute discounting (d 0.5) over trigram ->
+  bigram -> bottom level, computed for the personal and the bundled data separately and mixed by
+  the personal evidence after `prev1` (n / (n + 100), at least 0.1). The bundled bottom level is
+  uniform, lifted by the ending `prev1` usually takes (`ru_suffixes.txt`: "в" -> "-ом"; weight 10):
+  corpus word frequency there ranked worse than the pool order. Since 0.11.3; it replaced fixed
+  level weights (1000/100/30/10/1 on "share of the context's top count") and, against them, won on
+  all three sets (chat: KSR 18.5% -> 20.1%, mostly from the endings). A session cache of recent
+  words was measured and hurt (0.3-0.8 points), so recency is not modelled; per-day decay was not
+  built (nothing measured favours recency, and the sets have no time order to test it on). The
+  context mode itself was validated earlier against baseline and a semantic-embedding variant.
+  The scorer is built once per lookup (one lock) and each candidate is scored once. It can predict the next word
   after a space: the context (up to two preceding words) is read from the focused field via AX where
   one is exposed, the same way the current word is ranked, so it also works after clicking back into
   a sentence or returning from another app -- not only mid-typing-run, which is all the keystroke
@@ -257,18 +266,20 @@ language, permissions) · Providers (connections only). Rarely changed options s
   **Seed data** is a weighted mix built by `Tests/gen_ru_ngrams.py`: Leipzig `rus_news_2023` (0.5),
   Leipzig `rus-ru_web-public_2019` (1), Taiga social (0.5 + 0.5) and subtitles (1), up to 20M words
   each, n-grams seen at least 3 times, the evaluator's sets excluded. Against news alone it won on
-  the chat and general sets (with the new pool, chat 2 letters hit@1 32% vs 28%, KSR 19% vs 16%); web alone and Taiga
-  alone came between.
+  the chat and general sets (with the new pool, chat 2 letters hit@1 32% vs 28%, KSR 19% vs 16%);
+  web alone and Taiga alone came between. The endings table comes from the same run
+  (`--suffix-contexts 5000`, kept from a scaled count of 200: as good as 3 at 1/20 of the size).
   Suggestions start after `autocompleteMinPrefix` letters (2 by default, 2-4 on the Autocomplete
   tab). Measured with `Tests/eval_autocomplete.sh context online` (the store learning as the text
   goes, the only fair mode -- `warm` has seen every test sentence) on the chat set as of 0.11.2:
-  hit@1 32% at 2 letters, 45% at 3, 52% at 4; 19% of letters saved (KSR) from 2 letters; about
-  7 ms per lookup (p95 12 ms), off the input path. Hiding 2-letter lists
+  hit@1 33% at 2 letters, 46% at 3, 53% at 4; 20% of letters saved (KSR) from 2 letters (0.11.3);
+  about 5 ms per lookup on an idle machine (p95 9 ms), off the input path. The system dictionary
+  is asked once per lookup -- asking it twice (0.11.2) doubled the time. Hiding 2-letter lists
   that have no learned or n-gram support was measured too (29% right when shown, a third hidden) and
   left out. **Picks** (`AutocompleteLearningStore.recordPick`, `picks` in the file): what was accepted
-  on which 2-4 letters, looked up from the longest matching prefix; picked words lead the learned
-  pool, and in ranking they weigh like personal frequency (`pickWeight` 1) -- heavier, they
-  overrode the context and lost hits in `online-picks`.
+  on which 2-4 letters, looked up from the longest matching prefix; a pick scales the word's
+  probability by up to 2 (`pickWeight` 1). Neutral in `online-picks`; putting picked words first in
+  the learned pool (0.11.1-0.11.2) cost 1-3 points of hit@1 on the chat set and was dropped.
   Learned words can be reviewed: the "Learned words" sheet flags every word the dictionary does
   not know (`LearnedWordAudit`, pinned words exempt) and can drop them in one go -- anything typed
   twice gets learned, typos included.

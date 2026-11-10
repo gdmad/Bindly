@@ -25,6 +25,7 @@ Output (tab-separated, scaled counts, sorted by count descending):
   <outdir>/ru_unigrams.txt     word \\t count                   (top N words)
   <outdir>/ru_bigrams_ctx.txt  prev \\t next \\t count           (top N bigrams)
   <outdir>/ru_trigrams.txt     prev2 \\t prev1 \\t next \\t count (top N trigrams)
+  <outdir>/ru_suffixes.txt     prev \\t last two letters of next \\t count (with --suffix-contexts)
 
 Tokens: contiguous letter runs (Cyrillic + Latin), lowercased; "е" and "ё" stay distinct keys,
 matching the learning store. Punctuation and numbers split tokens.
@@ -113,6 +114,10 @@ def main():
     ap.add_argument("--top-trigrams", type=int, default=150_000)
     ap.add_argument("--min-count", type=int, default=3)
     ap.add_argument("--max-words", type=int, default=20_000_000, help="words read per source")
+    ap.add_argument("--suffix-contexts", type=int, default=0,
+                    help="also write ru_suffixes.txt for this many most frequent preceding words")
+    ap.add_argument("--suffix-min-count", type=int, default=200,
+                    help="scaled count an ending needs to be kept (200 measured as good as 3, at 1/20 the size)")
     args = ap.parse_args()
 
     excluded = set()
@@ -155,6 +160,18 @@ def main():
     with open(os.path.join(args.outdir, "ru_trigrams.txt"), "w", encoding="utf-8") as f:
         for key, c in top(2, args.top_trigrams):
             f.write(f"{key}\t{max(1, round(c))}\n")
+    if args.suffix_contexts:
+        # Which endings follow a word: "в" -> "-ом"/"-е", whatever the next word itself is.
+        contexts = {w for w, _ in top(0, args.suffix_contexts)}
+        suffixes = collections.Counter()
+        for key, c in totals[1].items():
+            prev, nxt = key.split("\t")
+            if prev in contexts and len(nxt) > 2:
+                suffixes[prev + "\t" + nxt[-2:]] += c
+        with open(os.path.join(args.outdir, "ru_suffixes.txt"), "w", encoding="utf-8") as f:
+            for key, c in sorted(suffixes.items(), key=lambda kv: (-kv[1], kv[0])):
+                if c >= args.suffix_min_count:
+                    f.write(f"{key}\t{max(1, round(c))}\n")
     print(f"unique: words={len(totals[0])} bigrams={len(totals[1])} trigrams={len(totals[2])} -> {args.outdir}",
           file=sys.stderr)
 

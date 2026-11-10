@@ -135,14 +135,14 @@ final class AutocompleteController {
 
     /// Context scorer for the mode, or nil when the mode does not use one. Called on the work queue
     /// (read-only store access). For the context mode it closes over the two preceding words so the
-    /// engine can score each candidate with `store.contextScore`.
-    /// A word picked on these very letters before outranks every other piece of evidence.
+    /// engine can score each candidate with one `ContextProbability` snapshot; a word picked on these
+    /// letters before weighs up to twice as much.
     private func contextScorer(mode: AutocompleteEngine.Mode, prev1: String?, prev2: String?,
                                partial: String) -> ((String) -> Double)? {
         guard mode == .context else { return nil }
-        let p1 = prev1, p2 = prev2
+        let model = store.contextProbability(prev1: prev1, prev2: prev2)
         return { [store] word in
-            AutocompleteLearningStore.pickWeight * store.pickScore(word: word, partial: partial) + store.contextScore(word: word, prev1: p1, prev2: p2)
+            model.probability(of: word) * (1 + AutocompleteLearningStore.pickWeight * store.pickScore(word: word, partial: partial))
         }
     }
 

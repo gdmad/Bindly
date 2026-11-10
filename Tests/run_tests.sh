@@ -59,6 +59,7 @@ swiftc -O \
     Bindly/Autocomplete/AutocompleteEngine.swift \
     Bindly/Autocomplete/AutocompleteLearningStore.swift \
     Bindly/Autocomplete/UnigramLexicon.swift \
+    Bindly/Autocomplete/ContextProbability.swift \
     Bindly/Autocomplete/LearnedWordAudit.swift \
     Bindly/Autocomplete/AutocompleteInsertion.swift \
     Bindly/Autocomplete/AutocompleteKeyPolicy.swift \

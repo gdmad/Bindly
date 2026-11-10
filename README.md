@@ -168,12 +168,12 @@ contributor conventions.
 ## Credits
 
 - Russian autocomplete seed data (`Bindly/Autocomplete/ru_unigrams.txt`, `ru_bigrams_ctx.txt`,
-  `ru_trigrams.txt`: word, pair and triple frequencies) is derived from:
+  `ru_trigrams.txt`, `ru_suffixes.txt`: word, pair, triple and ending frequencies) is derived from:
   - the Leipzig Corpora Collection, `rus_news_2023_1M` and `rus-ru_web-public_2019_1M`, licensed
     [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/);
   - the Taiga corpus (Shavrina and Shapovalova, 2017), social media and subtitles segments, licensed
     [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
-  As a derivative of Taiga, these three data files are distributed under CC BY-SA 3.0. The rest of
+  As a derivative of Taiga, these data files are distributed under CC BY-SA 3.0. The rest of
   Bindly is under the MIT license below.
 
 ## License

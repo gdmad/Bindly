@@ -4,7 +4,7 @@ import AppKit
 /// Autocomplete evaluator: simulates typing each Russian corpus word letter by letter (with the
 /// previous words as context) and measures where the correct completion lands, per engine mode.
 ///
-/// Usage: eval_autocomplete <corpusPath> <variant> <store> [limit] [bigramSeed] [trigramSeed] [unigramSeed]
+/// Usage: eval_autocomplete <corpusPath> <variant> <store> [limit] [bigramSeed] [trigramSeed] [unigramSeed] [suffixSeed]
 ///   variant: baseline | context | semantic
 ///   store:   cold = empty learning store; warm = corpus pre-recorded (has seen every test sentence);
 ///            online = starts empty and learns as the text goes, as typing does (the fair mode);
@@ -55,8 +55,22 @@ let dumpMissing = ProcessInfo.processInfo.environment["DUMP_MISSING"] == "1"
 
 let pickWeight = Double(ProcessInfo.processInfo.environment["PICK_WEIGHT"] ?? "") ?? AutocompleteLearningStore.pickWeight
 
+/// `ContextProbability` with its defaults, overridable with DISCOUNT, PERSONAL_K, PERSONAL_FLOOR
+/// and SUFFIX for grids; picks scale it as in the app.
+let env = ProcessInfo.processInfo.environment
+let tuning: ContextProbability.Tuning = {
+    var t = ContextProbability.Tuning()
+    if let v = Double(env["DISCOUNT"] ?? "") { t.discount = v }
+    if let v = Double(env["PERSONAL_K"] ?? "") { t.personalK = v }
+    if let v = Double(env["PERSONAL_FLOOR"] ?? "") { t.personalFloor = v }
+    if let v = Double(env["SUFFIX"] ?? "") { t.suffixWeight = v }
+    return t
+}()
+
 func contextScorer(store: AutocompleteLearningStore, prev1: String, prev2: String, partial: String) -> ((String) -> Double)? {
-    { word in pickWeight * store.pickScore(word: word, partial: partial) + store.contextScore(word: word, prev1: prev1, prev2: prev2) }
+    var model = store.contextProbability(prev1: prev1, prev2: prev2)
+    model.tuning = tuning
+    return { word in model.probability(of: word) * (1 + pickWeight * store.pickScore(word: word, partial: partial)) }
 }
 
 /// Semantic scorer for variant C (as specified: blended with the frequency prior): cosine
@@ -100,6 +114,7 @@ struct EvalMain {
                                          : URL(fileURLWithPath: "Bindly/Autocomplete/ru_bigrams_ctx.txt")
         let trigramSeed = args.count > 6 && !args[6].isEmpty ? URL(fileURLWithPath: args[6]) : nil
         let unigramSeed = args.count > 7 && !args[7].isEmpty ? URL(fileURLWithPath: args[7]) : nil
+        let suffixSeed = args.count > 8 && !args[8].isEmpty ? URL(fileURLWithPath: args[8]) : nil
         let poolLimit = max(AutocompleteEngine.reRankPoolLimit, limit)
 
         guard let corpusText = try? String(contentsOf: corpusURL, encoding: .utf8) else {
@@ -118,7 +133,8 @@ struct EvalMain {
         let loadStarted = DispatchTime.now().uptimeNanoseconds
         let store = AutocompleteLearningStore(fileURL: tmpDir.appendingPathComponent("store.json"),
                                               seedURL: bigramSeed, trigramSeedURL: trigramSeed,
-                                              unigramSeedURL: unigramSeed ?? URL(fileURLWithPath: "/dev/null"))
+                                              unigramSeedURL: unigramSeed ?? URL(fileURLWithPath: "/dev/null"),
+                                              suffixSeedURL: suffixSeed ?? URL(fileURLWithPath: "/dev/null"))
         let loadMs = Double(DispatchTime.now().uptimeNanoseconds - loadStarted) / 1_000_000
 
 
@@ -196,7 +212,9 @@ struct EvalMain {
                 }
                 // After all of this word's trials, so a pick never helps the occurrence that made it:
                 // the pick is the prefix the word would have been accepted on.
-                if picks, let p = (2..<max(2, word.count)).first(where: { rankAt[$0] == 1 }) {
+                // PICK_ON=3: the word is picked from the top 3 with the arrows, not only when first.
+                let pickRanks = env["PICK_ON"] == "3" ? 1...3 : 1...1
+                if picks, let p = (2..<max(2, word.count)).first(where: { pickRanks.contains(rankAt[$0] ?? 0) }) {
                     store.recordPick(partial: String(word.prefix(p)), word: word)
                 }
                 if online { store.record(word: word, prev1: prev1, prev2: prev2) }

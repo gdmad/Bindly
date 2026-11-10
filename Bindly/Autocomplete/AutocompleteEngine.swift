@@ -190,33 +190,33 @@ enum AutocompleteEngine {
                   !out.contains(where: { $0.lowercased() == word.lowercased() }) else { return }
             out.append(word)
         }
+        let checker = NSSpellChecker.shared
+        let range = NSRange(location: 0, length: (request.partial as NSString).length)
+        func languages() -> [String] {
+            guard request.languages.isEmpty else { return request.languages }
+            checker.automaticallyIdentifiesLanguages = true
+            return [checker.language()]
+        }
+        // The dictionary's completions, asked for once per request: the call costs milliseconds, and
+        // the re-ranking pool takes them in two parts around the bundled lexicon.
+        var dictionary: [String]?
         func fillFromSpellChecker(stopAt: Int, includeGuesses: Bool) {
-            let checker = NSSpellChecker.shared
-            let langs: [String]
-            if request.languages.isEmpty {
-                checker.automaticallyIdentifiesLanguages = true
-                langs = [checker.language()]
-            } else {
-                langs = request.languages
-            }
-            let range = NSRange(location: 0, length: (request.partial as NSString).length)
-            // Completions first (across all chosen languages), then guesses.
-            for lang in langs {
-                for candidate in (checker.completions(forPartialWordRange: range, in: request.partial,
-                                                      language: lang, inSpellDocumentWithTag: 0) ?? []) {
-                    addExtending(candidate)
-                    if out.count >= stopAt { break }
+            if dictionary == nil {
+                dictionary = languages().flatMap {
+                    checker.completions(forPartialWordRange: range, in: request.partial,
+                                        language: $0, inSpellDocumentWithTag: 0) ?? []
                 }
-                if out.count >= stopAt { break }
             }
-            if includeGuesses && out.count < stopAt {
-                for lang in langs {
-                    for guess in (checker.guesses(forWordRange: range, in: request.partial,
-                                                  language: lang, inSpellDocumentWithTag: 0) ?? []) {
-                        addCorrection(guess)
-                        if out.count >= stopAt { break }
-                    }
-                    if out.count >= stopAt { break }
+            for candidate in dictionary ?? [] {
+                guard out.count < stopAt else { return }
+                addExtending(candidate)
+            }
+            guard includeGuesses else { return }
+            for lang in languages() {
+                for guess in (checker.guesses(forWordRange: range, in: request.partial,
+                                              language: lang, inSpellDocumentWithTag: 0) ?? []) {
+                    guard out.count < stopAt else { return }
+                    addCorrection(guess)
                 }
             }
         }
@@ -262,14 +262,12 @@ enum AutocompleteEngine {
             case .semantic: scorer = { request.semanticScorer?($0) ?? 0 }
             case .baseline: fatalError("unreachable")
             }
-            // Stable sort by score descending: ties keep the pool order (frequency, then dictionary).
-            let ranked = out.enumerated()
-                .sorted { a, b in
-                    let sa = scorer(a.element), sb = scorer(b.element)
-                    return sa != sb ? sa > sb : a.offset < b.offset
-                }
-                .map { $0.element }
-            out = ranked
+            // Stable sort by score descending: ties keep the pool order. Each word is scored once --
+            // scoring inside the comparator ran the scorer about ten times per word.
+            out = out.enumerated()
+                .map { (offset: $0.offset, word: $0.element, score: scorer($0.element)) }
+                .sorted { $0.score != $1.score ? $0.score > $1.score : $0.offset < $1.offset }
+                .map(\.word)
         }
 
         // Recase to the typed word's case pattern, de-duplicating again.

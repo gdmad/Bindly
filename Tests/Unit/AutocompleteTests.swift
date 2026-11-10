@@ -109,9 +109,8 @@ func runAutocompleteTests() {
         picks.recordPick(partial: "пр", word: "проект")
         check(picks.pickScore(word: "привет", partial: "пр") == 1 && picks.pickScore(word: "проект", partial: "пр") == 0.5,
               "the most picked on these letters scores highest")
-        check(picks.completions(matching: "пр", limit: 5).prefix(2) == ["привет", "проект"],
-              "picked words lead the learned completions, even before they are frequent")
-        check(picks.completions(matching: "при", limit: 5) == ["привет"], "a longer prefix keeps only the words still matching")
+        check(picks.completions(matching: "пр", limit: 5).isEmpty,
+              "picks do not reorder or join the learned pool: they only re-weigh in ranking")
         check(picks.pickScore(word: "привет", partial: "приве") > 0, "past four letters the four-letter pick still counts")
         picks.recordPick(partial: "п", word: "привет")
         check(picks.picked(matching: "п").isEmpty, "one letter is not remembered")
@@ -160,26 +159,48 @@ func runAutocompleteTests() {
     check(s1.nextWords(prev1: "в", prev2: "пошёл", limit: 1) == ["театр"], "limit caps the result")
     check(s1.nextWords(prev1: "нигде", prev2: nil, limit: 5).isEmpty, "no evidence anywhere: nothing offered")
 
-    // contextScore: the same precedence, plus every layer is normalized so a huge corpus count cannot
-    // drown out a small personal one.
-    let s2 = makeStore(bigramSeed: [("в", "магазин", 500), ("в", "школу", 10)],
+    // contextScore: a smoothed probability, personal and bundled data mixed.
+    let s2 = makeStore(bigramSeed: [("в", "году", 9000), ("в", "городе", 4000), ("в", "школу", 300), ("в", "магазин", 200)],
                        trigramSeed: [("пошёл", "в", "театр", 900)])
-    s2.record(word: "магазин", prev1: "в", prev2: nil)
-    s2.record(word: "магазин", prev1: "в", prev2: nil) // learned bigram, clears the threshold
-    check(s2.contextScore(word: "магазин", prev1: "в", prev2: nil) >
-          s2.contextScore(word: "школу", prev1: "в", prev2: nil),
-          "a learned bigram outweighs the seed bigram even though the seed count is far larger")
-    s2.record(word: "театр", prev1: "в", prev2: "пошёл")
-    s2.record(word: "театр", prev1: "в", prev2: "пошёл") // learned trigram
-    check(s2.contextScore(word: "театр", prev1: "в", prev2: "пошёл") >
-          s2.contextScore(word: "магазин", prev1: "в", prev2: "пошёл"),
-          "a learned trigram outweighs a learned bigram")
-    check(s2.contextScore(word: "рынок", prev1: "в", prev2: nil) == 0,
-          "a word with no evidence anywhere scores zero")
+    check(s2.contextScore(word: "году", prev1: "в", prev2: nil) > s2.contextScore(word: "школу", prev1: "в", prev2: nil),
+          "with nothing learned the bundled counts decide")
+    s2.record(word: "офис", prev1: "в", prev2: nil)
+    s2.record(word: "офис", prev1: "в", prev2: nil)
+    check(s2.contextScore(word: "офис", prev1: "в", prev2: nil) > s2.contextScore(word: "школу", prev1: "в", prev2: nil),
+          "a pair typed twice beats a bundled pair with hundreds of occurrences")
+    check(s2.contextScore(word: "театр", prev1: "в", prev2: "пошёл") > s2.contextScore(word: "году", prev1: "в", prev2: "пошёл"),
+          "a trigram beats the bigram backoff")
+    check(s2.contextScore(word: "рынок", prev1: "в", prev2: nil) < s2.contextScore(word: "магазин", prev1: "в", prev2: nil)
+          && s2.contextScore(word: "рынок", prev1: "в", prev2: nil) > 0,
+          "a word with no evidence is unlikely but not impossible")
+    let probe = s2.contextProbability(prev1: "в", prev2: nil)
+    let mass = ["году", "городе", "школу", "магазин", "офис"].reduce(0) { $0 + probe.probability(of: $1) }
+    check(mass <= 1.0001, "probabilities over the known followers sum to at most 1 (got \(mass))")
     let s3 = makeStore()
     s3.record(word: "привет", prev1: nil, prev2: nil)
-    check(s3.contextScore(word: "привет", prev1: nil, prev2: nil) > 0,
-          "personal frequency alone still contributes when there is no context match")
+    check(s3.contextScore(word: "привет", prev1: nil, prev2: nil) > s3.contextScore(word: "пока", prev1: nil, prev2: nil),
+          "personal frequency alone still counts when there is no context")
+    s3.add(custom: "Bindly")
+    s3.record(word: "проект", prev1: nil, prev2: nil)
+    check(s3.contextScore(word: "проект", prev1: nil, prev2: nil) > s3.contextScore(word: "пока", prev1: nil, prev2: nil),
+          "a pinned word does not flatten the other personal frequencies")
+
+    print("Autocomplete endings")
+    do {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bindly-test-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let suffixURL = dir.appendingPathComponent("suffixes.txt")
+        try! "в\tом\t900\nв\tой\t300\nв\tах\t10".write(to: suffixURL, atomically: true, encoding: .utf8)
+        let st = AutocompleteLearningStore(fileURL: dir.appendingPathComponent("store.json"),
+                                           seedURL: dir.appendingPathComponent("none.txt"),
+                                           trigramSeedURL: dir.appendingPathComponent("none.txt"),
+                                           unigramSeedURL: dir.appendingPathComponent("none.txt"),
+                                           suffixSeedURL: suffixURL)
+        check(st.contextScore(word: "большом", prev1: "в", prev2: nil) > st.contextScore(word: "большая", prev1: "в", prev2: nil),
+              "the ending that usually follows lifts a word with no other evidence (в большом > в большая)")
+        check(st.contextScore(word: "большом", prev1: "на", prev2: nil) == st.contextScore(word: "большая", prev1: "на", prev2: nil),
+              "a preceding word with no endings data leaves them equal")
+    }
 
     // record(): the surface filter that keeps one-off typos out of nextWords's evidence.
     let s4 = makeStore()
