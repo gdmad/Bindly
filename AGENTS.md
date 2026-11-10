@@ -165,10 +165,12 @@ Tests/
 │                               # shared helpers), one <Area>Tests.swift per area (Actions, Proofread,
 │                               # Autocomplete, Settings, UI, Voice), main.swift runs them all
 ├── run_tests.sh
-├── eval_autocomplete.sh        # autocomplete ranking evaluator (hit@1/hit@3/MRR per prefix)
-├── eval_autocomplete.swift     # harness: RU corpus, cold/warm store, baseline|context|semantic modes
+├── eval_autocomplete.sh        # autocomplete evaluator over the three RU sets (default: context, online)
+├── eval_autocomplete.swift     # harness: hit@1/hit@3/MRR, inPool (ranking ceiling), KSR, lookup time
 ├── gen_ru_ngrams.py            # rebuilds ru_bigrams_ctx.txt / ru_trigrams.txt from a sentence corpus
-└── ru_eval_corpus.txt          # 105 RU sentences (80 hand-written + 25 Leipzig news) used by the evaluator
+├── ru_eval_chat.txt            # ~200 hand-written chat/AI-request messages -- the main, frozen set
+├── ru_eval_news.txt            # 25 Leipzig news sentences (held out of any seed rebuild)
+└── ru_eval_corpus.txt          # 80 hand-written general sentences
 Info.plist                      # LSUIElement, version (source of truth for version)
 ```
 

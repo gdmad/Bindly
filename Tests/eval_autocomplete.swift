@@ -1,15 +1,16 @@
 import Foundation
 import AppKit
 
-/// Autocomplete evaluator: simulates typing a prefix of each corpus word (with the previous words as
-/// context) and measures how often the correct completion appears in the suggestion list, per engine
-/// mode. Used to compare the baseline ranking against the experimental variants (A/B/C).
+/// Autocomplete evaluator: simulates typing each Russian corpus word letter by letter (with the
+/// previous words as context) and measures where the correct completion lands, per engine mode.
 ///
-/// Usage: eval_autocomplete <corpusPath> <seedPath> <variant> <cold|warm> [limit]
+/// Usage: eval_autocomplete <corpusPath> <variant> <store> [limit] [bigramSeed] [trigramSeed]
 ///   variant: baseline | context | semantic
-///   warm:    cold = empty learning store; warm = corpus pre-recorded (words + bigrams/trigrams);
-///            picks = warm, and every word is also "picked" on its letters after its trial (online,
-///            so a word only gains from a pick when it comes up again), as accepting does in the app
+///   store:   cold = empty learning store; warm = corpus pre-recorded (has seen every test sentence);
+///            online = starts empty and learns as the text goes, as typing does (the fair mode);
+///            online-picks = online, plus a pick on the prefix the word would have been accepted on.
+/// Reports hit@1/hit@3/MRR on the visible list, inPool (the word is anywhere in the ranked pool --
+/// the ceiling for any ranking), lookup time, and KSR (share of letters saved by accepting).
 let prefixes = [2, 3, 4, 5]
 
 struct Stats {
@@ -42,6 +43,10 @@ func tokenize(_ line: String) -> [String] {
     }
     if !current.isEmpty { words.append(current.lowercased()) }
     return words
+}
+
+func isCyrillic(_ word: String) -> Bool {
+    word.unicodeScalars.allSatisfy { (0x0400...0x04FF).contains($0.value) }
 }
 
 /// Context scorer for variant A/B: interpolated trigram -> bigram -> seed -> frequency evidence for
@@ -93,6 +98,7 @@ struct EvalMain {
         let bigramSeed = args.count > 5 ? URL(fileURLWithPath: args[5])
                                          : URL(fileURLWithPath: "Bindly/Autocomplete/ru_bigrams_ctx.txt")
         let trigramSeed = args.count > 6 && !args[6].isEmpty ? URL(fileURLWithPath: args[6]) : nil
+        let poolLimit = max(AutocompleteEngine.reRankPoolLimit, limit)
 
         guard let corpusText = try? String(contentsOf: corpusURL, encoding: .utf8) else {
             print("cannot read corpus \(corpusURL.path)")
@@ -123,58 +129,79 @@ struct EvalMain {
         }
 
         var statsByPrefix: [Int: Stats] = [:]
+        var inPoolByPrefix: [Int: Int] = [:]
         var timesByPrefix: [Int: [Double]] = [:]
-        var shortShown = 0, shortRight = 0
         var total = Stats()
+        // Keystroke savings: every Cyrillic word is typed letter by letter from `m` letters on and
+        // accepted as soon as it is first (Tab: 1 key) or, for KSR@3, in the top 3 (arrows + Tab).
+        let minPrefixes = [2, 3]
+        var letters = 0
+        var saved1: [Int: Int] = [:], saved3: [Int: Int] = [:]
 
         for line in sentences {
             let ws = tokenize(line)
-            // Only words with two preceding words: the context the variants are tested on.
-            for i in 2..<ws.count {
+            for i in ws.indices {
                 let word = ws[i]
-                let prev1 = ws[i - 1]
-                let prev2 = ws[i - 2]
-                for p in prefixes where p < word.count {
-                    let partial = String(word.prefix(p))
-                    let learnedLimit = mode == .baseline ? limit : max(AutocompleteEngine.reRankPoolLimit, limit)
-                    let learned = warm || online ? store.completions(matching: partial, limit: learnedLimit) : []
-                    var req = AutocompleteEngine.Request(partial: partial, languages: ["ru"],
-                                                         learned: learned, limit: limit, mode: mode)
-                    req.contextScorer = contextScorer(store: store, prev1: prev1, prev2: prev2, partial: partial)
-                    req.semanticScorer = semanticScorer(context: "\(prev2) \(prev1)", store: store)
-                    let started = DispatchTime.now().uptimeNanoseconds
-                    let list = AutocompleteEngine.suggestions(request: req)
-                    timesByPrefix[p, default: []].append(Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000)
-                    let rank = list.firstIndex { $0.lowercased() == word }.map { $0 + 1 } ?? 0
-                    // At two letters: would the list be shown at all under the "needs support" rule
-                    // (the first suggestion is a learned word or has context evidence), and was it right?
-                    if p == 2, let first = list.first {
-                        let supported = learned.contains { $0.lowercased() == first.lowercased() }
-                            || store.contextScore(word: first, prev1: prev1, prev2: prev2) > 0
-                        shortShown += supported ? 1 : 0
-                        shortRight += supported && rank == 1 ? 1 : 0
-                    }
-                    statsByPrefix[p, default: Stats()].add(rank: rank)
-                    total.add(rank: rank)
+                let prev1 = i >= 1 ? ws[i - 1] : nil
+                let prev2 = i >= 2 ? ws[i - 2] : nil
+                // Latin words stay as context only: the evaluator measures Russian completion.
+                guard isCyrillic(word) else {
+                    if online { store.record(word: word, prev1: prev1, prev2: prev2) }
+                    continue
                 }
-                // After all of this word's trials: a pick must not help the same occurrence's next prefix.
-                if picks { for p in prefixes where p < word.count { store.recordPick(partial: String(word.prefix(p)), word: word) } }
+                letters += word.count
+                var rankAt: [Int: Int] = [:]
+                for p in 2..<max(2, word.count) {
+                    let partial = String(word.prefix(p))
+                    let learned = warm || online ? store.completions(matching: partial, limit: poolLimit) : []
+                    // One request at the pool size: in the re-ranking modes the visible list is its prefix.
+                    var req = AutocompleteEngine.Request(partial: partial, languages: ["ru"],
+                                                         learned: learned, limit: poolLimit, mode: mode)
+                    req.contextScorer = contextScorer(store: store, prev1: prev1 ?? "", prev2: prev2 ?? "", partial: partial)
+                    req.semanticScorer = semanticScorer(context: [prev2, prev1].compactMap { $0 }.joined(separator: " "), store: store)
+                    let started = DispatchTime.now().uptimeNanoseconds
+                    let pool = AutocompleteEngine.suggestions(request: req)
+                    let elapsed = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
+                    let poolRank = pool.firstIndex { $0.lowercased() == word }.map { $0 + 1 } ?? 0
+                    let rank = poolRank <= limit ? poolRank : 0
+                    rankAt[p] = rank
+                    if prefixes.contains(p) {
+                        timesByPrefix[p, default: []].append(elapsed)
+                        statsByPrefix[p, default: Stats()].add(rank: rank)
+                        inPoolByPrefix[p, default: 0] += poolRank > 0 ? 1 : 0
+                        total.add(rank: rank)
+                    }
+                }
+                for m in minPrefixes {
+                    let accept1 = (m..<max(m, word.count)).first { rankAt[$0] == 1 }
+                    saved1[m, default: 0] += accept1.map { word.count - ($0 + 1) } ?? 0
+                    let accept3 = (m..<max(m, word.count)).first { (1...3).contains(rankAt[$0] ?? 0) }
+                    saved3[m, default: 0] += accept3.map { max(0, word.count - ($0 + rankAt[$0]!)) } ?? 0
+                }
+                // After all of this word's trials, so a pick never helps the occurrence that made it:
+                // the pick is the prefix the word would have been accepted on.
+                if picks, let p = (2..<max(2, word.count)).first(where: { rankAt[$0] == 1 }) {
+                    store.recordPick(partial: String(word.prefix(p)), word: word)
+                }
                 if online { store.record(word: word, prev1: prev1, prev2: prev2) }
             }
         }
 
-        print("mode=\(mode.rawValue) store=\(args[3]) limit=\(limit) lang=ru")
-        print("prefix  trials  hit@1   hit@3   MRR     absent  avg ms  p95 ms")
+        print("corpus=\(corpusURL.lastPathComponent) mode=\(mode.rawValue) store=\(args[3]) limit=\(limit)")
+        print("prefix  trials  hit@1   hit@3   MRR     absent  inPool  avg ms  p95 ms")
         for p in prefixes {
+            let s = statsByPrefix[p] ?? Stats()
             let times = (timesByPrefix[p] ?? []).sorted()
             let avg = times.isEmpty ? 0 : times.reduce(0, +) / Double(times.count)
             let p95 = times.isEmpty ? 0 : times[min(times.count - 1, Int(Double(times.count) * 0.95))]
-            print(String(format: "%d      %@  %6.2f  %6.2f", p, fmt(statsByPrefix[p] ?? Stats()), avg, p95))
+            let inPool = 100.0 * Double(inPoolByPrefix[p] ?? 0) / Double(max(1, s.trials))
+            print(String(format: "%d      %@  %5.1f%%  %6.2f  %6.2f", p, fmt(s), inPool, avg, p95))
         }
         print("all     \(fmt(total))")
-        let twoLetter = statsByPrefix[2]?.trials ?? 0
-        print(String(format: "2 letters with the support rule: shown %d of %d (%.0f%%), first right when shown %.0f%%",
-                     shortShown, twoLetter, 100.0 * Double(shortShown) / Double(max(1, twoLetter)),
-                     100.0 * Double(shortRight) / Double(max(1, shortShown))))
+        for m in minPrefixes {
+            print(String(format: "KSR from %d letters: %.1f%% (first only), %.1f%% (top 3), %d letters",
+                         m, 100.0 * Double(saved1[m] ?? 0) / Double(max(1, letters)),
+                         100.0 * Double(saved3[m] ?? 0) / Double(max(1, letters)), letters))
+        }
     }
 }

@@ -1,17 +1,17 @@
 #!/bin/bash
-# Compiles and runs the autocomplete evaluator (Tests/eval_autocomplete.swift) against the RU corpus.
-# Usage: Tests/eval_autocomplete.sh <variant> [cold|warm] [limit] [bigramSeed] [trigramSeed]
-#   variant: baseline | context | semantic
-#   bigramSeed / trigramSeed: override the bundled seed files (used to compare variant A's seed
-#   against variant B's rich data).
+# Compiles and runs the autocomplete evaluator (Tests/eval_autocomplete.swift).
+# Usage: Tests/eval_autocomplete.sh [variant] [store] [limit] [bigramSeed] [trigramSeed]
+#   variant: baseline | context | semantic (default context)
+#   store:   cold | warm | online | online-picks (default online -- the fair mode)
+#   CORPUS=path runs one corpus; by default the chat, news and general sets run in turn.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VARIANT="${1:-baseline}"
-WARM="${2:-cold}"
+VARIANT="${1:-context}"
+STORE="${2:-online}"
 LIMIT="${3:-5}"
 BIGRAM="${4:-Bindly/Autocomplete/ru_bigrams_ctx.txt}"
-TRIGRAM="${5:-}"
+TRIGRAM="${5:-Bindly/Autocomplete/ru_trigrams.txt}"
 
 OUT="$(mktemp -d)/EvalAutocomplete"
 swiftc -O \
@@ -22,4 +22,12 @@ swiftc -O \
     Tests/eval_autocomplete.swift \
     -o "$OUT"
 
-"$OUT" Tests/ru_eval_corpus.txt "$VARIANT" "$WARM" "$LIMIT" "$BIGRAM" "$TRIGRAM"
+if [ -n "${CORPUS:-}" ]; then
+    CORPORA=("$CORPUS")
+else
+    CORPORA=(Tests/ru_eval_chat.txt Tests/ru_eval_news.txt Tests/ru_eval_corpus.txt)
+fi
+for c in "${CORPORA[@]}"; do
+    "$OUT" "$c" "$VARIANT" "$STORE" "$LIMIT" "$BIGRAM" "$TRIGRAM"
+    echo
+done
