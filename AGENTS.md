@@ -53,7 +53,7 @@ Bindly/
 ├── Autocomplete/               # word completion while typing (off by default)
 │   ├── AutocompleteEngine.swift       # pool (context/field/learned/system/lexicon, per-source quotas) + scorer re-ranking; recasing, partial word, documentWords
 │   ├── AutocompleteController.swift   # two CGEventTaps on own thread (listen-only monitor + active suppressor); AX/keystroke word; suggestions, next-word, accept
-│   ├── AutocompleteLearningStore.swift# learned counts + bi/trigrams + picks; RU seeds (loaded off the launch path); contextCandidates/contextScore/nextWords (thread-safe)
+│   ├── AutocompleteLearningStore.swift# learned counts + bi/trigrams; RU seeds (loaded off the launch path); contextCandidates/contextScore/nextWords (thread-safe)
 │   ├── UnigramLexicon.swift           # pure: sorted word-frequency list, prefix range by binary search
 │   ├── ContextProbability.swift       # pure: smoothed P(word | two preceding words), personal + bundled mixed
 │   ├── LearnedWordAudit.swift         # pure: which learned words look like typos (dictionary check comes in as a closure)
@@ -259,7 +259,7 @@ language, permissions) · Providers (connections only). Rarely changed options s
   **The candidate pool** (up to 30, `AutocompleteEngine.suggestions`, re-ranking modes) is gathered
   in this order, each source capped so none crowds out the rest: words the preceding words led to
   in learned and bundled n-grams (`contextCandidates`, 10), words already in the field nearest the
-  caret first (`documentWords`, buffer-word completion as in editors, 5), picked/learned words (10),
+  caret first (`documentWords`, buffer-word completion as in editors, 5), learned words (10),
   the system dictionary, and the bundled frequency list (`UnigramLexicon`, 20, Cyrillic prefixes
   only). The dictionary goes before the lexicon: on ties the pool order decides, and the
   dictionary's order ranked better than corpus frequency. Before 0.11.2 the pool was learned words
@@ -284,10 +284,9 @@ language, permissions) · Providers (connections only). Rarely changed options s
   about 5 ms per lookup on an idle machine (p95 9 ms), off the input path. The system dictionary
   is asked once per lookup -- asking it twice (0.11.2) doubled the time. Hiding 2-letter lists
   that have no learned or n-gram support was measured too (29% right when shown, a third hidden) and
-  left out. **Picks** (`AutocompleteLearningStore.recordPick`, `picks` in the file): what was accepted
-  on which 2-4 letters, looked up from the longest matching prefix; a pick scales the word's
-  probability by up to 2 (`pickWeight` 1). Neutral in `online-picks`; putting picked words first in
-  the learned pool (0.11.1-0.11.2) cost 1-3 points of hit@1 on the chat set and was dropped.
+  left out. Accepted words are not remembered per prefix (0.11.5): putting them first cost 1-3
+  points of hit@1 on the chat set and re-weighing by them was neutral, so the `picks` map was
+  removed (old files still load; the key is dropped on the next save).
   Learned words can be reviewed: the "Learned words" sheet flags every word the dictionary does
   not know (`LearnedWordAudit`, pinned words exempt) and can drop them in one go -- anything typed
   twice gets learned, typos included.

@@ -8,8 +8,7 @@ import FoundationModels
 /// Usage: eval_autocomplete <corpusPath> <variant> <store> [limit] [bigramSeed] [trigramSeed] [unigramSeed] [suffixSeed]
 ///   variant: baseline | context | semantic
 ///   store:   cold = empty learning store; warm = corpus pre-recorded (has seen every test sentence);
-///            online = starts empty and learns as the text goes, as typing does (the fair mode);
-///            online-picks = online, plus a pick on the prefix the word would have been accepted on.
+///            online = starts empty and learns as the text goes, as typing does (the fair mode).
 /// Reports hit@1/hit@3/MRR on the visible list, inPool (the word is anywhere in the ranked pool --
 /// the ceiling for any ranking), lookup time, and KSR (share of letters saved by accepting).
 let prefixes = [2, 3, 4, 5]
@@ -54,10 +53,8 @@ func tokenize(_ line: String) -> [String] {
 let noPoolSources = ProcessInfo.processInfo.environment["NO_POOL_SOURCES"] == "1"
 let dumpMissing = ProcessInfo.processInfo.environment["DUMP_MISSING"] == "1"
 
-let pickWeight = Double(ProcessInfo.processInfo.environment["PICK_WEIGHT"] ?? "") ?? AutocompleteLearningStore.pickWeight
-
 /// `ContextProbability` with its defaults, overridable with DISCOUNT, PERSONAL_K, PERSONAL_FLOOR
-/// and SUFFIX for grids; picks scale it as in the app.
+/// and SUFFIX for grids.
 let env = ProcessInfo.processInfo.environment
 let tuning: ContextProbability.Tuning = {
     var t = ContextProbability.Tuning()
@@ -71,7 +68,7 @@ let tuning: ContextProbability.Tuning = {
 func contextScorer(store: AutocompleteLearningStore, prev1: String, prev2: String, partial: String) -> ((String) -> Double)? {
     var model = store.contextProbability(prev1: prev1, prev2: prev2)
     model.tuning = tuning
-    return { word in model.probability(of: word) * (1 + pickWeight * store.pickScore(word: word, partial: partial)) }
+    return { model.probability(of: $0) }
 }
 
 /// Semantic scorer for variant C (as specified: blended with the frequency prior): cosine
@@ -176,11 +173,10 @@ struct EvalMain {
             print("unknown variant \(args[2]); expected baseline|context|semantic")
             exit(2)
         }
-        // online / online-picks: the store starts empty and learns as the text goes, as typing does --
+        // online: the store starts empty and learns as the text goes, as typing does --
         // the only fair test, since warm has already seen every sentence it is asked about.
-        let online = args[3].hasPrefix("online")
-        let picks = args[3] == "picks" || args[3] == "online-picks"
-        let warm = args[3] == "warm" || args[3] == "picks"
+        let online = args[3] == "online"
+        let warm = args[3] == "warm"
         let limit = args.count > 4 ? (Int(args[4]) ?? 5) : 5
         let bigramSeed = args.count > 5 ? URL(fileURLWithPath: args[5])
                                          : URL(fileURLWithPath: "Bindly/Autocomplete/ru_bigrams_ctx.txt")
@@ -291,13 +287,6 @@ struct EvalMain {
                     saved1[m, default: 0] += accept1.map { word.count - ($0 + 1) } ?? 0
                     let accept3 = (m..<max(m, word.count)).first { (1...3).contains(rankAt[$0] ?? 0) }
                     saved3[m, default: 0] += accept3.map { max(0, word.count - ($0 + rankAt[$0]!)) } ?? 0
-                }
-                // After all of this word's trials, so a pick never helps the occurrence that made it:
-                // the pick is the prefix the word would have been accepted on.
-                // PICK_ON=3: the word is picked from the top 3 with the arrows, not only when first.
-                let pickRanks = env["PICK_ON"] == "3" ? 1...3 : 1...1
-                if picks, let p = (2..<max(2, word.count)).first(where: { pickRanks.contains(rankAt[$0] ?? 0) }) {
-                    store.recordPick(partial: String(word.prefix(p)), word: word)
                 }
                 if online { store.record(word: word, prev1: prev1, prev2: prev2) }
             }

@@ -20,7 +20,7 @@ struct AutocompleteSettingsView: View {
                 Picker(selection: $appState.settings.autocompleteMinPrefix) {
                     ForEach(2...4, id: \.self) { Text("\($0) letters").tag($0) }
                 } label: {
-                    HelpHeader("Suggest after", "How many letters to type before suggestions appear. From 2 there are more of them and more miss; from 3 they are more often right. Words you have picked before on the same letters come first either way.")
+                    HelpHeader("Suggest after", "How many letters to type before suggestions appear. From 2 there are more of them and more miss; from 3 they are more often right.")
                 }
                 Stepper("Suggestions shown: \(appState.settings.autocompleteCount)",
                         value: $appState.settings.autocompleteCount, in: 1...9)

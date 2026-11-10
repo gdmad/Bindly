@@ -25,8 +25,6 @@ final class AutocompleteLearningStore {
         var wordCounts: [String: Int] = [:]
         var bigrams: [String: [String: Int]] = [:]   // lowercased prev word -> (next -> count)
         var trigrams: [String: [String: Int]] = [:]  // "w2\tw1" (lowercased) -> (next -> count)
-        /// What was accepted on which letters: lowercased prefix (2-4 letters) -> (word -> count).
-        var picks: [String: [String: Int]] = [:]
 
         init() {}
         // Resilient: an older file without trigrams still loads.
@@ -35,7 +33,6 @@ final class AutocompleteLearningStore {
             wordCounts = try c.decodeIfPresent([String: Int].self, forKey: .wordCounts) ?? [:]
             bigrams = try c.decodeIfPresent([String: [String: Int]].self, forKey: .bigrams) ?? [:]
             trigrams = try c.decodeIfPresent([String: [String: Int]].self, forKey: .trigrams) ?? [:]
-            picks = try c.decodeIfPresent([String: [String: Int]].self, forKey: .picks) ?? [:]
         }
     }
 
@@ -161,67 +158,6 @@ final class AutocompleteLearningStore {
         persistSoon()
     }
 
-    // MARK: - Picks
-
-    /// A pick scales the word's probability by `1 + pickWeight * pickScore` (up to double). Measured
-    /// with `Tests/eval_autocomplete.sh context online-picks` (PICK_ON=3: picked from the top 3):
-    /// neutral at 0.3-1, while putting picked words first in the learned pool -- as 0.11.1 did --
-    /// cost 1-3 points of hit@1, so picks only re-weigh, never reorder the pool.
-    static let pickWeight: Double = 1
-
-    /// The prefixes a pick is remembered under: 2 to 4 letters of what was typed.
-    static let pickPrefixLengths = 2...4
-    /// Words kept per prefix; the least picked go first.
-    static let picksPerPrefix = 20
-
-    /// The picks that apply to a typed partial: those made on its longest remembered prefix that
-    /// still has a word extending it ("при" also finds what was picked on "пр"). Call under the lock.
-    private func picksLocked(for partial: String) -> [String: Int] {
-        let lower = partial.lowercased()
-        guard lower.count >= Self.pickPrefixLengths.lowerBound else { return [:] }
-        for length in stride(from: min(lower.count, Self.pickPrefixLengths.upperBound),
-                             through: Self.pickPrefixLengths.lowerBound, by: -1) {
-            let words = (model.picks[String(lower.prefix(length))] ?? [:])
-                .filter { $0.key.count > lower.count && $0.key.hasPrefix(lower) }
-            if !words.isEmpty { return words }
-        }
-        return [:]
-    }
-
-    /// The user took `word` from the list after typing `partial`: on these letters it comes first
-    /// next time -- the strongest signal there is at two or three letters.
-    func recordPick(partial: String, word: String) {
-        let w = word.lowercased(), p = partial.lowercased()
-        guard w.count > p.count, w.hasPrefix(p), w.allSatisfy({ $0.isLetter }) else { return }
-        withLock {
-            for length in Self.pickPrefixLengths where length <= p.count {
-                let key = String(p.prefix(length))
-                var words = model.picks[key, default: [:]]
-                words[w, default: 0] += 1
-                if words.count > Self.picksPerPrefix, let least = words.min(by: { $0.value < $1.value })?.key {
-                    words[least] = nil
-                }
-                model.picks[key] = words
-            }
-        }
-        persistSoon()
-    }
-
-    /// 0...1: how often `word` was the pick on these letters, against the most picked one.
-    func pickScore(word: String, partial: String) -> Double {
-        let w = word.lowercased()
-        return withLock {
-            let words = picksLocked(for: partial)
-            guard let c = words[w] else { return 0 }
-            return relative(c, to: words.values.max() ?? c)
-        }
-    }
-
-    /// Words picked on these letters that still extend `partial`, most picked first.
-    func picked(matching partial: String) -> [String] {
-        withLock { picksLocked(for: partial).sorted { $0.value > $1.value }.map(\.key) }
-    }
-
     /// Words typed/accepted fewer than this many times haven't been confirmed as real words yet
     /// (as opposed to one-off typos) and are excluded from suggestions, though still recorded.
     /// Pinned custom words (weight 1_000_000) are always exempt.
@@ -229,8 +165,7 @@ final class AutocompleteLearningStore {
     /// The count a pinned custom word gets: far above anything typed.
     static let pinnedWeight = 1_000_000
 
-    /// Learned words extending `partial` (case-insensitive): the ones picked on these letters first,
-    /// then most-used first.
+    /// Learned words extending `partial` (case-insensitive), most-used first.
     func completions(matching partial: String, limit: Int) -> [String] {
         let lower = partial.lowercased()
         return withLock {
@@ -372,10 +307,6 @@ final class AutocompleteLearningStore {
             for key in model.trigrams.keys {
                 model.trigrams[key]?[word] = nil
                 if model.trigrams[key]?.isEmpty == true { model.trigrams[key] = nil }
-            }
-            for key in model.picks.keys {
-                model.picks[key]?[word.lowercased()] = nil
-                if model.picks[key]?.isEmpty == true { model.picks[key] = nil }
             }
             return model
         }

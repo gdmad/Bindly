@@ -101,25 +101,6 @@ func runAutocompleteTests() {
                                          seedURL: bigramURL, trigramSeedURL: trigramURL)
     }
 
-    print("Autocomplete picks")
-    do {
-        let picks = makeStore(bigramSeed: [], trigramSeed: [])
-        picks.recordPick(partial: "пр", word: "привет")
-        picks.recordPick(partial: "пр", word: "привет")
-        picks.recordPick(partial: "пр", word: "проект")
-        check(picks.pickScore(word: "привет", partial: "пр") == 1 && picks.pickScore(word: "проект", partial: "пр") == 0.5,
-              "the most picked on these letters scores highest")
-        check(picks.completions(matching: "пр", limit: 5).isEmpty,
-              "picks do not reorder or join the learned pool: they only re-weigh in ranking")
-        check(picks.pickScore(word: "привет", partial: "приве") > 0, "past four letters the four-letter pick still counts")
-        picks.recordPick(partial: "п", word: "привет")
-        check(picks.picked(matching: "п").isEmpty, "one letter is not remembered")
-        picks.remove(word: "проект")
-        check(picks.picked(matching: "пр") == ["привет"], "removing a learned word removes its picks")
-        picks.clear()
-        check(picks.picked(matching: "пр").isEmpty, "clearing clears the picks")
-    }
-
     print("Autocomplete context candidates")
     do {
         let st = makeStore(bigramSeed: [("в", "городе", 900), ("в", "году", 800), ("в", "гостях", 10)],

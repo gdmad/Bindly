@@ -135,15 +135,12 @@ final class AutocompleteController {
 
     /// Context scorer for the mode, or nil when the mode does not use one. Called on the work queue
     /// (read-only store access). For the context mode it closes over the two preceding words so the
-    /// engine can score each candidate with one `ContextProbability` snapshot; a word picked on these
-    /// letters before weighs up to twice as much.
+    /// engine can score each candidate with one `ContextProbability` snapshot.
     private func contextScorer(mode: AutocompleteEngine.Mode, prev1: String?, prev2: String?,
                                partial: String) -> ((String) -> Double)? {
         guard mode == .context else { return nil }
         let model = store.contextProbability(prev1: prev1, prev2: prev2)
-        return { [store] word in
-            model.probability(of: word) * (1 + AutocompleteLearningStore.pickWeight * store.pickScore(word: word, partial: partial))
-        }
+        return { model.probability(of: $0) }
     }
 
     /// Semantic scorer for the mode, or nil when the mode does not use one. Called on the work
@@ -743,7 +740,6 @@ final class AutocompleteController {
     private func accept(word: String, replacing current: String) {
         guard !word.isEmpty else { clearSuggestion(); return }
         if config.learn {
-            store.recordPick(partial: current, word: word)
             store.record(word: word,
                          prev1: prevWord.isEmpty ? nil : prevWord,
                          prev2: prevWord2.isEmpty ? nil : prevWord2)
