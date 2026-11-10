@@ -113,6 +113,7 @@ final class HotkeyCoordinator {
         cfg.acceptReturn = s.autocompleteAcceptReturn
         cfg.inline = s.autocompleteInline
         cfg.contextRanking = s.autocompleteContextRanking
+        cfg.minPrefix = s.autocompleteMinPrefix
         cfg.appMode = AutocompleteController.AppFilterMode(rawValue: s.autocompleteAppMode) ?? .all
         cfg.apps = Set(s.autocompleteApps)
         autocomplete.configure(cfg)
@@ -527,23 +528,31 @@ final class HotkeyCoordinator {
             guard let self else { return }
             // Let the app take focus back before selecting in it.
             try? await Task.sleep(for: .milliseconds(200))
-            let current = ProofreadAX.currentText(of: context.element)
-            let unchanged = current == context.text
-            // The app's offsets map is only good for the text it was made from.
-            let range: NSRange? = if unchanged {
-                context.appRange
-            } else if context.offsetMap == nil, let current {
-                ReplaceTarget.range(context.subjectRange, in: context.text, now: current)
+            // The field as it reads now, with an offsets map made for this very text: the one taken
+            // when the star showed is only good for the text it was made from, and Chromium editors
+            // re-report their breaks between two reads.
+            guard case .axField(let now) = ProofreadAX.focus(analyze: false), CFEqual(now.element, context.element) else {
+                return self.showUnplaced(result, reason: "otherField", context: context)
+            }
+            let valueRange: NSRange? = if now.text == context.text {
+                context.subjectRange
+            } else if !context.isSelection && !context.insertsAtCaret {
+                ReplaceTarget.wholeField(original: context.text, now: now.text)
+            } else if context.isSelection {
+                ReplaceTarget.range(context.subjectRange, in: context.text, now: now.text)
             } else {
                 nil
             }
-            guard let range, ProofreadAX.select(range, in: context.element) else {
-                return self.showUnplaced(result)
+            guard let valueRange else { return self.showUnplaced(result, reason: "textChanged", context: context, now: now.text) }
+            let range = now.offsetMap?.appRange(valueRange) ?? valueRange
+            guard ProofreadAX.select(range, in: context.element) else {
+                return self.showUnplaced(result, reason: "notSelected", context: context, now: now.text)
             }
             try? await Task.sleep(for: .milliseconds(80))
+            let expected = (now.text as NSString).substring(with: valueRange)
             if let selected = ProofreadAX.selectedText(of: context.element), !selected.isEmpty,
-               !Self.sameText(selected, context.subject) {
-                return self.showUnplaced(result)
+               !ReplaceTarget.sameText(selected, expected) {
+                return self.showUnplaced(result, reason: "wrongSelection", context: context, now: now.text)
             }
             TextInjector.replaceSelection(with: result, restorePrevious: self.appState.settings.restoreClipboard,
                                           target: TextInjector.FocusTarget(app: app))
@@ -557,11 +566,7 @@ final class HotkeyCoordinator {
                            offsetMap: t.offsetMap, anchor: .zero)
     }
 
-    /// Whitespace aside: web editors report list and paragraph breaks their own way.
-    private static func sameText(_ a: String, _ b: String) -> Bool {
-        func squeezed(_ s: String) -> String { s.filter { !$0.isWhitespace && !$0.isNewline } }
-        return squeezed(a) == squeezed(b)
-    }
+    private static func sameText(_ a: String, _ b: String) -> Bool { ReplaceTarget.sameText(a, b) }
 
     /// A result window's title, naming the fallback provider when it answered.
     static func titled(_ title: String, answeredBy: String?) -> String {
@@ -572,9 +577,12 @@ final class HotkeyCoordinator {
         "Answered by \(provider): the Apple model could not."
     }
 
-    private func showUnplaced(_ result: String) {
-        UsageLog.record(.star, .failed, reason: "textChanged")
-        popup.show(title: "Not replaced: the text has changed", text: result)
+    /// Why a result did not go in, in the log (lengths only, never the text), and the result to copy.
+    private func showUnplaced(_ result: String, reason: String, context: StarContext, now: String? = nil) {
+        Self.log.notice("not replaced: \(reason, privacy: .public); was \(context.text.utf16.count) now \(now?.utf16.count ?? -1), subject \(context.subjectRange.location)+\(context.subjectRange.length), map \(context.offsetMap != nil)")
+        UsageLog.record(.star, .failed, reason: reason)
+        let title = reason == "textChanged" ? "Not replaced: the text has changed" : "Not replaced: the text could not be selected"
+        popup.show(title: title, text: result)
     }
 
     func stop() {

@@ -7,8 +7,10 @@ import AppKit
 ///
 /// Usage: eval_autocomplete <corpusPath> <seedPath> <variant> <cold|warm> [limit]
 ///   variant: baseline | context | semantic
-///   warm:    cold = empty learning store; warm = corpus pre-recorded (words + bigrams/trigrams)
-let prefixes = [3, 4, 5]
+///   warm:    cold = empty learning store; warm = corpus pre-recorded (words + bigrams/trigrams);
+///            picks = warm, and every word is also "picked" on its letters after its trial (online,
+///            so a word only gains from a pick when it comes up again), as accepting does in the app
+let prefixes = [2, 3, 4, 5]
 
 struct Stats {
     var trials = 0
@@ -45,8 +47,10 @@ func tokenize(_ line: String) -> [String] {
 /// Context scorer for variant A/B: interpolated trigram -> bigram -> seed -> frequency evidence for
 /// the candidate given the two preceding words. nil is never returned in context mode; the store
 /// returns 0 for words with no evidence.
-func contextScorer(store: AutocompleteLearningStore, prev1: String, prev2: String) -> ((String) -> Double)? {
-    { word in store.contextScore(word: word, prev1: prev1, prev2: prev2) }
+let pickWeight = Double(ProcessInfo.processInfo.environment["PICK_WEIGHT"] ?? "") ?? AutocompleteLearningStore.pickWeight
+
+func contextScorer(store: AutocompleteLearningStore, prev1: String, prev2: String, partial: String) -> ((String) -> Double)? {
+    { word in pickWeight * store.pickScore(word: word, partial: partial) + store.contextScore(word: word, prev1: prev1, prev2: prev2) }
 }
 
 /// Semantic scorer for variant C (as specified: blended with the frequency prior): cosine
@@ -80,7 +84,11 @@ struct EvalMain {
             print("unknown variant \(args[2]); expected baseline|context|semantic")
             exit(2)
         }
-        let warm = args[3] == "warm"
+        // online / online-picks: the store starts empty and learns as the text goes, as typing does --
+        // the only fair test, since warm has already seen every sentence it is asked about.
+        let online = args[3].hasPrefix("online")
+        let picks = args[3] == "picks" || args[3] == "online-picks"
+        let warm = args[3] == "warm" || args[3] == "picks"
         let limit = args.count > 4 ? (Int(args[4]) ?? 5) : 5
         let bigramSeed = args.count > 5 ? URL(fileURLWithPath: args[5])
                                          : URL(fileURLWithPath: "Bindly/Autocomplete/ru_bigrams_ctx.txt")
@@ -115,6 +123,8 @@ struct EvalMain {
         }
 
         var statsByPrefix: [Int: Stats] = [:]
+        var timesByPrefix: [Int: [Double]] = [:]
+        var shortShown = 0, shortRight = 0
         var total = Stats()
 
         for line in sentences {
@@ -127,24 +137,44 @@ struct EvalMain {
                 for p in prefixes where p < word.count {
                     let partial = String(word.prefix(p))
                     let learnedLimit = mode == .baseline ? limit : max(AutocompleteEngine.reRankPoolLimit, limit)
-                    let learned = warm ? store.completions(matching: partial, limit: learnedLimit) : []
+                    let learned = warm || online ? store.completions(matching: partial, limit: learnedLimit) : []
                     var req = AutocompleteEngine.Request(partial: partial, languages: ["ru"],
                                                          learned: learned, limit: limit, mode: mode)
-                    req.contextScorer = contextScorer(store: store, prev1: prev1, prev2: prev2)
+                    req.contextScorer = contextScorer(store: store, prev1: prev1, prev2: prev2, partial: partial)
                     req.semanticScorer = semanticScorer(context: "\(prev2) \(prev1)", store: store)
+                    let started = DispatchTime.now().uptimeNanoseconds
                     let list = AutocompleteEngine.suggestions(request: req)
+                    timesByPrefix[p, default: []].append(Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000)
                     let rank = list.firstIndex { $0.lowercased() == word }.map { $0 + 1 } ?? 0
+                    // At two letters: would the list be shown at all under the "needs support" rule
+                    // (the first suggestion is a learned word or has context evidence), and was it right?
+                    if p == 2, let first = list.first {
+                        let supported = learned.contains { $0.lowercased() == first.lowercased() }
+                            || store.contextScore(word: first, prev1: prev1, prev2: prev2) > 0
+                        shortShown += supported ? 1 : 0
+                        shortRight += supported && rank == 1 ? 1 : 0
+                    }
                     statsByPrefix[p, default: Stats()].add(rank: rank)
                     total.add(rank: rank)
                 }
+                // After all of this word's trials: a pick must not help the same occurrence's next prefix.
+                if picks { for p in prefixes where p < word.count { store.recordPick(partial: String(word.prefix(p)), word: word) } }
+                if online { store.record(word: word, prev1: prev1, prev2: prev2) }
             }
         }
 
-        print("mode=\(mode.rawValue) warm=\(warm ? "warm" : "cold") limit=\(limit) lang=ru")
-        print("prefix  trials  hit@1   hit@3   MRR     absent")
+        print("mode=\(mode.rawValue) store=\(args[3]) limit=\(limit) lang=ru")
+        print("prefix  trials  hit@1   hit@3   MRR     absent  avg ms  p95 ms")
         for p in prefixes {
-            print(String(format: "%d      %@", p, fmt(statsByPrefix[p] ?? Stats())))
+            let times = (timesByPrefix[p] ?? []).sorted()
+            let avg = times.isEmpty ? 0 : times.reduce(0, +) / Double(times.count)
+            let p95 = times.isEmpty ? 0 : times[min(times.count - 1, Int(Double(times.count) * 0.95))]
+            print(String(format: "%d      %@  %6.2f  %6.2f", p, fmt(statsByPrefix[p] ?? Stats()), avg, p95))
         }
         print("all     \(fmt(total))")
+        let twoLetter = statsByPrefix[2]?.trials ?? 0
+        print(String(format: "2 letters with the support rule: shown %d of %d (%.0f%%), first right when shown %.0f%%",
+                     shortShown, twoLetter, 100.0 * Double(shortShown) / Double(max(1, twoLetter)),
+                     100.0 * Double(shortRight) / Double(max(1, shortShown))))
     }
 }

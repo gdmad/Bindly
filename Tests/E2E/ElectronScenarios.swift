@@ -331,6 +331,39 @@ func electronScenarios(_ target: ElectronTarget) {
     }
     focusComposer(pid)
 
+    // MARK: Fix on the whole field, from the field star
+
+    // Twice in Claude: the second time with a line break after the text, which Chromium reports its
+    // own way between two reads -- what made Apply end in "Not replaced".
+    for withBreak in target.name == "Claude" ? [false, true] : [false] {
+        clearComposer()
+        E2E.type("Вчера малако было свежее")
+        if withBreak { E2E.key(kVK_Return, .maskShift) }
+        E2E.pause(1.5)
+        let label = withBreak ? "Fix on the whole field, a line break after it" : "Fix on the whole field"
+        guard E2E.wait(12, { E2E.window("Bindly Star") != nil }), let fieldStar = E2E.window("Bindly Star")?.bounds else {
+            record("\(label): the field star shows", false); continue
+        }
+        E2E.click(CGPoint(x: fieldStar.midX, y: fieldStar.midY))
+        E2E.pause(0.6)
+        if let fix = E2E.find(in: AXUIElementCreateApplication(E2E.testApp!.processIdentifier), depth: 6, {
+            (E2E.attr($0, kAXTitleAttribute) as? String) == "Fix"
+        }) {
+            E2E.press(fix)
+        } else {
+            record("\(label): Fix is in the star menu", false)
+            E2E.key(kVK_Escape); continue
+        }
+        guard E2E.wait(30, { E2E.window("Bindly Preview") != nil }) else { record("\(label): the preview opens", false); continue }
+        clickButton("Apply", in: "Bindly Preview")
+        let replaced = E2E.wait(6) { text().contains("молоко") && !text().contains("малако") }
+        let refused = E2E.window("Bindly Translation") != nil
+        record("\(label): Apply replaces the text", replaced && !refused,
+               "now: \(text().debugDescription)\(refused ? ", a Not replaced window" : "")")
+        if refused { clickButton("Close", in: "Bindly Translation") }
+        focusComposer(pid)
+    }
+
     // MARK: Fix all
 
     clearComposer()

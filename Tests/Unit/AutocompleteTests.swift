@@ -74,6 +74,26 @@ func runAutocompleteTests() {
                                          seedURL: bigramURL, trigramSeedURL: trigramURL)
     }
 
+    print("Autocomplete picks")
+    do {
+        let picks = makeStore(bigramSeed: [], trigramSeed: [])
+        picks.recordPick(partial: "пр", word: "привет")
+        picks.recordPick(partial: "пр", word: "привет")
+        picks.recordPick(partial: "пр", word: "проект")
+        check(picks.pickScore(word: "привет", partial: "пр") == 1 && picks.pickScore(word: "проект", partial: "пр") == 0.5,
+              "the most picked on these letters scores highest")
+        check(picks.completions(matching: "пр", limit: 5).prefix(2) == ["привет", "проект"],
+              "picked words lead the learned completions, even before they are frequent")
+        check(picks.completions(matching: "при", limit: 5) == ["привет"], "a longer prefix keeps only the words still matching")
+        check(picks.pickScore(word: "привет", partial: "приве") > 0, "past four letters the four-letter pick still counts")
+        picks.recordPick(partial: "п", word: "привет")
+        check(picks.picked(matching: "п").isEmpty, "one letter is not remembered")
+        picks.remove(word: "проект")
+        check(picks.picked(matching: "пр") == ["привет"], "removing a learned word removes its picks")
+        picks.clear()
+        check(picks.picked(matching: "пр").isEmpty, "clearing clears the picks")
+    }
+
     // nextWords: learned trigram beats learned bigram beats the seed, in that order, and the seed is
     // exempt from the surface-count threshold that gates learned pairs.
     let s1 = makeStore(bigramSeed: [("в", "магазин", 500)])

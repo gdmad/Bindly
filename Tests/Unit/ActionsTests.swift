@@ -54,6 +54,9 @@ func runActionsTests() {
     check(EdgeWhitespace.wrap("A", like: "  \n") == "A", "an all-blank original adds nothing")
 
     print("ReplaceTarget")
+    check(ReplaceTarget.wholeField(original: "Строка один\nСтрока два", now: "Строка один\n\nСтрока два\n") == NSRange(location: 0, length: 24),
+          "the whole field, re-read with other line breaks: all of it as it reads now")
+    check(ReplaceTarget.wholeField(original: "Строка один", now: "Строка один и ещё") == nil, "text typed since: not overwritten")
     let draft = "one two three two"
     let two = NSRange(location: 14, length: 3)
     check(ReplaceTarget.range(two, in: draft, now: draft) == two, "unchanged text: the same range")

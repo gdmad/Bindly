@@ -239,6 +239,15 @@ language, permissions) · Providers (connections only). Rarely changed options s
   learns the words you use (local
   `AutocompleteLearningStore`): a word is learned when a space or punctuation closes it, and when a
   suggestion is accepted. Return deliberately does not learn (it submits password fields).
+  Suggestions start after `autocompleteMinPrefix` letters (2 by default, 2-4 on the Autocomplete
+  tab). Measured with `Tests/eval_autocomplete.sh context online` (the store learning as the text
+  goes, the only fair mode -- `warm` has seen every test sentence): hit@1 25% at 2 letters, 38% at 3,
+  45% at 4; about 5 ms per lookup (p95 9 ms) at any length, off the input path. Hiding 2-letter lists
+  that have no learned or n-gram support was measured too (29% right when shown, a third hidden) and
+  left out. **Picks** (`AutocompleteLearningStore.recordPick`, `picks` in the file): what was accepted
+  on which 2-4 letters, looked up from the longest matching prefix; picked words lead the learned
+  pool, and in ranking they weigh like personal frequency (`pickWeight` 1) -- heavier, they
+  overrode the context and lost hits in `online-picks`.
   Learned words can be reviewed: the "Learned words" sheet flags every word the dictionary does
   not know (`LearnedWordAudit`, pinned words exempt) and can drop them in one go -- anything typed
   twice gets learned, typos included.
@@ -270,7 +279,12 @@ mouse let go (`FieldStarController.showForPlainSelection`). `replace()` puts a r
 back only where its text still is (`ReplaceTarget`: unchanged, or found again near its old place
 when there is no offset map), checks the select and the selected text, and otherwise shows the
 result to copy ("Not replaced"); the hotkey preview captures its selection (`selectionContext`) and
-goes through it. Results keep the subject's leading/trailing whitespace (`EdgeWhitespace`).
+goes through it. Results keep the subject's leading/trailing whitespace (`EdgeWhitespace`). At Apply `replace()` re-reads the field (`ProofreadAX.focus`) and
+uses that read's own offsets map: an action on the whole field goes in when the text is the same but
+for whitespace (`ReplaceTarget.wholeField` -- Chromium editors report their breaks differently between
+reads, which turned Fix in Claude into "Not replaced"); text typed since is never overwritten. Every
+refusal is logged with its reason (`otherField`, `textChanged`, `notSelected`, `wrongSelection`) and
+lengths, no text.
 Hotkey bursts do nothing while Bindly itself is in front (Quick Translate's toggle aside). Every
 engine and translation task is `currentTask`, so Esc cancels it; the local Esc monitor swallows Esc
 only while there is a task. The 25 s watchdog cancels the task, not just the busy flag. Fix spelling
@@ -474,7 +488,8 @@ dimmed while Proofread is off.
   leaf. `ProofreadAX.cachingLeaves { }` walks each field once per pass (the underline pass and the
   visual-break filter), and the overlay logs at `.notice` how many issues could not be found or
   measured.
-- **Field star marks the issues.** Without a selection the star shows in the field; while Proofread
+- **Field star marks the issues.** Without a selection the star shows in the field (never in an empty
+  one: `FieldStarPolicy.shows(..., isEmpty:)`); while Proofread
   found issues there a 5 pt dot by its upper right ray takes the most serious one's color
   (`IssueKind.mostSevere`, `ProofreadController.issueSummary`, `StarActivity.worstIssue`; the kind's
   symbol with Differentiate Without Color), and the tooltip and VoiceOver give the count; its menu then starts

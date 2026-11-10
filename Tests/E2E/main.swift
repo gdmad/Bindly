@@ -724,6 +724,10 @@ func captureExact(_ rect: CGRect, to file: URL) {
 
 func starScenarios() {
     group = "Stars"
+    // An empty field (only the caret) has no star.
+    clearField()
+    E2E.pause(2.0)
+    record("an empty field has no star", E2E.window("Bindly Star") == nil, "windows \(E2E.windows().map(\.name))")
     // The field star is always there; it counts the issues when there are some.
     clearField()
     E2E.type("Всё в порядке, текст без ошибок. ")

@@ -18,6 +18,7 @@ swiftc -O \
     Bindly/Autocomplete/AutocompleteEngine.swift \
     Bindly/Autocomplete/AutocompleteLearningStore.swift \
     Bindly/Autocomplete/SemanticRanker.swift \
+    Bindly/Store/AppPaths.swift \
     Tests/eval_autocomplete.swift \
     -o "$OUT"
 

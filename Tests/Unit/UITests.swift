@@ -4,9 +4,10 @@ import Foundation
 
 func runUITests() {
     print("FieldStarPolicy")
-    check(FieldStarPolicy.shows(onlyWithIssues: false, issues: 0), "by default: shown with no issues too")
-    check(FieldStarPolicy.shows(onlyWithIssues: true, issues: 3), "only with issues: shown with them")
-    check(!FieldStarPolicy.shows(onlyWithIssues: true, issues: 0), "only with issues: hidden without")
+    check(FieldStarPolicy.shows(onlyWithIssues: false, issues: 0, isEmpty: false), "by default: shown with no issues too")
+    check(FieldStarPolicy.shows(onlyWithIssues: true, issues: 3, isEmpty: false), "only with issues: shown with them")
+    check(!FieldStarPolicy.shows(onlyWithIssues: true, issues: 0, isEmpty: false), "only with issues: hidden without")
+    check(!FieldStarPolicy.shows(onlyWithIssues: false, issues: 0, isEmpty: true), "an empty field: never")
     check(IssueKind.mostSevere([.style, .grammar, .spelling]) == .spelling, "spelling is the most serious")
     check(IssueKind.mostSevere([.style, .punctuation]) == .punctuation && IssueKind.mostSevere([]) == nil, "then punctuation over style; none for none")
 

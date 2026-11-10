@@ -93,6 +93,7 @@ final class AutocompleteController {
         var acceptReturn = true
         var inline = true            // gray text after the caret at the end of a line, when possible
         var contextRanking = true   // rank completions by the preceding words (the winning variant)
+        var minPrefix = 2           // letters typed before anything is suggested
         var appMode = AppFilterMode.all
         var apps: Set<String> = []
     }
@@ -103,7 +104,6 @@ final class AutocompleteController {
     private var prevWord2 = ""
     private let store = AutocompleteLearningStore.shared
 
-    private let minPrefix = 3
 
     /// Set while another feature owns the keyboard (a proofread popup is up). Both consume Tab, so
     /// only one may be suggesting at a time. Counted, so overlapping suspend/resume pairs cannot
@@ -136,10 +136,14 @@ final class AutocompleteController {
     /// Context scorer for the mode, or nil when the mode does not use one. Called on the work queue
     /// (read-only store access). For the context mode it closes over the two preceding words so the
     /// engine can score each candidate with `store.contextScore`.
-    private func contextScorer(mode: AutocompleteEngine.Mode, prev1: String?, prev2: String?) -> ((String) -> Double)? {
+    /// A word picked on these very letters before outranks every other piece of evidence.
+    private func contextScorer(mode: AutocompleteEngine.Mode, prev1: String?, prev2: String?,
+                               partial: String) -> ((String) -> Double)? {
         guard mode == .context else { return nil }
         let p1 = prev1, p2 = prev2
-        return { [store] word in store.contextScore(word: word, prev1: p1, prev2: p2) }
+        return { [store] word in
+            AutocompleteLearningStore.pickWeight * store.pickScore(word: word, partial: partial) + store.contextScore(word: word, prev1: p1, prev2: p2)
+        }
     }
 
     /// Semantic scorer for the mode, or nil when the mode does not use one. Called on the work
@@ -516,7 +520,7 @@ final class AutocompleteController {
                 if !self.prevWord2.isEmpty { contextWords.append(self.prevWord2) }
             }
 
-            guard resolvedPartial.count >= self.minPrefix else {
+            guard resolvedPartial.count >= cfg.minPrefix else {
                 self.applyOnMain(gen) { $0.clearSuggestion() }
                 return
             }
@@ -530,7 +534,8 @@ final class AutocompleteController {
                                                  learned: learned, limit: cfg.maxSuggestions, mode: mode)
             req.contextScorer = self.contextScorer(mode: mode,
                                                    prev1: contextWords.first,
-                                                   prev2: contextWords.count > 1 ? contextWords[1] : nil)
+                                                   prev2: contextWords.count > 1 ? contextWords[1] : nil,
+                                                   partial: resolvedPartial)
             req.semanticScorer = self.semanticScorer(mode: mode, context: contextWords.joined(separator: " "))
             let list = AutocompleteEngine.suggestions(request: req)
             self.applyOnMain(gen) { me in
@@ -723,6 +728,7 @@ final class AutocompleteController {
     private func accept(word: String, replacing current: String) {
         guard !word.isEmpty else { clearSuggestion(); return }
         if config.learn {
+            store.recordPick(partial: current, word: word)
             store.record(word: word,
                          prev1: prevWord.isEmpty ? nil : prevWord,
                          prev2: prevWord2.isEmpty ? nil : prevWord2)

@@ -62,6 +62,7 @@ func runSettingsTests() {
     allChanged.autocompleteInline = false
     allChanged.starFieldEnabled = false
     allChanged.starFieldOnlyWithIssues = true
+    allChanged.autocompleteMinPrefix = 4
     allChanged.starSelectionEnabled = false
     allChanged.previewFromMenu = false
     allChanged.previewFromHotkeys = true

@@ -126,7 +126,8 @@ final class FieldStarController {
             show(target, kind: "selection", origin: origin, label: "Actions for the selection")
         } else if config.fieldEnabled, target.selection.length == 0, target.isEditable,
                   case let summary = issueSummary(target.element),
-                  FieldStarPolicy.shows(onlyWithIssues: config.fieldOnlyWithIssues, issues: summary.count) {
+                  FieldStarPolicy.shows(onlyWithIssues: config.fieldOnlyWithIssues, issues: summary.count,
+                                        isEmpty: target.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
             let field = UnderlineGeometry.appKitRect(fromQuartz: fieldQuartz, primaryScreenHeight: screenHeight)
             let origin = NSPoint(x: field.maxX - size - 6, y: field.minY + 6)
             show(target, kind: "field", origin: origin, label: "Actions for this text", issues: summary.count, worst: summary.worst)
