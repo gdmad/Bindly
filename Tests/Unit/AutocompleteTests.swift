@@ -46,6 +46,33 @@ func runAutocompleteTests() {
     check(!guessesOff.contains("кафе"), "context mode does not use spelling guesses (коф -> кафе)")
 
 
+    print("Autocomplete pool sources")
+    eqArr(AutocompleteEngine.documentWords(in: "Bindly умеет. Привет, бинарный Bindly при", caretUTF16Offset: 41,
+                                           prefix: "би", limit: 5),
+          ["бинарный"], "only words with the prefix (Latin Bindly does not start with Cyrillic би)")
+    eqArr(AutocompleteEngine.documentWords(in: "проект продукт пр", caretUTF16Offset: 17, prefix: "пр", limit: 5),
+          ["продукт", "проект"], "nearest to the caret first, the word being typed left out")
+    eqArr(AutocompleteEngine.documentWords(in: "Привет. Я сказал привет и Прага пр", caretUTF16Offset: 34, prefix: "пр", limit: 5),
+          ["Прага", "привет"],
+          "a capital kept mid-sentence (Прага), dropped when the word is also lowercase (привет)")
+    eqArr(AutocompleteEngine.documentWords(in: "Проект готов. пр", caretUTF16Offset: 16, prefix: "пр", limit: 5),
+          ["проект"], "a capital only at a sentence start is not a name")
+    eqArr(AutocompleteEngine.documentWords(in: "LanguageTool нашёл ошибку lan", caretUTF16Offset: 29, prefix: "lan", limit: 5),
+          ["LanguageTool"], "a mixed-case term keeps its case")
+    eqArr(AutocompleteEngine.documentWords(in: "привет при", caretUTF16Offset: 10, prefix: "привет", limit: 5),
+          [], "a word no longer than the prefix is not a completion")
+
+    let lexicon = UnigramLexicon(entries: [("привет", 50), ("при", 900), ("проект", 300), ("пример", 300),
+                                           ("работа", 70), ("ёлка", 5), ("еда", 9)])
+    eqArr(lexicon.completions(prefix: "пр", limit: 5), ["при", "пример", "проект", "привет"],
+          "most frequent first, ties alphabetical")
+    eqArr(lexicon.completions(prefix: "При", limit: 5), ["пример", "привет"], "case-insensitive; the prefix itself is no completion")
+    eqArr(lexicon.completions(prefix: "ё", limit: 5), ["ёлка"], "ё is its own letter")
+    eqArr(lexicon.completions(prefix: "я", limit: 5), [], "no match past the end")
+    eqArr(lexicon.completions(prefix: "", limit: 5), [], "an empty prefix suggests nothing")
+    check(lexicon.frequency(of: "при") == 1 && lexicon.frequency(of: "нет") == 0 && lexicon.frequency(of: "еда") > 0,
+          "frequency is log-scaled against the top word, 0 when unknown")
+
     print("Autocomplete isWordTerminator")
     check(AutocompleteEngine.isWordTerminator("."), "period ends a word")
     check(AutocompleteEngine.isWordTerminator(","), "comma ends a word")
@@ -92,6 +119,27 @@ func runAutocompleteTests() {
         check(picks.picked(matching: "пр") == ["привет"], "removing a learned word removes its picks")
         picks.clear()
         check(picks.picked(matching: "пр").isEmpty, "clearing clears the picks")
+    }
+
+    print("Autocomplete context candidates")
+    do {
+        let st = makeStore(bigramSeed: [("в", "городе", 900), ("в", "году", 800), ("в", "гостях", 10)],
+                           trigramSeed: [("в", "этом", "году", 500)])
+        eqArr(st.contextCandidates(prev1: "этом", prev2: "в", prefix: "го", limit: 5), ["году"], "the trigram's words")
+        eqArr(st.contextCandidates(prev1: "в", prev2: nil, prefix: "го", limit: 5), ["городе", "году", "гостях"],
+              "the bigram's words by count")
+        eqArr(st.contextCandidates(prev1: "в", prev2: nil, prefix: "го", limit: 2), ["городе", "году"], "limited")
+        eqArr(st.contextCandidates(prev1: nil, prev2: nil, prefix: "го", limit: 5), [], "no context, no candidates")
+        st.record(word: "гараже", prev1: "в", prev2: nil)
+        check(!st.contextCandidates(prev1: "в", prev2: nil, prefix: "га", limit: 5).contains("гараже"),
+              "a learned pair typed once is not offered yet")
+        st.record(word: "гараже", prev1: "в", prev2: nil)
+        eqArr(st.contextCandidates(prev1: "в", prev2: nil, prefix: "га", limit: 5), ["гараже"], "typed twice, it is")
+        let pooled = AutocompleteEngine.suggestions(request: .init(
+            partial: "го", languages: ["ru"], learned: [], limit: 3, mode: .context,
+            contextCandidates: ["году"], lexiconWords: ["город"]))
+        check(pooled.first == "году", "a context candidate leads the pool even when the dictionary does not offer it")
+        check(pooled.contains("город") || pooled.count == 3, "lexicon words join the pool")
     }
 
     // nextWords: learned trigram beats learned bigram beats the seed, in that order, and the seed is

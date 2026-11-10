@@ -190,6 +190,14 @@ func autocompleteScenarios() {
     record("in the middle of a line the list is shown", midLine && E2E.window("Bindly Inline") == nil,
            midLine ? "" : "windows: \(E2E.windows().map(\.name))")
     E2E.key(kVK_Escape)
+
+    // A made-up term no dictionary knows comes from the field itself.
+    clearField()
+    E2E.type("Вчера обсуждали квазиморфинг. Сегодня ква")
+    _ = E2E.wait(3) { suggestionsVisible() }
+    E2E.key(kVK_Tab)
+    let fromField = E2E.wait(2) { fieldText().hasSuffix("квазиморфинг") }
+    record("a word already in the field is suggested", fromField, fromField ? "" : "text \"\(fieldText())\"")
 }
 
 func proofreadScenarios() {

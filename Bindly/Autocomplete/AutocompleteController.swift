@@ -503,6 +503,7 @@ final class AutocompleteController {
             // field text (it is the source of truth for the partial); fall back to the keystroke
             // tracker for apps that expose no text.
             var contextWords: [String] = []
+            var fieldText: (text: String, caret: Int)?
             switch self.focusState() {
             case .secure:
                 self.applyOnMain(gen) { $0.resetWord() }
@@ -512,6 +513,7 @@ final class AutocompleteController {
                 resolvedAnchor = self.caretAnchor(for: info, primaryHeight: primaryHeight)
                     ?? self.anchor(for: info.element, caret: info.caret, primaryHeight: primaryHeight)
                 contextWords = AutocompleteEngine.precedingWords(in: info.text, caretUTF16Offset: info.caret, count: 2)
+                fieldText = (info.text, info.caret)
                 ghostPlace = cfg.inline ? self.ghostPlace(for: info, primaryHeight: primaryHeight) : nil
             case .unavailable:
                 resolvedPartial = fallback
@@ -532,6 +534,19 @@ final class AutocompleteController {
             let learned = cfg.learn ? self.store.completions(matching: resolvedPartial, limit: learnedLimit) : []
             var req = AutocompleteEngine.Request(partial: resolvedPartial, languages: cfg.languages,
                                                  learned: learned, limit: cfg.maxSuggestions, mode: mode)
+            if mode != .baseline {
+                let prev1 = contextWords.first, prev2 = contextWords.count > 1 ? contextWords[1] : nil
+                req.contextCandidates = self.store.contextCandidates(prev1: prev1, prev2: prev2, prefix: resolvedPartial,
+                                                                     limit: AutocompleteEngine.contextQuota)
+                if let fieldText {
+                    req.documentWords = AutocompleteEngine.documentWords(in: fieldText.text, caretUTF16Offset: fieldText.caret,
+                                                                         prefix: resolvedPartial,
+                                                                         limit: AutocompleteEngine.documentQuota)
+                }
+                if AutocompleteEngine.isCyrillic(resolvedPartial) {
+                    req.lexiconWords = self.store.lexiconCompletions(prefix: resolvedPartial, limit: AutocompleteEngine.lexiconQuota)
+                }
+            }
             req.contextScorer = self.contextScorer(mode: mode,
                                                    prev1: contextWords.first,
                                                    prev2: contextWords.count > 1 ? contextWords[1] : nil,

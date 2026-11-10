@@ -53,6 +53,55 @@ enum AutocompleteEngine {
         return tokens
     }
 
+    /// Words of `text` that extend `prefix` (case-insensitively), nearest to the caret first, the
+    /// word being typed excluded -- buffer-word completion. A word keeps its capitals only where the
+    /// text never has it in lowercase and it is capitalized somewhere besides a sentence start, or
+    /// past its first letter ("Bindly", "LanguageTool"); "Привет" opening a line comes back as "привет".
+    static func documentWords(in text: String, caretUTF16Offset: Int, prefix: String, limit: Int) -> [String] {
+        let lowerPrefix = prefix.lowercased()
+        guard !lowerPrefix.isEmpty, limit > 0 else { return [] }
+        let ns = text as NSString
+        let caret = max(0, min(caretUTF16Offset, ns.length))
+        struct Seen { var distance: Int; var lowercase: Bool; var midSentence: String? }
+        var seen: [String: Seen] = [:]
+        var i = 0
+        var sentenceStart = true
+        while i < ns.length {
+            guard let scalar = Unicode.Scalar(ns.character(at: i)), CharacterSet.letters.contains(scalar) else {
+                if let scalar = Unicode.Scalar(ns.character(at: i)) {
+                    if ".!?\n\r".unicodeScalars.contains(scalar) { sentenceStart = true }
+                    else if !CharacterSet.whitespaces.contains(scalar) { sentenceStart = false }
+                }
+                i += 1
+                continue
+            }
+            let start = i
+            while i < ns.length, let s = Unicode.Scalar(ns.character(at: i)), CharacterSet.letters.contains(s) { i += 1 }
+            let atStart = sentenceStart
+            sentenceStart = false
+            // The word under the caret is the one being typed.
+            if start <= caret && caret <= i { continue }
+            let word = ns.substring(with: NSRange(location: start, length: i - start))
+            let key = word.lowercased()
+            guard key.count > lowerPrefix.count, key.hasPrefix(lowerPrefix) else { continue }
+            let distance = i < caret ? caret - i : start - caret
+            var entry = seen[key] ?? Seen(distance: distance, lowercase: false, midSentence: nil)
+            entry.distance = min(entry.distance, distance)
+            // A capital past the first letter (LanguageTool, API) marks a term wherever it stands.
+            let innerCapital = word.dropFirst().contains { $0.isUppercase }
+            if word == key { entry.lowercase = true } else if !atStart || innerCapital, entry.midSentence == nil { entry.midSentence = word }
+            seen[key] = entry
+        }
+        return seen.sorted { $0.value.distance != $1.value.distance ? $0.value.distance < $1.value.distance : $0.key < $1.key }
+            .prefix(limit)
+            .map { key, entry in entry.lowercase ? key : (entry.midSentence ?? key) }
+    }
+
+    /// True when every letter of `word` is Cyrillic -- the words the bundled Russian data covers.
+    static func isCyrillic(_ word: String) -> Bool {
+        !word.isEmpty && word.unicodeScalars.allSatisfy { (0x0400...0x04FF).contains($0.value) }
+    }
+
     private static let wordTerminators: Set<Character> = [".", ",", "!", "?", ";", ":",
                                                           ")", "]", "}", "\"", "»", "”", "…"]
 
@@ -92,7 +141,25 @@ enum AutocompleteEngine {
         var contextScorer: ((String) -> Double)? = nil
         /// Higher is better; nil means semantic ranking is unavailable (falls back to the pool order).
         var semanticScorer: ((String) -> Double)? = nil
+        /// Words the preceding words lead to (learned and bundled n-grams), best first. The
+        /// re-ranking modes put them in the pool before anything else: a word missing from the pool
+        /// cannot be ranked up, and the dictionary alone often misses it on short prefixes.
+        var contextCandidates: [String] = []
+        /// Words already in the field, nearest to the caret first (as an editor's buffer-word
+        /// completion does). They bring names and terms no dictionary has. Pool only: an in-field
+        /// bonus in the ranking was measured (0 to 100) and did not help.
+        var documentWords: [String] = []
+        /// The bundled frequency list's words for the prefix, most frequent first: they fill the
+        /// pool after the context, field and learned words, before the system dictionary.
+        var lexiconWords: [String] = []
     }
+
+    /// How many pool places each source may take in the re-ranking modes, in gathering order, so
+    /// one source cannot crowd the others out; the dictionary fills whatever is left.
+    static let contextQuota = 10
+    static let documentQuota = 5
+    static let learnedQuota = 10
+    static let lexiconQuota = 20
 
     /// How many candidates are gathered before a re-ranking mode scores them. Large enough that the
     /// context/semantic ranking has real choices, small enough that NSSpellChecker never floods the
@@ -168,10 +235,24 @@ enum AutocompleteEngine {
         case .context, .semantic:
             // Gather a pool larger than the visible limit so the re-ranking has real choices.
             let poolLimit = max(reRankPoolLimit, limit)
-            for word in request.learned {
-                addExtending(word)
-                if out.count >= poolLimit { break }
+            func take(_ words: [String], quota: Int) {
+                var taken = 0
+                for word in words {
+                    guard taken < quota, out.count < poolLimit else { break }
+                    let before = out.count
+                    addExtending(word)
+                    if out.count > before { taken += 1 }
+                }
             }
+            take(request.contextCandidates, quota: contextQuota)
+            take(request.documentWords, quota: documentQuota)
+            take(request.learned, quota: learnedQuota)
+            // The system dictionary goes before the bundled list but leaves it room: on ties the pool
+            // order decides, and the dictionary's own order ranked better than corpus frequency.
+            if out.count < poolLimit {
+                fillFromSpellChecker(stopAt: max(out.count, poolLimit - lexiconQuota), includeGuesses: false)
+            }
+            take(request.lexiconWords, quota: lexiconQuota)
             if out.count < poolLimit {
                 fillFromSpellChecker(stopAt: poolLimit, includeGuesses: false)
             }

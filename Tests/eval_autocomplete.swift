@@ -4,7 +4,7 @@ import AppKit
 /// Autocomplete evaluator: simulates typing each Russian corpus word letter by letter (with the
 /// previous words as context) and measures where the correct completion lands, per engine mode.
 ///
-/// Usage: eval_autocomplete <corpusPath> <variant> <store> [limit] [bigramSeed] [trigramSeed]
+/// Usage: eval_autocomplete <corpusPath> <variant> <store> [limit] [bigramSeed] [trigramSeed] [unigramSeed]
 ///   variant: baseline | context | semantic
 ///   store:   cold = empty learning store; warm = corpus pre-recorded (has seen every test sentence);
 ///            online = starts empty and learns as the text goes, as typing does (the fair mode);
@@ -45,13 +45,14 @@ func tokenize(_ line: String) -> [String] {
     return words
 }
 
-func isCyrillic(_ word: String) -> Bool {
-    word.unicodeScalars.allSatisfy { (0x0400...0x04FF).contains($0.value) }
-}
-
 /// Context scorer for variant A/B: interpolated trigram -> bigram -> seed -> frequency evidence for
 /// the candidate given the two preceding words. nil is never returned in context mode; the store
 /// returns 0 for words with no evidence.
+/// Experiment switches: NO_POOL_SOURCES=1 leaves the context, field and lexicon words out of the
+/// pool (the pre-0.11.2 pool); DUMP_MISSING=1 prints the words missing from the pool at 2 letters.
+let noPoolSources = ProcessInfo.processInfo.environment["NO_POOL_SOURCES"] == "1"
+let dumpMissing = ProcessInfo.processInfo.environment["DUMP_MISSING"] == "1"
+
 let pickWeight = Double(ProcessInfo.processInfo.environment["PICK_WEIGHT"] ?? "") ?? AutocompleteLearningStore.pickWeight
 
 func contextScorer(store: AutocompleteLearningStore, prev1: String, prev2: String, partial: String) -> ((String) -> Double)? {
@@ -98,6 +99,7 @@ struct EvalMain {
         let bigramSeed = args.count > 5 ? URL(fileURLWithPath: args[5])
                                          : URL(fileURLWithPath: "Bindly/Autocomplete/ru_bigrams_ctx.txt")
         let trigramSeed = args.count > 6 && !args[6].isEmpty ? URL(fileURLWithPath: args[6]) : nil
+        let unigramSeed = args.count > 7 && !args[7].isEmpty ? URL(fileURLWithPath: args[7]) : nil
         let poolLimit = max(AutocompleteEngine.reRankPoolLimit, limit)
 
         guard let corpusText = try? String(contentsOf: corpusURL, encoding: .utf8) else {
@@ -113,8 +115,12 @@ struct EvalMain {
         // context-score level; the optional trigram arg adds the rich-data level.
         let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent("bindly-eval-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        let loadStarted = DispatchTime.now().uptimeNanoseconds
         let store = AutocompleteLearningStore(fileURL: tmpDir.appendingPathComponent("store.json"),
-                                              seedURL: bigramSeed, trigramSeedURL: trigramSeed)
+                                              seedURL: bigramSeed, trigramSeedURL: trigramSeed,
+                                              unigramSeedURL: unigramSeed ?? URL(fileURLWithPath: "/dev/null"))
+        let loadMs = Double(DispatchTime.now().uptimeNanoseconds - loadStarted) / 1_000_000
+
 
         if warm {
             for line in sentences {
@@ -145,7 +151,7 @@ struct EvalMain {
                 let prev1 = i >= 1 ? ws[i - 1] : nil
                 let prev2 = i >= 2 ? ws[i - 2] : nil
                 // Latin words stay as context only: the evaluator measures Russian completion.
-                guard isCyrillic(word) else {
+                guard AutocompleteEngine.isCyrillic(word) else {
                     if online { store.record(word: word, prev1: prev1, prev2: prev2) }
                     continue
                 }
@@ -158,6 +164,15 @@ struct EvalMain {
                     var req = AutocompleteEngine.Request(partial: partial, languages: ["ru"],
                                                          learned: learned, limit: poolLimit, mode: mode)
                     req.contextScorer = contextScorer(store: store, prev1: prev1 ?? "", prev2: prev2 ?? "", partial: partial)
+                    if mode != .baseline, !noPoolSources {
+                        req.lexiconWords = store.lexiconCompletions(prefix: partial, limit: AutocompleteEngine.lexiconQuota)
+                        req.contextCandidates = store.contextCandidates(prev1: prev1, prev2: prev2, prefix: partial,
+                                                                        limit: AutocompleteEngine.contextQuota)
+                        // The field holds the message typed so far.
+                        let field = (ws[..<i] + [partial]).joined(separator: " ")
+                        req.documentWords = AutocompleteEngine.documentWords(in: field, caretUTF16Offset: (field as NSString).length,
+                                                                             prefix: partial, limit: AutocompleteEngine.documentQuota)
+                    }
                     req.semanticScorer = semanticScorer(context: [prev2, prev1].compactMap { $0 }.joined(separator: " "), store: store)
                     let started = DispatchTime.now().uptimeNanoseconds
                     let pool = AutocompleteEngine.suggestions(request: req)
@@ -165,6 +180,7 @@ struct EvalMain {
                     let poolRank = pool.firstIndex { $0.lowercased() == word }.map { $0 + 1 } ?? 0
                     let rank = poolRank <= limit ? poolRank : 0
                     rankAt[p] = rank
+                    if dumpMissing, p == 2, poolRank == 0 { print("missing\t\(word)\t\(prev1 ?? "")") }
                     if prefixes.contains(p) {
                         timesByPrefix[p, default: []].append(elapsed)
                         statsByPrefix[p, default: Stats()].add(rank: rank)
@@ -187,6 +203,7 @@ struct EvalMain {
             }
         }
 
+        print(String(format: "seed load %.0f ms", loadMs))
         print("corpus=\(corpusURL.lastPathComponent) mode=\(mode.rawValue) store=\(args[3]) limit=\(limit)")
         print("prefix  trials  hit@1   hit@3   MRR     absent  inPool  avg ms  p95 ms")
         for p in prefixes {

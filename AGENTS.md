@@ -51,14 +51,16 @@ Bindly/
 │   ├── AudioLevelMeter.swift          # input loudness: the mic's level and the silent-input hint
 │   └── PushToTalkController.swift     # session: note by the caret, optional translation, paste
 ├── Autocomplete/               # word completion while typing (off by default)
-│   ├── AutocompleteEngine.swift       # NSSpellChecker completions/guesses + recasing + partial-word; Mode (baseline/context/semantic) + scorer re-ranking
+│   ├── AutocompleteEngine.swift       # pool (context/field/learned/system/lexicon, per-source quotas) + scorer re-ranking; recasing, partial word, documentWords
 │   ├── AutocompleteController.swift   # two CGEventTaps on own thread (listen-only monitor + active suppressor); AX/keystroke word; suggestions, next-word, accept
-│   ├── AutocompleteLearningStore.swift# learned counts + bi/trigrams; next-word backoff + RU seed; contextScore() ranks completions by preceding words (thread-safe)
+│   ├── AutocompleteLearningStore.swift# learned counts + bi/trigrams + picks; RU seeds (loaded off the launch path); contextCandidates/contextScore/nextWords (thread-safe)
+│   ├── UnigramLexicon.swift           # pure: sorted word-frequency list, prefix range by binary search
 │   ├── LearnedWordAudit.swift         # pure: which learned words look like typos (dictionary check comes in as a closure)
 │   ├── AutocompleteInsertion.swift    # pure: append the suggestion's remainder vs. delete-and-retype (never passes through an empty field)
 │   ├── SemanticRanker.swift           # experimental: NLContextualEmbedding (Cyrillic) cosine re-ranking, debug-only
-│   ├── ru_bigrams_ctx.txt             # RU bigram seed (Leipzig news, CC BY 4.0) -- feeds both next-word and completion ranking
-│   ├── ru_trigrams.txt                # RU trigram seed (Leipzig news, CC BY 4.0) for completion ranking
+│   ├── ru_unigrams.txt                # RU word frequencies (100k) -- pool candidates     \
+│   ├── ru_bigrams_ctx.txt             # RU bigram seed -- next-word, pool and ranking      } mixed corpus, see Credits in README
+│   ├── ru_trigrams.txt                # RU trigram seed -- pool and ranking               /
 │   └── AutocompleteOverlay.swift      # non-activating floating list shown near the caret (PopupKit)
 ├── Proofread/                  # step through LanguageTool's findings one at a time
 │   ├── TextIssue.swift                # shared issue model (UTF-16 ranges, stable ids)
@@ -167,7 +169,7 @@ Tests/
 ├── run_tests.sh
 ├── eval_autocomplete.sh        # autocomplete evaluator over the three RU sets (default: context, online)
 ├── eval_autocomplete.swift     # harness: hit@1/hit@3/MRR, inPool (ranking ceiling), KSR, lookup time
-├── gen_ru_ngrams.py            # rebuilds ru_bigrams_ctx.txt / ru_trigrams.txt from a sentence corpus
+├── gen_ru_ngrams.py            # rebuilds the three ru_*.txt seeds from weighted corpora (txt / Taiga parquet)
 ├── ru_eval_chat.txt            # ~200 hand-written chat/AI-request messages -- the main, frozen set
 ├── ru_eval_news.txt            # 25 Leipzig news sentences (held out of any seed rebuild)
 └── ru_eval_corpus.txt          # 80 hand-written general sentences
@@ -241,10 +243,27 @@ language, permissions) · Providers (connections only). Rarely changed options s
   learns the words you use (local
   `AutocompleteLearningStore`): a word is learned when a space or punctuation closes it, and when a
   suggestion is accepted. Return deliberately does not learn (it submits password fields).
+  **The candidate pool** (up to 30, `AutocompleteEngine.suggestions`, re-ranking modes) is gathered
+  in this order, each source capped so none crowds out the rest: words the preceding words led to
+  in learned and bundled n-grams (`contextCandidates`, 10), words already in the field nearest the
+  caret first (`documentWords`, buffer-word completion as in editors, 5), picked/learned words (10),
+  the system dictionary, and the bundled frequency list (`UnigramLexicon`, 20, Cyrillic prefixes
+  only). The dictionary goes before the lexicon: on ties the pool order decides, and the
+  dictionary's order ranked better than corpus frequency. Before 0.11.2 the pool was learned words
+  plus the dictionary alone, and the word wanted was missing from it at 2 letters 41% of the time on
+  the chat set. Neither a lexicon-frequency prior nor an in-field bonus in `contextScore` helped
+  (measured 0-5 and 0-100) -- both stay pool-only. The seeds (8 MB, about 0.5 s to parse) load on a
+  background queue for the shared store.
+  **Seed data** is a weighted mix built by `Tests/gen_ru_ngrams.py`: Leipzig `rus_news_2023` (0.5),
+  Leipzig `rus-ru_web-public_2019` (1), Taiga social (0.5 + 0.5) and subtitles (1), up to 20M words
+  each, n-grams seen at least 3 times, the evaluator's sets excluded. Against news alone it won on
+  the chat and general sets (with the new pool, chat 2 letters hit@1 32% vs 28%, KSR 19% vs 16%); web alone and Taiga
+  alone came between.
   Suggestions start after `autocompleteMinPrefix` letters (2 by default, 2-4 on the Autocomplete
   tab). Measured with `Tests/eval_autocomplete.sh context online` (the store learning as the text
-  goes, the only fair mode -- `warm` has seen every test sentence): hit@1 25% at 2 letters, 38% at 3,
-  45% at 4; about 5 ms per lookup (p95 9 ms) at any length, off the input path. Hiding 2-letter lists
+  goes, the only fair mode -- `warm` has seen every test sentence) on the chat set as of 0.11.2:
+  hit@1 32% at 2 letters, 45% at 3, 52% at 4; 19% of letters saved (KSR) from 2 letters; about
+  7 ms per lookup (p95 12 ms), off the input path. Hiding 2-letter lists
   that have no learned or n-gram support was measured too (29% right when shown, a third hidden) and
   left out. **Picks** (`AutocompleteLearningStore.recordPick`, `picks` in the file): what was accepted
   on which 2-4 letters, looked up from the longest matching prefix; picked words lead the learned

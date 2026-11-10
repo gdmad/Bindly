@@ -58,6 +58,7 @@ swiftc -O \
     Bindly/LocalServer/LocalServerManifest.swift \
     Bindly/Autocomplete/AutocompleteEngine.swift \
     Bindly/Autocomplete/AutocompleteLearningStore.swift \
+    Bindly/Autocomplete/UnigramLexicon.swift \
     Bindly/Autocomplete/LearnedWordAudit.swift \
     Bindly/Autocomplete/AutocompleteInsertion.swift \
     Bindly/Autocomplete/AutocompleteKeyPolicy.swift \

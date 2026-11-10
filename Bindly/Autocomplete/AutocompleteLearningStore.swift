@@ -8,9 +8,9 @@ import os
 /// management UI touches it from the main thread. All access to the mutable `model` is serialized with
 /// `lock`, and disk writes are pushed to a background queue so callers never block on I/O.
 final class AutocompleteLearningStore {
-    static let shared = AutocompleteLearningStore()
+    static let shared = AutocompleteLearningStore(seedsInBackground: true)
 
-    /// Guards `model` (and `seedBigrams` during setup). Held only for cheap in-memory work; disk I/O
+    /// Guards `model` and the seed tables (assigned once, when they finish loading). Held only for cheap in-memory work; disk I/O
     /// happens off-lock on `ioQueue`.
     private var lock = os_unfair_lock()
     private func withLock<T>(_ body: () -> T) -> T {
@@ -53,13 +53,19 @@ final class AutocompleteLearningStore {
     /// Bundled seed trigrams (Russian only, Leipzig news corpus), keyed by `trigramKey(prev2, prev1)`,
     /// used as a stronger context-score level than the seed bigrams. Read-only.
     private var seedTrigrams: [String: [String: Int]] = [:]
+    /// Bundled word frequencies (Russian only): pool candidates. Read-only.
+    private var lexicon = UnigramLexicon(entries: [])
     private let fileURL: URL
     /// Pending debounced save; guarded by `lock`.
     private var saveDebounce: DispatchWorkItem?
 
     private static let log = Logger(subsystem: "com.evgeny.bindly", category: "autocomplete")
 
-    init(fileURL: URL? = nil, seedURL: URL? = nil, trigramSeedURL: URL? = nil) {
+    /// `seedsInBackground`: the shared store reads the bundled tables (about half a second) off the
+    /// launch path; until they land, suggestions simply lack the seeds. Tests and the evaluator load
+    /// them synchronously so the first lookup already sees them.
+    init(fileURL: URL? = nil, seedURL: URL? = nil, trigramSeedURL: URL? = nil, unigramSeedURL: URL? = nil,
+         seedsInBackground: Bool = false) {
         if let fileURL {
             self.fileURL = fileURL
         } else {
@@ -67,20 +73,40 @@ final class AutocompleteLearningStore {
         }
         load()
         // Explicit URLs override the bundle lookups so tests/CLI can point at the same data files.
-        // Silent by design elsewhere in this class, but a seed failing to load is otherwise
-        // indistinguishable from "the feature just doesn't work" -- log the outcome either way.
-        if let url = seedURL ?? Bundle.main.url(forResource: "ru_bigrams_ctx", withExtension: "txt") {
-            seedBigrams = Self.loadBigrams(from: url)
-            Self.log.info("loaded \(self.seedBigrams.count) bigram seed keys from \(url.lastPathComponent)")
+        let bigramURL = seedURL ?? Bundle.main.url(forResource: "ru_bigrams_ctx", withExtension: "txt")
+        let trigramURL = trigramSeedURL ?? Bundle.main.url(forResource: "ru_trigrams", withExtension: "txt")
+        let unigramURL = unigramSeedURL ?? Bundle.main.url(forResource: "ru_unigrams", withExtension: "txt")
+        if seedsInBackground {
+            DispatchQueue.global(qos: .utility).async { [self] in
+                loadSeeds(bigrams: bigramURL, trigrams: trigramURL, unigrams: unigramURL)
+            }
         } else {
-            Self.log.warning("ru_bigrams_ctx.txt not found in the bundle; next-word and context ranking lose their seed")
+            loadSeeds(bigrams: bigramURL, trigrams: trigramURL, unigrams: unigramURL)
         }
-        if let url = trigramSeedURL ?? Bundle.main.url(forResource: "ru_trigrams", withExtension: "txt") {
-            seedTrigrams = Self.loadTrigrams(from: url)
-            Self.log.info("loaded \(self.seedTrigrams.count) trigram seed keys from \(url.lastPathComponent)")
-        } else {
-            Self.log.warning("ru_trigrams.txt not found in the bundle; context ranking loses its trigram seed")
+    }
+
+    /// Silent by design elsewhere in this class, but a seed failing to load is otherwise
+    /// indistinguishable from "the feature just doesn't work" -- log the outcome either way.
+    private func loadSeeds(bigrams: URL?, trigrams: URL?, unigrams: URL?) {
+        let started = DispatchTime.now().uptimeNanoseconds
+        let bi = bigrams.map(Self.loadBigrams(from:)) ?? [:]
+        let tri = trigrams.map(Self.loadTrigrams(from:)) ?? [:]
+        let lex = unigrams.map(UnigramLexicon.init(contentsOf:)) ?? UnigramLexicon(entries: [])
+        withLock {
+            seedBigrams = bi
+            seedTrigrams = tri
+            lexicon = lex
         }
+        let ms = (DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
+        if bigrams == nil || trigrams == nil || unigrams == nil {
+            Self.log.warning("a bundled autocomplete table is missing; ranking and the pool lose that seed")
+        }
+        Self.log.info("loaded seeds: \(bi.count) bigram keys, \(tri.count) trigram keys, \(lex.count) words in \(ms) ms")
+    }
+
+    /// The most frequent bundled words that extend `prefix`, best first.
+    func lexiconCompletions(prefix: String, limit: Int) -> [String] {
+        withLock { lexicon }.completions(prefix: prefix, limit: limit)
     }
 
     /// Parses a bigram seed file (tab-separated: prev, next, count). Missing/empty is fine.
@@ -211,6 +237,33 @@ final class AutocompleteLearningStore {
         }
         var seen = Set<String>()
         return (picks + learned).filter { seen.insert($0.lowercased()).inserted }.prefix(limit).map { $0 }
+    }
+
+    /// Words that extend `prefix` and followed these preceding words before, best first: learned
+    /// trigram, bundled trigram, learned bigram, bundled bigram -- each table by count. Learned
+    /// n-grams need `minSurfaceCount` like every learned suggestion; the bundled ones are pre-vetted.
+    func contextCandidates(prev1: String?, prev2: String?, prefix: String, limit: Int) -> [String] {
+        let lower = prefix.lowercased()
+        guard !lower.isEmpty, limit > 0, let p1 = prev1?.lowercased(), !p1.isEmpty else { return [] }
+        let p2 = prev2?.lowercased() ?? ""
+        return withLock {
+            var out: [String] = []
+            func add(_ following: [String: Int]?, minCount: Int) {
+                guard let following, out.count < limit else { return }
+                let matching = following.filter { $0.value >= minCount && $0.key.count > lower.count && $0.key.hasPrefix(lower) }
+                for (word, _) in matching.sorted(by: { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }) {
+                    if !out.contains(word) { out.append(word) }
+                    if out.count >= limit { return }
+                }
+            }
+            if !p2.isEmpty {
+                add(model.trigrams[Self.trigramKey(p2, p1)], minCount: minSurfaceCount)
+                add(seedTrigrams[Self.trigramKey(p2, p1)], minCount: 1)
+            }
+            add(model.bigrams[p1], minCount: minSurfaceCount)
+            add(seedBigrams[p1], minCount: 1)
+            return out
+        }
     }
 
     /// Most likely next words, using a trigram -> bigram backoff. `prev1` is the immediately previous
