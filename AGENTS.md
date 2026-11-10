@@ -261,18 +261,22 @@ language, permissions) · Providers (connections only). Rarely changed options s
   dictionary's order ranked better than corpus frequency. Before 0.11.2 the pool was learned words
   plus the dictionary alone, and the word wanted was missing from it at 2 letters 41% of the time on
   the chat set. Neither a lexicon-frequency prior nor an in-field bonus in `contextScore` helped
-  (measured 0-5 and 0-100) -- both stay pool-only. The seeds (8 MB, about 0.5 s to parse) load on a
+  (measured 0-5 and 0-100) -- both stay pool-only. The seeds (14.5 MB, about 1 s to parse, about 50 MB of memory more than the 0.11.2
+  tables) load on a
   background queue for the shared store.
   **Seed data** is a weighted mix built by `Tests/gen_ru_ngrams.py`: Leipzig `rus_news_2023` (0.5),
   Leipzig `rus-ru_web-public_2019` (1), Taiga social (0.5 + 0.5) and subtitles (1), up to 20M words
-  each, n-grams seen at least 3 times, the evaluator's sets excluded. Against news alone it won on
+  each, n-grams seen at least 3 times, the evaluator's sets excluded; the top 100k words, 100k bigrams
+  and 300k trigrams (0.11.4: twice the 0.11.2 tables, chat hit@1 at 2 letters 33% -> 34%, KSR
+  20.1% -> 20.9%, news +3.5 points -- larger would pass the 15 MB budget). Against news alone it won on
   the chat and general sets (with the new pool, chat 2 letters hit@1 32% vs 28%, KSR 19% vs 16%);
   web alone and Taiga alone came between. The endings table comes from the same run
   (`--suffix-contexts 5000`, kept from a scaled count of 200: as good as 3 at 1/20 of the size).
   Suggestions start after `autocompleteMinPrefix` letters (2 by default, 2-4 on the Autocomplete
   tab). Measured with `Tests/eval_autocomplete.sh context online` (the store learning as the text
   goes, the only fair mode -- `warm` has seen every test sentence) on the chat set as of 0.11.2:
-  hit@1 33% at 2 letters, 46% at 3, 53% at 4; 20% of letters saved (KSR) from 2 letters (0.11.3);
+  hit@1 34% at 2 letters, 47% at 3, 55% at 4; 21% of letters saved (KSR) from 2 letters (0.11.4;
+  before 0.11.2: 28%, 40%, 47% and 16%);
   about 5 ms per lookup on an idle machine (p95 9 ms), off the input path. The system dictionary
   is asked once per lookup -- asking it twice (0.11.2) doubled the time. Hiding 2-letter lists
   that have no learned or n-gram support was measured too (29% right when shown, a third hidden) and
