@@ -244,6 +244,10 @@ language, permissions) · Providers (connections only). Rarely changed options s
   words was measured and hurt (0.3-0.8 points), so recency is not modelled; per-day decay was not
   built (nothing measured favours recency, and the sets have no time order to test it on). The
   context mode itself was validated earlier against baseline and a semantic-embedding variant.
+  Apple's on-device model was measured as a refiner (`FM_BENCH=1`, 0.11.4, chat set, ~150 cases per
+  length): choosing among the top 10 it was right 21% / 26% at 2 / 3 letters against the n-grams'
+  35% / 48%, free completion 11% / 22%, at 500-540 ms a request (p95 ~600 ms); Russian is not in its
+  supported languages. Not built into the app.
   The scorer is built once per lookup (one lock) and each candidate is scored once. It can predict the next word
   after a space: the context (up to two preceding words) is read from the focused field via AX where
   one is exposed, the same way the current word is ranked, so it also works after clicking back into

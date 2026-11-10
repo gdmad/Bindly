@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import FoundationModels
 
 /// Autocomplete evaluator: simulates typing each Russian corpus word letter by letter (with the
 /// previous words as context) and measures where the correct completion lands, per engine mode.
@@ -91,9 +92,80 @@ func fmt(_ s: Stats) -> String {
                   100.0 * Double(s.hits3) / Double(t), s.mrrSum / Double(t), s.absent)
 }
 
+// MARK: - Foundation Models (FM_BENCH=1): can the on-device model refine the list in time?
+
+let fmBench = env["FM_BENCH"] == "1"
+
+struct FMCase {
+    let prefix: Int
+    let context: String
+    let partial: String
+    let word: String
+    let ngramTop: [String]
+    let ngramRank: Int
+}
+
+let fmInstructions = """
+You complete the Russian word a person is typing. You get the text before the caret and the letters \
+typed so far. Answer with the one most likely complete word.
+"""
+
+func percentile(_ xs: [Double], _ q: Double) -> Double {
+    let s = xs.sorted()
+    return s.isEmpty ? 0 : s[min(s.count - 1, Int(Double(s.count) * q))]
+}
+
+/// Two ways, each request in a fresh session (requests are independent; a reused session would
+/// carry every earlier lookup in its transcript): choosing among the n-gram top 10 with guided
+/// generation, and free completion checked against the typed letters.
+func runFMBench(_ cases: [FMCase]) async {
+    print("Foundation Models: availability \(SystemLanguageModel.default.availability)")
+    let languages = SystemLanguageModel.default.supportedLanguages.compactMap { $0.languageCode?.identifier }
+    print("Foundation Models: supported languages include ru: \(languages.contains("ru"))")
+    guard case .available = SystemLanguageModel.default.availability else { return }
+    let warm = LanguageModelSession(instructions: fmInstructions)
+    warm.prewarm()
+    try? await Task.sleep(for: .seconds(3))
+    let options = GenerationOptions(temperature: 0, maximumResponseTokens: 12)
+    for method in ["choose", "free"] {
+        for p in [2, 3] {
+            let subset = cases.filter { $0.prefix == p && (method == "free" || !$0.ngramTop.isEmpty) }
+            var fmHits = 0, ngramHits = 0, failed = 0
+            var times: [Double] = []
+            for c in subset {
+                let session = LanguageModelSession(instructions: fmInstructions)
+                let prompt = "Text: \(c.context)\nTyped letters: \(c.partial)"
+                let started = DispatchTime.now().uptimeNanoseconds
+                var answer: String?
+                do {
+                    if method == "choose" {
+                        let choices = DynamicGenerationSchema(name: "Word", anyOf: c.ngramTop)
+                        let schema = try GenerationSchema(root: choices, dependencies: [])
+                        answer = try await session.respond(to: prompt + "\nChoose from: " + c.ngramTop.joined(separator: ", "),
+                                                           schema: schema, options: options).content.value(String.self)
+                    } else {
+                        answer = try await session.respond(to: prompt, options: options).content
+                    }
+                } catch {
+                    failed += 1
+                }
+                times.append(Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000)
+                let word = (answer ?? "").lowercased().split(whereSeparator: { !$0.isLetter }).first.map(String.init) ?? ""
+                if word == c.word && word.hasPrefix(c.partial) { fmHits += 1 }
+                if c.ngramRank == 1 { ngramHits += 1 }
+            }
+            let n = Double(max(1, subset.count))
+            let avg = times.isEmpty ? 0 : times.reduce(0, +) / Double(times.count)
+            print(String(format: "FM %@ %d letters: %d cases, FM hit@1 %.1f%% vs n-gram %.1f%%, failed %d, avg %.0f ms, p95 %.0f ms",
+                         method, p, subset.count, 100.0 * Double(fmHits) / n, 100.0 * Double(ngramHits) / n,
+                         failed, avg, percentile(times, 0.95)))
+        }
+    }
+}
+
 @main
 struct EvalMain {
-    static func main() {
+    static func main() async {
         let args = CommandLine.arguments
         guard args.count >= 4 else {
             print("usage: eval_autocomplete <corpusPath> <variant> <cold|warm> [limit] [bigramSeed] [trigramSeed]")
@@ -150,6 +222,8 @@ struct EvalMain {
             }
         }
 
+        var fmSeen: [Int: Int] = [:]
+        var fmCases: [FMCase] = []
         var statsByPrefix: [Int: Stats] = [:]
         var inPoolByPrefix: [Int: Int] = [:]
         var timesByPrefix: [Int: [Double]] = [:]
@@ -196,6 +270,14 @@ struct EvalMain {
                     let poolRank = pool.firstIndex { $0.lowercased() == word }.map { $0 + 1 } ?? 0
                     let rank = poolRank <= limit ? poolRank : 0
                     rankAt[p] = rank
+                    if fmBench, p == 2 || p == 3 {
+                        fmSeen[p, default: 0] += 1
+                        if fmSeen[p]! % (p == 2 ? 7 : 6) == 0 {
+                            let context = ws[max(0, i - 20)..<i].joined(separator: " ")
+                            fmCases.append(FMCase(prefix: p, context: context, partial: partial, word: word,
+                                                  ngramTop: Array(pool.prefix(10)), ngramRank: rank))
+                        }
+                    }
                     if dumpMissing, p == 2, poolRank == 0 { print("missing\t\(word)\t\(prev1 ?? "")") }
                     if prefixes.contains(p) {
                         timesByPrefix[p, default: []].append(elapsed)
@@ -221,6 +303,7 @@ struct EvalMain {
             }
         }
 
+        if fmBench { await runFMBench(fmCases) }
         print(String(format: "seed load %.0f ms", loadMs))
         print("corpus=\(corpusURL.lastPathComponent) mode=\(mode.rawValue) store=\(args[3]) limit=\(limit)")
         print("prefix  trials  hit@1   hit@3   MRR     absent  inPool  avg ms  p95 ms")

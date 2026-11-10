@@ -4,6 +4,7 @@
 #   variant: baseline | context | semantic (default context)
 #   store:   cold | warm | online | online-picks (default online -- the fair mode)
 #   CORPUS=path runs one corpus; by default the chat, news and general sets run in turn.
+#   FM_BENCH=1 also asks Apple's on-device model on a sample of the 2- and 3-letter cases (slow).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
