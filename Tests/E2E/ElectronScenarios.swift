@@ -124,16 +124,16 @@ func electronScenarios(_ target: ElectronTarget) {
         E2E.keysBlocked = false
     }
     let text = { composer(of: pid).map(E2E.value) ?? "" }
-    func rect(_ word: String) -> CGRect? {
+    func rect(_ word: String, last: Bool = false) -> CGRect? {
         guard let el = composer(of: pid) else { return nil }
-        let range = (E2E.value(el) as NSString).range(of: word)
+        let range = (E2E.value(el) as NSString).range(of: word, options: last ? .backwards : [])
         guard range.location != NSNotFound else { return nil }
         if let box = E2E.bounds(range, in: el) { return box }
         // Chromium answers geometry on the text runs inside the field, not on the field itself.
         var hit: CGRect?
         collect(el, depth: 8) { child in
             guard hit == nil, (E2E.attr(child, kAXRoleAttribute) as? String) == "AXStaticText" else { return }
-            let local = (E2E.value(child) as NSString).range(of: word)
+            let local = (E2E.value(child) as NSString).range(of: word, options: last ? .backwards : [])
             if local.location != NSNotFound { hit = E2E.bounds(local, in: child) }
         }
         return hit
@@ -165,8 +165,8 @@ func electronScenarios(_ target: ElectronTarget) {
         E2E.key(kVK_Delete)
         E2E.pause(0.6)
     }
-    func openFixes(_ word: String) -> CGRect? {
-        guard let box = rect(word) else { return nil }
+    func openFixes(_ word: String, last: Bool = false) -> CGRect? {
+        guard let box = rect(word, last: last) else { return nil }
         E2E.click(CGPoint(x: box.midX, y: box.midY))
         if E2E.wait(4, { E2E.window("Bindly Fixes") != nil }) { return box }
         E2E.click(CGPoint(x: box.midX, y: box.midY))
@@ -382,6 +382,30 @@ func electronScenarios(_ target: ElectronTarget) {
         }
     } else {
         record("Fix all fixes every word at once", false, "no Fix all in the popup; underlines \(E2E.underlineCount())")
+    }
+
+    // MARK: The same typo twice
+
+    // Each occurrence is fixed by clicking it, the later one first: the fix has to land on the word
+    // clicked, not on its twin.
+    dismiss()
+    focusComposer(pid)
+    clearComposer()
+    E2E.type("Купи малако \(joiner) ещё малако потом ")
+    func count(_ word: String) -> Int { text().components(separatedBy: word).count - 1 }
+    var twice = E2E.wait(12) { E2E.underlineCount() >= 2 }
+    for (step, last) in [(1, true), (2, false)] where twice {
+        guard openFixes("малако", last: last) != nil,
+              let row = E2E.testElement(window: "Bindly Fixes", E2E.named("молоко")), let frame = E2E.frame(row) else {
+            record("the same typo twice: fix \(step) opens", false, "underlines \(E2E.underlineCount())")
+            twice = false; break
+        }
+        E2E.click(CGPoint(x: frame.midX, y: frame.midY))
+        twice = E2E.wait(6) { count("молоко") == step && count("малако") == 2 - step }
+        record("the same typo twice: fix \(step) lands", twice,
+               "now: \(text()); \(E2E.window("Bindly Translation") != nil ? "a message window" : "")")
+        dismiss()
+        if step == 1 { E2E.wait(6) { E2E.underlineCount() >= 1 } }
     }
 
     // MARK: Autocomplete

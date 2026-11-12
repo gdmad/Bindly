@@ -33,7 +33,7 @@ enum IssueApplier {
             return .failed("Cannot read the field.")
         }
         guard let ourRange = IssueMerger.relocate(issue, in: text) else {
-            log.debug("relocate failed: the issue's text is no longer at or near its range")
+            log.notice("stale: relocate found no match for the issue at \(issue.range, privacy: .public) in \((text as NSString).length, privacy: .public) units, \(occurrences(of: issue.original, in: text), privacy: .public) occurrences")
             return .stale
         }
         // Our offsets come from the field's value; the app's selection may be indexed differently
@@ -43,7 +43,7 @@ enum IssueApplier {
         guard let range = ProofreadAX.alignedRange(ourRange, expecting: issue.original, in: element,
                                                    contextBefore: issue.contextBefore,
                                                    contextAfter: issue.contextAfter, map: map) else {
-            log.debug("alignedRange found nothing matching near \(ourRange)")
+            log.notice("stale: the app's text did not line up at \(ourRange, privacy: .public) (map \(map != nil, privacy: .public), \(occurrences(of: issue.original, in: text), privacy: .public) occurrences)")
             return .stale
         }
         log.debug("relocated to \(ourRange), app-aligned to \(range)")
@@ -92,7 +92,7 @@ enum IssueApplier {
         // so pasting immediately can overwrite whatever was selected *before* -- the previous issue.
         // Wait for the selected text to actually read back as this issue's text before pasting.
         guard await selectionSettled(on: element, equals: issue.original, range: range) else {
-            log.debug("selection never settled on the issue's text")
+            log.notice("stale: the selection never settled on the issue at \(range, privacy: .public) (\(occurrences(of: issue.original, in: text), privacy: .public) occurrences)")
             return .stale
         }
         // The paste itself is fire-and-forget (it lands ~0.05-0.3 s later); FocusTarget re-activates
@@ -102,6 +102,11 @@ enum IssueApplier {
                                       target: TextInjector.FocusTarget(
                                           app: NSRunningApplication(processIdentifier: pid)))
         return .applied(replacedRange: ourRange)
+    }
+
+    /// How many times the issue's text occurs in the field: for the log, never the text itself.
+    private static func occurrences(of needle: String, in text: String) -> Int {
+        needle.isEmpty ? 0 : text.components(separatedBy: needle).count - 1
     }
 
     /// Whether a write that claimed success actually replaced the word near `location`: re-reads the

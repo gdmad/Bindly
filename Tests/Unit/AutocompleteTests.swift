@@ -254,7 +254,7 @@ func runAutocompleteTests() {
     check(ac(126, browsing: true, atFirst: false) == .move(dx: 0, dy: -1), "Up moves when not on the first")
     check(ac(36, browsing: true) == .accept, "Return accepts inside the list")
     check(ac(36, browsing: true, ret: false) == .passAndClose(reason: "navigation"), "unless Accept with Return is off")
-    check(ac(53, browsing: true) == .leave, "Esc backs out of the list")
+    check(ac(53, browsing: true) == .close(reason: "esc"), "Esc inside the list closes it at once")
     check(ac(123, browsing: true) == .passAndClose(reason: "navigation"), "Left in a column moves the caret")
     check(ac(124, browsing: true, layout: .line) == .move(dx: 1, dy: 0), "Right moves in a line")
     check(ac(124, browsing: true, layout: .tile) == .move(dx: 1, dy: 0) && ac(125, browsing: true, layout: .tile) == .move(dx: 0, dy: 1),

@@ -40,7 +40,7 @@ enum AutocompleteKeyPolicy {
                                                              : .passAndClose(reason: "typedOn")
         }
         if isReturn { return acceptReturn ? .accept : .passAndClose(reason: "navigation") }
-        if keyCode == kVK_Escape { return .leave }
+        if keyCode == kVK_Escape { return .close(reason: "esc") }
         if let delta = delta(for: keyCode, layout: layout, opensUpward: opensUpward) {
             if atFirst, delta.dy < 0 || (layout == .line && delta.dx < 0) { return .leave }
             return .move(dx: delta.dx, dy: delta.dy)

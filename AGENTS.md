@@ -501,7 +501,8 @@ dimmed while Proofread is off.
   (autocomplete: Return is not taken, it may send the message), Down enters, Esc closes; every other
   arrow, Return, Shift+arrow, any Cmd/Ctrl/Opt shortcut and typing go to the field and close.
   Browsing -- the layout's arrows move (Up from the first item backs out), Return/Tab accept, Esc
-  backs out. Until entered, the first item is shown with a soft highlight (`PopupCell.softSelection`).
+  closes the autocomplete list at once (it used to back out first, so it took two presses) and backs
+  out of the fixes popup. Until entered, the first item is shown with a soft highlight (`PopupCell.softSelection`).
   Both popups close when the input source changes (`TISNotifySelectedKeyboardInputSourceChanged`).
   The fixes popup header has Skip (eye) and Close (cross) icons.
 - **Inline suggestion (ghost text):** with `autocompleteInline` on (default), when the caret is at the
@@ -635,7 +636,7 @@ dimmed while Proofread is off.
   removeTells, quick, tray, hotkeys (⌘C ⌘C in place, ⌘C ⌘C ⌘C translation window, Restore
   clipboard), starActions (Show translation, an action key, a custom prompt to its result), cancel
   (Esc while an action runs), master (the Enabled switch), settings (every tab of the window), drag (result, preview, prompt and Quick Translate windows move by their header), plainStar (a reading star on text selected in a Safari page),
-  slack, claude. Explain and Summarize run from the menu bar (`pressTrayItem`), and explain checks
+  slack, claude (both also fix the same typo twice, the later one first, by clicking each). Explain and Summarize run from the menu bar (`pressTrayItem`), and explain checks
   the star menu no longer lists them. Star items go through `runStarItem`, which waits for the star to move to the
   selection before clicking it. Checks on model output test its shape (`isShouting`), not its words:
   the on-device model phrases things its own way. A failed precondition is reported as
@@ -672,7 +673,9 @@ Open `Bindly.xcodeproj` in Xcode and Run to launch the app (set the signing Team
 Failures that used to be silent (a `tapCreate` returning nil, a monitor that never (re)installs) are
 now logged via `os.Logger`, subsystem `com.evgeny.bindly`, one category per area (`hotkeys`,
 `proofread`, `proofread-ax`, `login-item`, …): `log stream --predicate 'subsystem ==
-"com.evgeny.bindly"'`. `ProofreadAX.alignedRange`'s search window now scales with how far into the
+"com.evgeny.bindly"'`. A fix that comes back stale logs why at `.notice` (kept by the system, unlike `.debug`):
+relocation, the app's text not lining up, or the selection never settling, with the range and how
+many times the word occurs in the field (never the text). `ProofreadAX.alignedRange`'s search window now scales with how far into the
 text the range sits (`max(16, min(256, location / 20))`) instead of a fixed ±16 UTF-16 units, and a
 miss is logged at `.debug` -- a fixed small window is what let long-document offset drift (an app's
 own AX bookkeeping disagreeing with ours) silently drop underlines and fixes. All AX calls made
